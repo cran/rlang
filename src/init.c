@@ -4,10 +4,6 @@
 
 #include "export.h"
 
-// Constants initialised at load-time
-SEXP sym_tilde = NULL;
-SEXP sym_def = NULL;
-
 // Callable from other packages
 extern SEXP rlang_new_dictionary(SEXP, SEXP, SEXP);
 extern SEXP rlang_squash_if(SEXP, SEXPTYPE, bool (*is_spliceable)(SEXP), int);
@@ -16,7 +12,7 @@ extern bool is_clevel_spliceable(SEXP);
 // Callable from this package
 extern SEXP f_lhs_(SEXP);
 extern SEXP f_rhs_(SEXP);
-extern SEXP replace_na(SEXP, SEXP);
+extern SEXP rlang_replace_na(SEXP, SEXP);
 extern SEXP rlang_car(SEXP);
 extern SEXP rlang_cdr(SEXP);
 extern SEXP rlang_caar(SEXP);
@@ -52,53 +48,51 @@ extern SEXP rlang_unescape_character(SEXP);
 extern SEXP capture_arg(SEXP, SEXP);
 extern SEXP rlang_capturearg(SEXP, SEXP, SEXP, SEXP);
 extern SEXP rlang_capturedots(SEXP, SEXP, SEXP, SEXP);
+extern SEXP rlang_new_language(SEXP, SEXP);
 
 static const R_CallMethodDef call_entries[] = {
-  {"f_lhs_", (DL_FUNC) f_lhs_, 1},
-  {"f_rhs_", (DL_FUNC) f_rhs_, 1},
-  {"replace_na", (DL_FUNC) replace_na, 2},
-  {"rlang_car", (DL_FUNC) rlang_car, 1},
-  {"rlang_cdr", (DL_FUNC) rlang_cdr, 1},
-  {"rlang_caar", (DL_FUNC) rlang_caar, 1},
-  {"rlang_cadr", (DL_FUNC) rlang_cadr, 1},
-  {"rlang_cdar", (DL_FUNC) rlang_cdar, 1},
-  {"rlang_cddr", (DL_FUNC) rlang_cddr, 1},
-  {"rlang_set_car", (DL_FUNC) rlang_set_car, 2},
-  {"rlang_set_cdr", (DL_FUNC) rlang_set_cdr, 2},
-  {"rlang_set_caar", (DL_FUNC) rlang_set_caar, 2},
-  {"rlang_set_cadr", (DL_FUNC) rlang_set_cadr, 2},
-  {"rlang_set_cdar", (DL_FUNC) rlang_set_cdar, 2},
-  {"rlang_set_cddr", (DL_FUNC) rlang_set_cddr, 2},
-  {"rlang_cons", (DL_FUNC) rlang_cons, 2},
-  {"rlang_duplicate", (DL_FUNC) rlang_duplicate, 1},
-  {"rlang_shallow_duplicate", (DL_FUNC) rlang_shallow_duplicate, 1},
-  {"rlang_tag", (DL_FUNC) rlang_tag, 1},
-  {"rlang_set_tag", (DL_FUNC) rlang_set_tag, 2},
-  {"rlang_eval", (DL_FUNC) rlang_eval, 2},
-  {"rlang_zap_attrs", (DL_FUNC) rlang_zap_attrs, 1},
-  {"rlang_get_attrs", (DL_FUNC) rlang_get_attrs, 1},
-  {"rlang_set_attrs", (DL_FUNC) rlang_set_attrs, 2},
-  {"rlang_interp", (DL_FUNC) rlang_interp, 3},
-  {"rlang_is_formulaish", (DL_FUNC) rlang_is_formulaish, 3},
-  {"rlang_is_reference", (DL_FUNC) rlang_is_reference, 2},
-  {"rlang_sxp_address", (DL_FUNC) rlang_sxp_address, 1},
-  {"rlang_length", (DL_FUNC) rlang_length, 1},
-  {"rlang_new_dictionary", (DL_FUNC) rlang_new_dictionary, 3},
-  {"rlang_set_parent", (DL_FUNC) rlang_set_parent, 2},
-  {"rlang_squash", (DL_FUNC) rlang_squash, 4},
-  {"rlang_symbol", (DL_FUNC) rlang_symbol, 1},
-  {"rlang_symbol_to_character", (DL_FUNC) rlang_symbol_to_character, 1},
-  {"rlang_unescape_character", (DL_FUNC) rlang_unescape_character, 1},
-  {"rlang_capturearg", (DL_FUNC) rlang_capturearg, 4},
-  {"rlang_capturedots", (DL_FUNC) rlang_capturedots, 4},
+  {"f_lhs_",                    (DL_FUNC) &f_lhs_, 1},
+  {"f_rhs_",                    (DL_FUNC) &f_rhs_, 1},
+  {"rlang_replace_na",          (DL_FUNC) &rlang_replace_na, 2},
+  {"rlang_caar",                (DL_FUNC) &rlang_caar, 1},
+  {"rlang_cadr",                (DL_FUNC) &rlang_cadr, 1},
+  {"rlang_capturearg",          (DL_FUNC) &rlang_capturearg, 4},
+  {"rlang_capturedots",         (DL_FUNC) &rlang_capturedots, 4},
+  {"rlang_car",                 (DL_FUNC) &rlang_car, 1},
+  {"rlang_cdar",                (DL_FUNC) &rlang_cdar, 1},
+  {"rlang_cddr",                (DL_FUNC) &rlang_cddr, 1},
+  {"rlang_cdr",                 (DL_FUNC) &rlang_cdr, 1},
+  {"rlang_cons",                (DL_FUNC) &rlang_cons, 2},
+  {"rlang_duplicate",           (DL_FUNC) &rlang_duplicate, 1},
+  {"rlang_eval",                (DL_FUNC) &rlang_eval, 2},
+  {"rlang_get_attrs",           (DL_FUNC) &rlang_get_attrs, 1},
+  {"rlang_interp",              (DL_FUNC) &rlang_interp, 3},
+  {"rlang_is_formulaish",       (DL_FUNC) &rlang_is_formulaish, 3},
+  {"rlang_is_reference",        (DL_FUNC) &rlang_is_reference, 2},
+  {"rlang_length",              (DL_FUNC) &rlang_length, 1},
+  {"rlang_new_dictionary",      (DL_FUNC) &rlang_new_dictionary, 3},
+  {"rlang_set_attrs",           (DL_FUNC) &rlang_set_attrs, 2},
+  {"rlang_set_caar",            (DL_FUNC) &rlang_set_caar, 2},
+  {"rlang_set_cadr",            (DL_FUNC) &rlang_set_cadr, 2},
+  {"rlang_set_car",             (DL_FUNC) &rlang_set_car, 2},
+  {"rlang_set_cdar",            (DL_FUNC) &rlang_set_cdar, 2},
+  {"rlang_set_cddr",            (DL_FUNC) &rlang_set_cddr, 2},
+  {"rlang_set_cdr",             (DL_FUNC) &rlang_set_cdr, 2},
+  {"rlang_set_parent",          (DL_FUNC) &rlang_set_parent, 2},
+  {"rlang_set_tag",             (DL_FUNC) &rlang_set_tag, 2},
+  {"rlang_shallow_duplicate",   (DL_FUNC) &rlang_shallow_duplicate, 1},
+  {"rlang_squash",              (DL_FUNC) &rlang_squash, 4},
+  {"rlang_sxp_address",         (DL_FUNC) &rlang_sxp_address, 1},
+  {"rlang_symbol",              (DL_FUNC) &rlang_symbol, 1},
+  {"rlang_symbol_to_character", (DL_FUNC) &rlang_symbol_to_character, 1},
+  {"rlang_tag",                 (DL_FUNC) &rlang_tag, 1},
+  {"rlang_unescape_character",  (DL_FUNC) &rlang_unescape_character, 1},
+  {"rlang_zap_attrs",           (DL_FUNC) &rlang_zap_attrs, 1},
+  {"rlang_new_language",        (DL_FUNC) &rlang_new_language, 2},
   {NULL, NULL, 0}
 };
 
 void R_init_rlang(DllInfo* dll) {
-  // Initialise constants
-  sym_tilde = Rf_install("~");
-  sym_def = Rf_install(":=");
-
   // Register functions callable from other packages
   R_RegisterCCallable("rlang", "rlang_new_dictionary", (DL_FUNC) &rlang_new_dictionary);
   R_RegisterCCallable("rlang", "rlang_squash_if", (DL_FUNC) &rlang_squash_if);
