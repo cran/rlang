@@ -1,6 +1,7 @@
 # rlang
 
 [![Build Status](https://travis-ci.org/tidyverse/rlang.svg?branch=master)](https://travis-ci.org/tidyverse/rlang)
+[![Coverage Status](http://codecov.io/github/tidyverse/rlang/coverage.svg?branch=master)](http://codecov.io/github/tidyverse/rlang?branch=master)
 
 ## Overview
 

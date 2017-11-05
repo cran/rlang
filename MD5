@@ -1,6 +1,6 @@
-25eea7a62ac382818e2404acaa118a06 *DESCRIPTION
+65d35856e178a8546fd03c7504d5bad0 *DESCRIPTION
 65e8be68e9c270cee089874f0a91d54b *NAMESPACE
-3dc858b904ccd682a399764432254f21 *NEWS.md
+848fcc63906d9ddf671293a4d945c8fb *NEWS.md
 5850c9a2547cc102760f6e7b31a0ab44 *R/arg.R
 b87c840684fbca7a060d0f26c50de634 *R/attr.R
 ebe43cd5909495eda412096fe8504082 *R/cnd-handlers.R
@@ -12,7 +12,7 @@ feaa904f11d6970ddbc1057a30cf6610 *R/compat-purrr.R
 1a08a8fbda2f47103500c2bf75e16b9a *R/dictionary.R
 5e40bec0fe1de4cdbee2e69b63e71edf *R/dots.R
 4994de628a91c8c0666ce64b9189fa63 *R/env.R
-a274f5a30b044f570f92afa22103ab61 *R/eval-tidy.R
+c9cf06cbb5a307af0d9ee7ec2ef6182f *R/eval-tidy.R
 c75b93394da034fba516f3e4de376d73 *R/eval.R
 388c0182395c9097dec25488f238a9f0 *R/expr-lang.R
 940d8b698ba48d98bb2d63eed74e63cc *R/expr-node.R
@@ -36,7 +36,7 @@ fc209d4253bdd65575665072492f8034 *R/vector-ctor.R
 bd7a7c1849b9e4fc6bd0a74d90600544 *R/vector-raw.R
 ba84d9a9590dcd2c00955efc33412060 *R/vector-squash.R
 b0806a2d025031a83d77602c2c10962d *R/vector-utils.R
-a30526960e3890f9f1005faf0a0461a5 *README.md
+79d46b8a5affc5231a428d98b7e47410 *README.md
 434467c5842f5c005d33976fca693fc1 *build/vignette.rds
 21c7dbbbe94c04ebc0079d1a6354a6c7 *inst/doc/tidy-evaluation.R
 2feb5d2bc3cdd936bedfc6fee3dbd6b3 *inst/doc/tidy-evaluation.Rmd
@@ -168,10 +168,10 @@ fc59656f3e428a760dc0495920c26c9d *man/vector-coercion.Rd
 ec96a4d180e97c582d48344245055fef *man/with_handlers.Rd
 6b11d3538b23bf99cd534c7c37d40a70 *man/with_restarts.Rd
 01b67f9a87ec275638ea7fda507a5bd2 *src/attrs.c
-a93282970e52e3588f17cdd94d708f4d *src/capture.c
+43d8f37ce17435241db5e0d780352334 *src/capture.c
 e70f730597da4fae90ec0d701207a200 *src/env.c
 3bb13c900498e3bc73f021b48e423fac *src/eval.c
-7180953c095a5d580b43cc8e578d8362 *src/export.c
+93502928dfe006912885ba9e24502eda *src/export.c
 a38b760fd28821b93e4784c32ae1f63b *src/export.h
 5a4831941c2148102ff05a5fd4b7d264 *src/formula.c
 513c2b96983ca4b454e046861589ffa8 *src/formula.h
@@ -180,7 +180,7 @@ ae15801957c56233dfc9f4351fc2b372 *src/lang.c
 b57df213d7db4146c41dece2ce716c0c *src/pairlist.c
 b69fa43716f95ae3fb4c6c359a45e4bf *src/replace-na.c
 a347f2ebd39fa6de52d69919d2bb071f *src/sexp.c
-dd2aa426091ee2e615a749985871df59 *src/splice.c
+df0700081acfb03e4ac09b2ff604f379 *src/splice.c
 eef080034ed3e85f5bd91674698d34aa *src/symbol.c
 7415abdd0bbee28ab86181e349a67a08 *src/unquote.c
 343e916983e85ff27f3330282545f3e8 *src/utils.c
@@ -195,7 +195,7 @@ f39aa969618c1abb58b4f3f0ca828969 *tests/testthat/test-arg.R
 401bef78b8d85991bf8eb2ef3a504b7a *tests/testthat/test-compat.R
 b2b0ce84a6a1a1958bdeb85ff6e32973 *tests/testthat/test-conditions.R
 f5cd5c0e09a4344d933cfb812b638b7d *tests/testthat/test-dictionary.R
-dbf409f79498787684f6573ee1d6a0ef *tests/testthat/test-dots.R
+46d5c6a85bcc6e31bb026a51327ca296 *tests/testthat/test-dots.R
 c8ef7ffbf320fa6712f1417208e197e9 *tests/testthat/test-encoding.R
 f539828c6b65165db8d14a37e32cd0f7 *tests/testthat/test-env.R
 23f0564b9101b2409f843a979b2e018b *tests/testthat/test-eval.R
@@ -209,9 +209,9 @@ be988bf66c3673ded7a9ba5ee474ce4a *tests/testthat/test-parse.R
 9aa5a7d3440162f931853e2d3118d77d *tests/testthat/test-quo-enquo.R
 21489a8fb3068bdd2d00f4d17fa41c6e *tests/testthat/test-quosure.R
 48befc498a6ee454bffd036a8bdf6071 *tests/testthat/test-stack.R
-7bb827063f12cdde9ee68cabb5a74d51 *tests/testthat/test-tidy-capture.R
+c4b7101f8d191f6633af905aab7caa39 *tests/testthat/test-tidy-capture.R
 a8171390c87680d0ad8737f3cc056fe8 *tests/testthat/test-tidy-eval.R
-b1f4b073912d27e34e65e6e4d22f45f1 *tests/testthat/test-tidy-unquote.R
+c8e7ee45247572338a97d04a8020aa93 *tests/testthat/test-tidy-unquote.R
 2bc782df7ad5fa0368bc31cffb412cca *tests/testthat/test-types-coercion.R
 c048b0fca9ca76d7eaa9c7942da5a612 *tests/testthat/test-types.R
 874c18cb5b85c2d779909b4ad8e3f5ff *tests/testthat/test-utils.R
