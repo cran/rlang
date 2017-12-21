@@ -1,6 +1,6 @@
-65d35856e178a8546fd03c7504d5bad0 *DESCRIPTION
-65e8be68e9c270cee089874f0a91d54b *NAMESPACE
-848fcc63906d9ddf671293a4d945c8fb *NEWS.md
+3ed65c1700b1daed27d056a9ef806f71 *DESCRIPTION
+32d3a35fffd05baca64cefd369c254f7 *NAMESPACE
+2394a32cf14a6436ef170b44271d9cb8 *NEWS.md
 5850c9a2547cc102760f6e7b31a0ab44 *R/arg.R
 b87c840684fbca7a060d0f26c50de634 *R/attr.R
 ebe43cd5909495eda412096fe8504082 *R/cnd-handlers.R
@@ -27,7 +27,7 @@ a4bb7debffb7d55af28f8dc93285eb63 *R/quo.R
 cffe6f4479320f0640aa3c2f970acf9c *R/quos.R
 83f1c70b36f26f7ddf9c0e0fa1290e82 *R/rlang.R
 2583e58030013fee46205deae2f071d7 *R/stack.R
-174f851dc9dd721543b129e6804240a3 *R/types.R
+5c7fab29d615972418230d5e1e337d33 *R/types.R
 237bacef41cc547b0256727998170196 *R/utils.R
 6d65b52cb4ae292f761f68b0b4bc075b *R/vector-chr.R
 c783ded521984be52b454008b052d363 *R/vector-coercion.R
@@ -37,7 +37,7 @@ bd7a7c1849b9e4fc6bd0a74d90600544 *R/vector-raw.R
 ba84d9a9590dcd2c00955efc33412060 *R/vector-squash.R
 b0806a2d025031a83d77602c2c10962d *R/vector-utils.R
 79d46b8a5affc5231a428d98b7e47410 *README.md
-434467c5842f5c005d33976fca693fc1 *build/vignette.rds
+4d60a733dee5ce92188ce9e5d6f91b72 *build/vignette.rds
 21c7dbbbe94c04ebc0079d1a6354a6c7 *inst/doc/tidy-evaluation.R
 2feb5d2bc3cdd936bedfc6fee3dbd6b3 *inst/doc/tidy-evaluation.Rmd
 901194adf5fa47401dd376c0d9991194 *inst/doc/tidy-evaluation.html
@@ -106,6 +106,7 @@ c4c6a39ed0cc0d45d0ffb726ec1c39c1 *man/is_lang.Rd
 b4888543fa7d4d715edd043863b447c5 *man/is_named.Rd
 31d0b8b7e3eeba05f2f9e7a48c28113e *man/is_pairlist.Rd
 08a9249075af51e04eb4add9a8eb545b *man/is_quosure.Rd
+0c54a46e99b9a03e256414f079041894 *man/is_reference.Rd
 ef22617e10a178f3937ce38a1d574440 *man/is_stack.Rd
 aeef320a784189e1144fca2d7067797a *man/is_symbol.Rd
 c524dae3c587048154fff2fbded9f7b9 *man/is_true.Rd
@@ -168,7 +169,7 @@ fc59656f3e428a760dc0495920c26c9d *man/vector-coercion.Rd
 ec96a4d180e97c582d48344245055fef *man/with_handlers.Rd
 6b11d3538b23bf99cd534c7c37d40a70 *man/with_restarts.Rd
 01b67f9a87ec275638ea7fda507a5bd2 *src/attrs.c
-43d8f37ce17435241db5e0d780352334 *src/capture.c
+23490b1b4435fe23909d4977ac507d81 *src/capture.c
 e70f730597da4fae90ec0d701207a200 *src/env.c
 3bb13c900498e3bc73f021b48e423fac *src/eval.c
 93502928dfe006912885ba9e24502eda *src/export.c

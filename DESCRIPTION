@@ -1,5 +1,5 @@
 Package: rlang
-Version: 0.1.4
+Version: 0.1.6
 Title: Functions for Base Types and Core R and 'Tidyverse' Features
 Description: A toolbox for working with base types, core R features
   like the condition system, and core 'Tidyverse' features like tidy
@@ -18,10 +18,10 @@ RoxygenNote: 6.0.1
 URL: http://rlang.tidyverse.org, https://github.com/tidyverse/rlang
 BugReports: https://github.com/tidyverse/rlang/issues
 NeedsCompilation: yes
-Packaged: 2017-11-04 11:22:57 UTC; lionel
+Packaged: 2017-12-21 16:29:51 UTC; lionel
 Author: Lionel Henry [aut, cre],
   Hadley Wickham [aut],
   RStudio [cph]
 Maintainer: Lionel Henry <lionel@rstudio.com>
 Repository: CRAN
-Date/Publication: 2017-11-05 15:47:40 UTC
+Date/Publication: 2017-12-21 21:15:03 UTC
