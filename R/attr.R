@@ -7,13 +7,28 @@
 #' Unlike [structure()], these setters have no special handling of
 #' internal attributes names like `.Dim`, `.Dimnames` or `.Names`.
 #'
+#'
+#' @section Life cycle:
+#'
+#' These functions are experimental, expect API changes.
+#'
+#' * `set_attrs()` should probably set the attributes as a
+#'   whole. Another function with `add_` prefix would be in charge of
+#'   adding an attribute to the set.
+#'
+#' * `mut_attrs()` should be renamed to use the `poke_` prefix. Also
+#'   it may be useful to allow any kind of objects, not just
+#'   [non-copyable][is_copyable] ones.
+#'
 #' @param .x An object to decorate with attributes.
 #' @param ... A list of named attributes. These have [explicit
-#'   splicing semantics][dots_list]. Pass a single unnamed `NULL` to
+#'   splicing semantics][tidy-dots]. Pass a single unnamed `NULL` to
 #'   zap all attributes from `.x`.
 #' @return `set_attrs()` returns a modified [shallow copy][duplicate]
 #'   of `.x`. `mut_attrs()` invisibly returns the original `.x`
 #'   modified in place.
+#'
+#' @keywords internal
 #' @export
 #' @examples
 #' set_attrs(letters, names = 1:26, class = "my_chr")
@@ -62,6 +77,11 @@ set_attrs_impl <- function(.x, ...) {
 }
 set_attrs_null <- list(NULL)
 names(set_attrs_null) <- ""
+
+add_attributes <- set_attrs
+set_class <- function(x, class) {
+  add_attributes(x, class = class)
+}
 
 #' Is object named?
 #'
@@ -171,6 +191,11 @@ has_name <- function(x, name) {
 #' This is equivalent to [stats::setNames()], with more features and
 #' stricter argument checking.
 #'
+#'
+#' @section Life cycle:
+#'
+#' `set_names()` is stable and exported in purrr.
+#'
 #' @param x Vector to name.
 #' @param nm,... Vector of names, the same length as `x`.
 #'
@@ -184,9 +209,8 @@ has_name <- function(x, name) {
 #'
 #'   * If `nm` is `NULL`, the names are removed (if present).
 #'
-#'   * In all other cases, `nm` and `...` are passed to [chr()]. This
-#'     gives implicit splicing semantics: you can pass character
-#'     vectors or list of character vectors indistinctly.
+#'   * In all other cases, `nm` and `...` are coerced to character.
+#'
 #' @export
 #' @examples
 #' set_names(1:4, c("a", "b", "c", "d"))
@@ -203,17 +227,22 @@ has_name <- function(x, name) {
 #' # `...` is passed to the function:
 #' set_names(head(mtcars), paste0, "_foo")
 set_names <- function(x, nm = x, ...) {
+  set_names_impl(x, x, nm, ...)
+}
+set_names_impl <- function(x, mold, nm, ...) {
   if (!is_vector(x)) {
     abort("`x` must be a vector")
   }
 
   if (is_function(nm) || is_formula(nm)) {
     nm <- as_function(nm)
-    nm <- nm(names2(x), ...)
+    nm <- nm(names2(mold), ...)
   } else if (!is_null(nm)) {
-    # Make sure `x` is serialised when no arguments is provided.
-    nm <- as.character(nm)
-    nm <- chr(nm, ...)
+    if (dots_n(...)) {
+      nm <- as.character(c(nm, ...))
+    } else {
+      nm <- as.character(nm)
+    }
   }
 
   if (!is_null(nm) && !is_character(nm, length(x))) {
@@ -230,6 +259,11 @@ set_names <- function(x, nm = x, ...) {
 #' object does not have a `names` attribute. In this case, it returns
 #' a vector of empty names `""`. It also standardises missing names to
 #' `""`.
+#'
+#'
+#' @section Life cycle:
+#'
+#' `names2()` is stable.
 #'
 #' @param x A vector.
 #' @export
@@ -279,4 +313,8 @@ has_length <- function(x, n = NULL) {
   } else {
     len == n
   }
+}
+
+poke_attributes <- function(x, attrs) {
+  .Call(rlang_poke_attributes, x, attrs)
 }

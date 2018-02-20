@@ -6,7 +6,7 @@
 \alias{is_scalar_integerish}
 \title{Is a vector integer-like?}
 \usage{
-is_integerish(x, n = NULL)
+is_integerish(x, n = NULL, finite = TRUE)
 
 is_bare_integerish(x, n = NULL)
 
@@ -16,6 +16,9 @@ is_scalar_integerish(x)
 \item{x}{Object to be tested.}
 
 \item{n}{Expected length of a vector.}
+
+\item{finite}{Whether values must be finite. Examples of non-finite
+values are \code{Inf}, \code{-Inf} and \code{NaN}.}
 }
 \description{
 These predicates check whether R considers a number vector to be
@@ -27,6 +30,7 @@ of how to check for whole numbers.
 \examples{
 is_integerish(10L)
 is_integerish(10.0)
+is_integerish(10.0, n = 2)
 is_integerish(10.000001)
 is_integerish(TRUE)
 }

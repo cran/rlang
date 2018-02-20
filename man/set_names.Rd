@@ -18,15 +18,19 @@ You can specify names in the following ways:
 to transform the existing names. In that case, \code{...} is passed
 to the function.
 \item If \code{nm} is \code{NULL}, the names are removed (if present).
-\item In all other cases, \code{nm} and \code{...} are passed to \code{\link[=chr]{chr()}}. This
-gives implicit splicing semantics: you can pass character
-vectors or list of character vectors indistinctly.
+\item In all other cases, \code{nm} and \code{...} are coerced to character.
 }}
 }
 \description{
 This is equivalent to \code{\link[stats:setNames]{stats::setNames()}}, with more features and
 stricter argument checking.
 }
+\section{Life cycle}{
+
+
+\code{set_names()} is stable and exported in purrr.
+}
+
 \examples{
 set_names(1:4, c("a", "b", "c", "d"))
 set_names(1:4, letters[1:4])

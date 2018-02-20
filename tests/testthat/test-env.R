@@ -48,6 +48,12 @@ test_that("promises are created", {
   expect_error(env$stop, "forced")
 })
 
+test_that("env_bind_fns() creates active bindings", {
+  env <- env_bind_fns(env(), a = function() "foo")
+  expect_identical(env$a, "foo")
+  expect_identical(env$a, "foo")
+})
+
 test_that("with_env() evaluates within correct environment", {
   fn <- function() {
     g(get_env())
@@ -78,15 +84,15 @@ test_that("ns_env_name() returns namespace name", {
   expect_identical(ns_env_name(rlang::get_env), "rlang")
 })
 
-test_that("as_env() dispatches correctly", {
-  expect_identical(as_env("base"), base_env())
-  expect_false(env_has(as_env(set_names(letters)), "map"))
+test_that("as_environment() dispatches correctly", {
+  expect_identical(as_environment("base"), base_env())
+  expect_false(env_has(as_environment(set_names(letters)), "map"))
 
-  expect_identical(as_env(NULL), empty_env())
+  expect_identical(as_environment(NULL), empty_env())
 
-  expect_true(all(env_has(as_env(mtcars), names(mtcars))))
-  expect_identical(env_parent(as_env(mtcars)), empty_env())
-  expect_identical(env_parent(as_env(mtcars, base_env())), base_env())
+  expect_true(all(env_has(as_environment(mtcars), names(mtcars))))
+  expect_identical(env_parent(as_environment(mtcars)), empty_env())
+  expect_identical(env_parent(as_environment(mtcars, base_env())), base_env())
 })
 
 test_that("env_inherits() finds ancestor", {
@@ -144,10 +150,10 @@ test_that("env_depth() counts parents", {
 })
 
 test_that("env_parents() returns all parents", {
-  expect_identical(env_parents(empty_env()), ll())
+  expect_identical(env_parents(empty_env()), list2())
   env1 <- child_env(NULL)
   env2 <- child_env(env1)
-  expect_identical(env_parents(env2), ll(env1, empty_env()))
+  expect_identical(env_parents(env2), list2(env1, empty_env()))
 })
 
 test_that("scoped_envs() includes global and empty envs", {
@@ -177,4 +183,136 @@ test_that("new_environment() creates a child of the empty env", {
 test_that("new_environment() accepts empty vectors", {
   expect_identical(length(new_environment()), 0L)
   expect_identical(length(new_environment(dbl())), 0L)
+})
+
+test_that("env_poke() returns env", {
+  env <- child_env(new_environment())
+  expect_identical(env_poke(env, "foo", "foo"), env)
+  expect_identical(env_poke(env, "foo", "foo", inherit = TRUE), env)
+})
+
+test_that("env_poke() creates binding if `create` is TRUE", {
+  env <- new_environment()
+  expect_identical(env_get(env_poke(env, "foo", "foo"), "foo"), "foo")
+
+  expect_error(env_poke(env, "bar", "BAR", create = FALSE), "Can't find existing binding")
+  expect_identical(env_get(env_poke(env, "foo", "FOO", create = FALSE), "foo"), "FOO")
+})
+
+test_that("env_poke() inherits from parents if `inherit` is TRUE", {
+  env <- child_env(new_environment(), foo = "foo")
+  env <- child_env(env)
+
+  env_has(env, "foo")
+  env_has(env, "foo", TRUE)
+
+  env_poke(env, "foo", "FOO", inherit = TRUE, create = FALSE)
+  expect_identical(env_get(env_parent(env), "foo", inherit = FALSE), "FOO")
+
+  expect_error(env_poke(env, "bar", "bar", inherit = TRUE, create = FALSE), "Can't find existing binding")
+  expect_error(env_poke(env, "bar", "bar", inherit = TRUE), "Can't find existing binding")
+
+  env_poke(env, "bar", "bar", inherit = TRUE, create = TRUE)
+  expect_identical(env_get(env, "bar"), "bar")
+})
+
+test_that("env_tail() detects sentinel", {
+  sentinel <- get_env()
+  env <- env()
+  descendant <- child_env(child_env(child_env(env)))
+  expect_identical(env_tail(descendant, sentinel), env)
+})
+
+test_that("env_get_list() retrieves multiple bindings", {
+  env <- env(foo = 1L, bar = 2L)
+  expect_identical(env_get_list(env, c("foo", "bar")), list(foo = 1L, bar =2L))
+
+  baz <- 0L
+  expect_error(env_get_list(env, "baz"), "'baz' not found")
+  expect_identical(env_get_list(env, c("foo", "baz"), inherit = TRUE), list(foo = 1L, baz =0L))
+})
+
+test_that("scoped_bindings binds temporarily", {
+  env <- env(foo = "foo", bar = "bar")
+
+  local({
+    old <- scoped_bindings(.env = env,
+      foo = "FOO",
+      bar = "BAR",
+      baz = "BAZ"
+    )
+    expect_identical(old, list(foo = "foo", bar = "bar"))
+    temp_bindings <- env_get_list(env, c("foo", "bar", "baz"))
+    expect_identical(temp_bindings, list(foo = "FOO", bar = "BAR", baz = "BAZ"))
+  })
+
+  bindings <- env_get_list(env, c("foo", "bar"))
+  expect_identical(bindings, list(foo = "foo", bar = "bar"))
+  expect_false(env_has(env, "baz"))
+})
+
+test_that("with_bindings() evaluates with temporary bindings", {
+  foo <- "foo"
+  baz <- "baz"
+  expect_identical(with_bindings(paste(foo, baz), foo = "FOO"), "FOO baz")
+  expect_identical(foo, "foo")
+})
+
+test_that("as_environment() treats named strings as vectors", {
+  env <- as_environment(c(foo = "bar"))
+  expect_true(is_environment(env))
+  expect_true(env_has(env, "foo"))
+})
+
+test_that("as_environment() converts character vectors", {
+  env <- as_environment(set_names(letters))
+  expect_true(is_environment(env))
+  expect_true(all(env_has(env, letters)))
+})
+
+test_that("env_unbind() with `inherits = TRUE` wipes out all bindings", {
+  bindings <- list(`_foo` = "foo", `_bar` = "bar")
+  env_bind(global_env(), !!! bindings)
+  env <- child_env(global_env(), !!! bindings)
+
+  env_unbind(env, "_foo", inherit = TRUE)
+  expect_false(all(env_has(env, names(bindings))))
+  expect_false(all(env_has(global_env(), names(bindings))))
+})
+
+test_that("env_bind() requires uniquely named elements", {
+  expect_error(env_bind(env(), 1), "not uniquely named")
+  expect_error(env_bind(env(), !!! list(1)), "not uniquely named")
+})
+
+test_that("env_bind() works with empty unnamed lists", {
+  expect_no_error(env_bind(env()))
+  expect_no_error(env_bind(env(), !!! list()))
+})
+
+test_that("env_names() unserialises unicode", {
+  env <- env(`<U+5E78><U+798F>` = "foo")
+  expect_identical(env_names(env), "\u5E78\u798F")
+})
+
+test_that("env_clone() clones an environment", {
+  data <- list(a = 1L, b = 2L)
+  env <- env(!!! data)
+  clone <- env_clone(env)
+  expect_false(is_reference(env, clone))
+  expect_reference(env_parent(env), env_parent(clone))
+  expect_identical(env_get_list(clone, c("a", "b")), data)
+})
+
+test_that("friendly_env_type() returns a friendly env name", {
+  expect_identical(friendly_env_type("global"), "the global environment")
+  expect_identical(friendly_env_type("empty"), "the empty environment")
+  expect_identical(friendly_env_type("base"), "the base environment")
+  expect_identical(friendly_env_type("frame"), "a frame environment")
+  expect_identical(friendly_env_type("local"), "a local environment")
+})
+
+test_that("is_namespace() recognises namespaces", {
+  expect_false(is_namespace(env()))
+  expect_true(is_namespace(get_env(is_namespace)))
 })

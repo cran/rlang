@@ -72,28 +72,157 @@ discard_unnamed <- function(x) {
   }
 }
 
-sxp_address <- function(x) {
-  .Call(rlang_sxp_address, x)
+captureArgInfo <- function(x) {
+  args <- pairlist(parent.frame())
+  .Call(rlang_capturearginfo, NULL, NULL, args, environment())
+}
+captureDots <- function() {
+  args <- pairlist(parent.frame())
+  .Call(rlang_capturedots, NULL, NULL, args, environment())
 }
 
-captureArg <- function(x, strict = TRUE) {
-  caller_env <- parent.frame()
-
-  if (identical(caller_env, globalenv())) {
-    stop("must be called in a function")
-  }
-  if (missing(x)) {
-    stop("argument \"x\" is missing")
-  }
-
-  .Call(rlang_capturearg, NULL, NULL, pairlist(caller_env, strict), get_env())
+meow <- function(..., .trailing = TRUE) {
+  cat(chr_lines(..., .trailing = .trailing))
 }
-captureDots <- function(strict = TRUE) {
-  caller_env <- parent.frame()
-
-  if (!exists("...", caller_env)) {
-    stop("must be called in a function where dots exist")
+chr_lines <- function(..., .trailing = FALSE) {
+  lines <- paste(chr(...), collapse = "\n")
+  if (.trailing) {
+    lines <- paste0(lines, "\n")
   }
+  lines
+}
 
-  .Call(rlang_capturedots, NULL, NULL, pairlist(caller_env, strict), get_env())
+red <- function(x) {
+  if (is_installed("crayon")) {
+    crayon::red(x)
+  } else {
+    x
+  }
+}
+blue <- function(x) {
+  if (is_installed("crayon")) {
+    crayon::blue(x)
+  } else {
+    x
+  }
+}
+green <- function(x) {
+  if (is_installed("crayon")) {
+    crayon::green(x)
+  } else {
+    x
+  }
+}
+yellow <- function(x) {
+  if (is_installed("crayon")) {
+    crayon::yellow(x)
+  } else {
+    x
+  }
+}
+magenta <- function(x) {
+  if (is_installed("crayon")) {
+    crayon::magenta(x)
+  } else {
+    x
+  }
+}
+cyan <- function(x) {
+  if (is_installed("crayon")) {
+    crayon::cyan(x)
+  } else {
+    x
+  }
+}
+
+has_crayon <- function() {
+  is_installed("crayon") && crayon::has_color()
+}
+open_red <- function() if (has_crayon()) open_style("red")
+open_blue <- function() if (has_crayon()) open_style("blue")
+open_green <- function() if (has_crayon()) open_style("green")
+open_yellow <- function() if (has_crayon()) open_style("yellow")
+open_magenta <- function() if (has_crayon()) open_style("magenta")
+open_cyan <- function() if (has_crayon()) open_style("cyan")
+
+close_colour <- function() if (has_crayon()) "\u001b[39m"
+close_italic <- function() if (has_crayon()) "\u001b[23m"
+
+open_yellow_italic <- function() if (has_crayon()) "\u001b[33m\u001b[3m"
+open_blurred_italic <- function() if (has_crayon()) "\u001b[2m\u001b[3m"
+close_blurred_italic <- function() if (has_crayon()) "\u001b[23m\u001b[22m"
+
+
+open_style <- function(style) {
+  paste0("\u001b[", codes[[style]][[1]], "m")
+}
+close_style <- function(style) {
+  paste0("\u001b[", codes[[style]][[2]], "m")
+}
+
+ansi_regex <- paste0(
+  "(?:(?:\\x{001b}\\[)|\\x{009b})",
+  "(?:(?:[0-9]{1,3})?(?:(?:;[0-9]{0,3})*)?[A-M|f-m])",
+  "|\\x{001b}[A-M]"
+)
+strip_style <- function(x) {
+  gsub(ansi_regex, "", x, perl = TRUE)
+}
+
+codes <- list(
+  reset =           c(0L, 0L),
+  bold =            c(1L, 22L),
+  blurred =         c(2L, 22L),
+  italic =          c(3L, 23L),
+  underline =       c(4L, 24L),
+  inverse =         c(7L, 27L),
+  hidden =          c(8L, 28L),
+  strikethrough =   c(9L, 29L),
+
+  black =           c(30L, 39L),
+  red =             c(31L, 39L),
+  green =           c(32L, 39L),
+  yellow =          c(33L, 39L),
+  blue =            c(34L, 39L),
+  magenta =         c(35L, 39L),
+  cyan =            c(36L, 39L),
+  white =           c(37L, 39L),
+  silver =          c(90L, 39L),
+
+  bgBlack =         c(40L, 49L),
+  bgRed =           c(41L, 49L),
+  bgGreen =         c(42L, 49L),
+  bgYellow =        c(43L, 49L),
+  bgBlue =          c(44L, 49L),
+  bgMagenta =       c(45L, 49L),
+  bgCyan =          c(46L, 49L),
+  bgWhite =         c(47L, 49L)
+)
+
+
+`$.r6lite` <- function(self, arg) {
+  field <- env_get(self, as_string(substitute(arg)), inherit = TRUE)
+
+  if (is_function(field)) {
+    expr_interp(function(...) {
+      # Unquote the method so it is printable
+      method <- !!field
+      method(self, ...)
+    })
+  } else {
+    field
+  }
+}
+r6lite <- function(...) {
+  structure(new_environment(dots_list(...)), class = "r6lite")
+}
+child_r6lite <- function(.parent, ...) {
+  structure(child_env(.parent, ...), class = "r6lite")
+}
+
+inc <- function(x) {
+  x + 1L
+}
+dec <- function(x) {
+  x - 1L
 }

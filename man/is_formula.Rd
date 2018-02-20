@@ -3,21 +3,18 @@
 \name{is_formula}
 \alias{is_formula}
 \alias{is_bare_formula}
-\alias{is_formulaish}
 \title{Is object a formula?}
 \usage{
 is_formula(x, scoped = NULL, lhs = NULL)
 
 is_bare_formula(x, scoped = NULL, lhs = NULL)
-
-is_formulaish(x, scoped = NULL, lhs = NULL)
 }
 \arguments{
 \item{x}{An object to test.}
 
-\item{scoped}{A boolean indicating whether the quosure or formula
-is scoped, that is, has a valid environment attribute. If \code{NULL},
-the scope is not inspected.}
+\item{scoped}{A boolean indicating whether the quosure is scoped,
+that is, has a valid environment attribute. If \code{NULL}, the scope
+is not inspected.}
 
 \item{lhs}{A boolean indicating whether the \link[=is_formula]{formula}
 or \link[=is_definition]{definition} has a left-hand side. If \code{NULL},
@@ -26,8 +23,7 @@ the LHS is not inspected.}
 \description{
 \code{is_formula()} tests if \code{x} is a call to \code{~}. \code{is_bare_formula()}
 tests in addition that \code{x} does not inherit from anything else than
-\code{"formula"}. \code{is_formulaish()} returns \code{TRUE} for both formulas and
-\link[=is_definition]{definitions} of the type \code{a := b}.
+\code{"formula"}.
 }
 \details{
 The \code{scoped} argument patterns-match on whether the scoped bundled
@@ -56,13 +52,4 @@ is_bare_formula(f)
 # return FALSE for these unevaluated formulas:
 is_bare_formula(f, scoped = TRUE)
 is_bare_formula(eval(f), scoped = TRUE)
-
-
-# There is also a variant that returns TRUE for definitions in
-# addition to formulas:
-is_formulaish(a ~ b)
-is_formulaish(a := b)
-}
-\seealso{
-\code{\link[=is_quosure]{is_quosure()}} and \code{\link[=is_quosureish]{is_quosureish()}}
 }

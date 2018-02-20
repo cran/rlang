@@ -18,6 +18,12 @@ make dispatching easier:
 \item The type of special and builtin functions is "primitive".
 }
 }
+\section{Life cycle}{
+
+
+\code{type_of()} is an experimental function. Expect API changes.
+}
+
 \examples{
 type_of(10L)
 
@@ -46,3 +52,4 @@ typeof(`$`)
 type_of(list)
 type_of(`$`)
 }
+\keyword{internal}

@@ -10,7 +10,7 @@ set_expr(x, value)
 get_expr(x, default = x)
 }
 \arguments{
-\item{x}{An expression or one-sided formula. In addition,
+\item{x}{An expression, closure, or one-sided formula. In addition,
 \code{set_expr()} accept frames.}
 
 \item{value}{An updated expression.}
@@ -42,4 +42,8 @@ get_expr(frame)
 
 set_expr(f, quote(baz))
 set_expr(e, quote(baz))
+}
+\seealso{
+\code{\link[=quo_get_expr]{quo_get_expr()}} and \code{\link[=quo_set_expr]{quo_set_expr()}} for versions of
+\code{\link[=get_expr]{get_expr()}} and \code{\link[=set_expr]{set_expr()}} that only work on quosures.
 }

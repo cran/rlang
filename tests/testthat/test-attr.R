@@ -36,7 +36,7 @@ test_that("inputs must be valid", {
 test_that("can supply vector or ...", {
   expect_named(set_names(1:2, c("a", "b")), c("a", "b"))
   expect_named(set_names(1:2, "a", "b"), c("a", "b"))
-  expect_named(set_names(1:2, list("a"), list("b")), c("a", "b"))
+  expect_named(set_names(1:2, 1, 2), c("1", "2"))
 })
 
 test_that("can supply function/formula to rename", {
@@ -48,4 +48,9 @@ test_that("can supply function/formula to rename", {
 
 test_that("set_names() zaps names", {
   expect_null(names(set_names(mtcars, NULL)))
+})
+
+test_that("set_names() coerces to character", {
+  expect_identical(set_names(1L, TRUE), c(`TRUE` = 1L))
+  expect_identical(set_names(1:2, "a", TRUE), c(a = 1L, `TRUE` = 2L))
 })

@@ -9,25 +9,14 @@
 #' new_formula(quote(a), quote(b))
 #' new_formula(NULL, quote(b))
 new_formula <- function(lhs, rhs, env = caller_env()) {
-  if (!is_env(env) && !is_null(env)) {
-    abort("`env` must be an environment")
-  }
-
-  if (is_null(lhs)) {
-    f <- lang("~", rhs)
-  } else {
-    f <- lang("~", lhs, rhs)
-  }
-
-  structure(f, class = "formula", .Environment = env)
+  .Call(rlang_new_formula, lhs, rhs, env)
 }
 
 #' Is object a formula?
 #'
 #' `is_formula()` tests if `x` is a call to `~`. `is_bare_formula()`
 #' tests in addition that `x` does not inherit from anything else than
-#' `"formula"`. `is_formulaish()` returns `TRUE` for both formulas and
-#' [definitions][is_definition] of the type `a := b`.
+#' `"formula"`.
 #'
 #' The `scoped` argument patterns-match on whether the scoped bundled
 #' with the quosure is valid or not. Invalid scopes may happen in
@@ -36,11 +25,13 @@ new_formula <- function(lhs, rhs, env = caller_env()) {
 #' environment when it is evaluated, and quoted formulas are by
 #' definition not evaluated.
 #'
-#' @inheritParams is_quosure
+#' @param x An object to test.
+#' @param scoped A boolean indicating whether the quosure is scoped,
+#'   that is, has a valid environment attribute. If `NULL`, the scope
+#'   is not inspected.
 #' @param lhs A boolean indicating whether the [formula][is_formula]
 #'   or [definition][is_definition] has a left-hand side. If `NULL`,
 #'   the LHS is not inspected.
-#' @seealso [is_quosure()] and [is_quosureish()]
 #' @export
 #' @examples
 #' x <- disp ~ am
@@ -61,17 +52,11 @@ new_formula <- function(lhs, rhs, env = caller_env()) {
 #' # return FALSE for these unevaluated formulas:
 #' is_bare_formula(f, scoped = TRUE)
 #' is_bare_formula(eval(f), scoped = TRUE)
-#'
-#'
-#' # There is also a variant that returns TRUE for definitions in
-#' # addition to formulas:
-#' is_formulaish(a ~ b)
-#' is_formulaish(a := b)
 is_formula <- function(x, scoped = NULL, lhs = NULL) {
   if (!is_formulaish(x, scoped = scoped, lhs = lhs)) {
     return(FALSE)
   }
-  identical(node_car(x), sym_tilde)
+  identical(node_car(x), tilde_sym)
 }
 #' @rdname is_formula
 #' @export
@@ -81,11 +66,6 @@ is_bare_formula <- function(x, scoped = NULL, lhs = NULL) {
   }
   class <- class(x)
   is_null(class) || identical(class, "formula")
-}
-#' @rdname is_formula
-#' @export
-is_formulaish <- function(x, scoped = NULL, lhs = NULL) {
-  .Call(rlang_is_formulaish, x, scoped, lhs)
 }
 
 #' Get or set formula components
@@ -111,13 +91,23 @@ is_formulaish <- function(x, scoped = NULL, lhs = NULL) {
 #'
 #' f_env(~ x)
 f_rhs <- function(f) {
-  .Call(f_rhs_, f)
+  if (is_quosure(f)) {
+    signal_formula_access()
+    return(quo_get_expr(f))
+  }
+  .Call(r_f_rhs, f)
 }
 
 #' @export
 #' @rdname f_rhs
 `f_rhs<-` <- function(x, value) {
-  stopifnot(is_formula(x))
+  if (is_quosure(x)) {
+    signal_formula_access()
+    return(quo_set_expr(x, value))
+  }
+  if (!is_formula(x)) {
+    abort("`f` must be a formula")
+  }
   x[[length(x)]] <- value
   x
 }
@@ -125,31 +115,42 @@ f_rhs <- function(f) {
 #' @export
 #' @rdname f_rhs
 f_lhs <- function(f) {
-  .Call(f_lhs_, f)
+  if (is_quosure(f)) {
+    signal_formula_access()
+    abort("Can't retrieve the LHS of a quosure")
+  }
+  .Call(r_f_lhs, f)
 }
 
 #' @export
 #' @rdname f_rhs
 `f_lhs<-` <- function(x, value) {
-  stopifnot(is_formula(x))
+  if (is_quosure(x)) {
+    signal_formula_access()
+    abort("Can't set the LHS of a quosure")
+  }
+  if (!is_formula(x)) {
+    abort("`f` must be a formula")
+  }
+
   if (length(x) < 3) {
     x <- duplicate(x)
-    mut_node_cdr(x, pairlist(value, x[[2]]))
+    node_poke_cdr(x, pairlist(value, x[[2]]))
   } else {
     x[[2]] <- value
   }
-  x
-}
 
-copy_lang_name <- function(f, x) {
-  f[[1]] <- x[[1]]
-  f
+  x
 }
 
 #' @export
 #' @rdname f_rhs
 f_env <- function(f) {
-  if(!is_formula(f)) {
+  if (is_quosure(f)) {
+    signal_formula_access()
+    return(quo_get_env(f))
+  }
+  if (!is_formula(f)) {
     abort("`f` must be a formula")
   }
   attr(f, ".Environment")
@@ -158,7 +159,13 @@ f_env <- function(f) {
 #' @export
 #' @rdname f_rhs
 `f_env<-` <- function(x, value) {
-  stopifnot(is_formula(x))
+  if (is_quosure(x)) {
+    signal_formula_access()
+    return(quo_set_env(x, value))
+  }
+  if (!is_formula(x)) {
+    abort("`f` must be a formula")
+  }
   set_attrs(x, .Environment = value)
 }
 
@@ -195,4 +202,13 @@ f_name <- function(x) {
 #' @export
 f_label <- function(x) {
   expr_label(f_rhs(x))
+}
+
+
+signal_formula_access <- function() {
+  if (is_true(peek_option("rlang_internal_warn_quosure_access"))) {
+    warn(
+      "Using formula accessors with quosures is soft-deprecated"
+    )
+  }
 }

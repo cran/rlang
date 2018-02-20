@@ -34,7 +34,7 @@
 #' @param ... Named handlers. Handlers should inherit from `exiting`
 #'   or `inplace`. See [exiting()] and [inplace()] for constructing
 #'   such handlers. Dots are evaluated with [explicit
-#'   splicing][dots_list].
+#'   splicing][tidy-dots].
 #' @seealso [exiting()], [inplace()].
 #' @export
 #' @examples
@@ -185,7 +185,7 @@ inplace <- function(handler, muffle = FALSE) {
 #' @param ... Additional arguments passed on the restart
 #'   function. These arguments are evaluated only once and
 #'   immediately, when creating the restarting handler. Furthermore,
-#'   they are evaluated with [explicit splicing][dots_list].
+#'   they support [tidy dots][tidy-dots] features.
 #' @export
 #' @seealso [inplace()] and [exiting()].
 #' @examples

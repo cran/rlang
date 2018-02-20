@@ -2,15 +2,18 @@
 % Please edit documentation in R/env.R
 \name{env_get}
 \alias{env_get}
-\title{Get an object from an environment}
+\alias{env_get_list}
+\title{Get an object in an environment}
 \usage{
 env_get(env = caller_env(), nm, inherit = FALSE)
+
+env_get_list(env = caller_env(), nms, inherit = FALSE)
 }
 \arguments{
 \item{env}{An environment or an object bundling an environment,
-e.g. a formula, \link{quosure} or \link[=is_closure]{closure}.}
+e.g. a formula, \link[=quotation]{quosure} or \link[=is_closure]{closure}.}
 
-\item{nm}{The name of a binding.}
+\item{nm, nms}{Names of bindings. \code{nm} must be a single string.}
 
 \item{inherit}{Whether to look for bindings in the parent
 environments.}
@@ -21,6 +24,8 @@ An object if it exists. Otherwise, throws an error.
 \description{
 \code{env_get()} extracts an object from an enviroment \code{env}. By
 default, it does not look in the parent environments.
+\code{env_get_list()} extracts multiple objects from an environment into
+a named list.
 }
 \examples{
 parent <- child_env(NULL, foo = "foo")

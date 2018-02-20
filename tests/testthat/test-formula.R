@@ -2,43 +2,9 @@ context("formula")
 
 # Creation ----------------------------------------------------------------
 
-test_that("env must be an environment", {
-  expect_error(new_quosure(quote(a), env = list()), "must be an environment")
-})
-
-test_that("equivalent to ~", {
-  f1 <- ~abc
-  f2 <- new_quosure(quote(abc))
-
-  expect_identical(set_attrs(f1, class = c("quosure", "formula")), f2)
-})
-
 test_that("is_formula works", {
   expect_true(is_formula(~10))
   expect_false(is_formula(10))
-})
-
-test_that("as_quosure() uses correct env", {
-  fn <- function(expr, env = caller_env()) {
-    f <- as_quosure(expr, env)
-    list(env = get_env(), f = g(f))
-  }
-  g <- function(expr, env = caller_env()) {
-    as_quosure(expr, env)
-  }
-  f_env <- child_env(NULL)
-  f <- new_quosure(quote(expr), f_env)
-
-  out_expr_default <- fn(quote(expr))
-  out_f_default <- fn(f)
-  expect_identical(f_env(out_expr_default$f), get_env())
-  expect_identical(f_env(out_f_default$f), f_env)
-
-  user_env <- child_env(NULL)
-  out_expr <- fn(quote(expr), user_env)
-  out_f <- fn(f, user_env)
-  expect_identical(f_env(out_expr$f), user_env)
-  expect_identical(out_f$f, f)
 })
 
 
@@ -143,9 +109,11 @@ test_that("lhs is inspected", {
 })
 
 test_that("definitions are not formulas but are formulaish", {
-  expect_false(is_formula(foo := bar))
-  expect_true(is_formulaish(foo := bar, lhs = TRUE))
-  expect_false(is_formulaish(foo := bar, lhs = FALSE))
+  expect_false(is_formula(quote(foo := bar)))
+  expect_true(is_formulaish(quote(foo := bar), lhs = TRUE))
+  expect_false(is_formulaish(quote(foo := bar), lhs = FALSE))
+
+  `:=` <- `~`
   expect_false(is_formulaish(foo := bar, scoped = TRUE, lhs = FALSE))
   expect_false(is_formulaish(foo := bar, scoped = FALSE, lhs = TRUE))
 })

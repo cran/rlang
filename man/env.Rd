@@ -13,11 +13,11 @@ child_env(.parent, ...)
 new_environment(data = list())
 }
 \arguments{
-\item{..., data}{Named values. The dots have \link[=dots_list]{explicit splicing
-semantics}.}
+\item{..., data}{Named values. These dots support \link[=tidy-dots]{tidy
+dots} features.}
 
 \item{.parent}{A parent environment. Can be an object supported by
-\code{\link[=as_env]{as_env()}}.}
+\code{\link[=as_environment]{as_environment()}}.}
 }
 \description{
 These functions create new environments.
@@ -41,10 +41,11 @@ is one of the most powerful feature of R as it allows you to change
 what objects a function or expression sees when it is evaluated.
 
 Environments also constitute a data structure in their own
-right. They are \link[=dictionary]{dictionaries} of uniquely named
-objects, subsettable by name and modifiable by reference. This
-latter property (see section on reference semantics) is especially
-useful for creating mutable OO systems (cf the \href{https://github.com/wch/R6}{R6package} and the \href{http://ggplot2.tidyverse.org/articles/extending-ggplot2.html}{ggprotosystem}
+right. They are a collection of uniquely named objects, subsettable
+by name and modifiable by reference. This latter property (see
+section on reference semantics) is especially useful for creating
+mutable OO systems (cf the \href{https://github.com/wch/R6}{R6 package}
+and the \href{http://ggplot2.tidyverse.org/articles/extending-ggplot2.html}{ggprotosystem}
 for extending ggplot2).
 }
 
@@ -63,8 +64,8 @@ parent environments.
 
 The ability of overriding specific definitions is used in the
 tidyeval framework to create powerful domain-specific grammars. A
-common use of overscoping is to put data frame columns in
-scope. See \code{\link[=as_overscope]{as_overscope()}} for technical details.
+common use of masking is to put data frame columns in scope. See
+for example \code{\link[=as_data_mask]{as_data_mask()}}.
 }
 
 \section{Reference semantics}{
@@ -94,8 +95,9 @@ identical(env_parent(child), env)
 env_has(child, c("a", "b", "c", "d"))
 env_has(child, c("a", "b", "c", "d"), inherit = TRUE)
 
-# `parent` is passed to as_env() to provide handy shortcuts. Pass a
-# string to create a child of a package environment:
+# `parent` is passed to as_environment() to provide handy
+# shortcuts. Pass a string to create a child of a package
+# environment:
 child_env("rlang")
 env_parent(child_env("rlang"))
 
@@ -123,7 +125,7 @@ env_has(rlang_child, "env", inherit = TRUE)     # rlang function
 env_has(rlang_child, "lapply", inherit = TRUE)  # base function
 
 
-# Both env() and child_env() take dots with explicit splicing:
+# Both env() and child_env() support tidy dots features:
 objs <- list(b = "foo", c = "bar")
 env <- env(a = 1, !!! objs)
 env$c

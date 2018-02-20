@@ -3,15 +3,18 @@
 \name{get_env}
 \alias{get_env}
 \alias{set_env}
+\alias{env_poke_parent}
 \title{Get or set the environment of an object}
 \usage{
 get_env(env = caller_env(), default = NULL)
 
 set_env(env, new_env = caller_env())
+
+env_poke_parent(env, new_env)
 }
 \arguments{
 \item{env}{An environment or an object bundling an environment,
-e.g. a formula, \link{quosure} or \link[=is_closure]{closure}.}
+e.g. a formula, \link[=quotation]{quosure} or \link[=is_closure]{closure}.}
 
 \item{default}{The default environment in case \code{env} does not wrap
 an environment. If \code{NULL} and no environment could be extracted,
@@ -28,6 +31,14 @@ returned. If you call \code{get_env()} with an environment, it acts as
 the identity function and the environment is simply returned (this
 helps simplifying code when writing generic functions for
 environments).
+}
+\details{
+While \code{set_env()} returns a modified copy and does not have side
+effects, \code{env_poke_parent()} operates changes the environment by
+side effect. This is because environments are
+\link[=is_copyable]{uncopyable}. Be careful not to change environments
+that you don't own, e.g. a parent environment of a function from a
+package.
 }
 \examples{
 # Get the environment of frame objects. If no argument is supplied,
@@ -81,4 +92,8 @@ identical(get_env(fn), other_env)
 # environment, you'll need to reassign the result:
 fn <- set_env(fn, other_env)
 identical(get_env(fn), other_env)
+}
+\seealso{
+\code{\link[=quo_get_env]{quo_get_env()}} and \code{\link[=quo_set_env]{quo_set_env()}} for versions of
+\code{\link[=get_env]{get_env()}} and \code{\link[=set_env]{set_env()}} that only work on quosures.
 }

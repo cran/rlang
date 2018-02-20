@@ -48,7 +48,7 @@ infix functions \code{$} or \code{@}). The call subtype is said to be
 \code{foo::bar()}. \code{switch_lang()} returns "namespaced" for these
 calls. It is generally a good idea if your function treats
 \code{bar()} and \code{foo::bar()} similarly.
-\item Finally, it is possible to have a literal (see \code{\link[=is_expr]{is_expr()}} for a
+\item Finally, it is possible to have a literal (see \code{\link[=is_expression]{is_expression()}} for a
 definition of literals) as call head. In most cases, this will be
 a function inlined in the call (this is sometimes an expedient
 way of dealing with scoping issues). For calls with a literal
@@ -60,10 +60,17 @@ wrong and using that object will probably make R crash.
 
 The reason we use the term \emph{node head} is because calls are
 structured as tree objects. This makes sense because the best
-representation for language code is a parse tree, with the tree
-hierarchy determined by the order of operations. See \link{pairlist} for
-more on this.
+representation for language code is a tree whose hierarchy is
+determined by the order of operations. See \link{node} for more on this.
 }
+\section{Life cycle}{
+
+\itemize{
+\item \code{lang_type_of()} is an experimental function.
+\item \code{switch_lang()} and \code{coerce_lang()} are experimental functions.
+}
+}
+
 \examples{
 # Named calls:
 lang_type_of(~foo())
@@ -82,3 +89,4 @@ call[[1]] <- base::toupper
 call
 lang_type_of(call)
 }
+\keyword{internal}

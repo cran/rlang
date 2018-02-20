@@ -1,89 +1,8 @@
-#' Raw quotation of an expression
-#'
-#' @description
-#'
-#' These functions return raw expressions (whereas [quo()] and
-#' variants return quosures). They support [quasiquotation]
-#' syntax.
-#'
-#' - `expr()` returns its argument unevaluated. It is equivalent to
-#'   [base::bquote()].
-#'
-#' - `enexpr()` takes an argument name and returns it unevaluated. It
-#'   is equivalent to [base::substitute()].
-#'
-#' - `exprs()` captures multiple expressions and returns a list. In
-#'   particular, it can capture expressions in `...`. It supports name
-#'   unquoting with `:=` (see [quos()]). It is equivalent to
-#'   `eval(substitute(alist(...)))`.
-#'
-#' See [is_expr()] for more about R expressions.
-#'
-#' @inheritParams quosure
-#' @seealso [quo()], [is_expr()]
-#' @return The raw expression supplied as argument. `exprs()` returns
-#'   a list of expressions.
-#' @export
-#' @examples
-#' # The advantage of expr() over quote() is that it unquotes on
-#' # capture:
-#' expr(list(1, !! 3 + 10))
-#'
-#' # Unquoting can be especially useful for successive transformation
-#' # of a captured expression:
-#' (expr <- quote(foo(bar)))
-#' (expr <- expr(inner(!! expr, arg1)))
-#' (expr <- expr(outer(!! expr, !!! lapply(letters[1:3], as.symbol))))
-#'
-#' # Unlike quo(), expr() produces expressions that can
-#' # be evaluated with base::eval():
-#' e <- quote(letters)
-#' e <- expr(toupper(!!e))
-#' eval(e)
-#'
-#' # Be careful if you unquote a quosure: you need to take the RHS
-#' # (and lose the scope information) to evaluate with eval():
-#' f <- quo(letters)
-#' e <- expr(toupper(!! get_expr(f)))
-#' eval(e)
-#'
-#' # On the other hand it's fine to unquote quosures if you evaluate
-#' # with eval_tidy():
-#' f <- quo(letters)
-#' e <- expr(toupper(!! f))
-#' eval_tidy(e)
-#'
-#' # exprs() lets you unquote names with the definition operator:
-#' nm <- "foo"
-#' exprs(a = 1, !! nm := 2)
-expr <- function(expr) {
-  enexpr(expr)
-}
-#' @rdname expr
-#' @export
-enexpr <- function(arg) {
-  if (missing(arg)) {
-    return(missing_arg())
-  }
-
-  capture <- lang(captureArg, substitute(arg))
-  arg <- eval_bare(capture, caller_env())
-  .Call(rlang_interp, arg$expr, arg$env, TRUE)
-}
-#' @rdname expr
-#' @inheritParams dots_values
-#' @param ... Arguments to extract.
-#' @export
-exprs <- function(..., .ignore_empty = "trailing") {
-  map(quos(..., .ignore_empty = .ignore_empty), f_rhs)
-}
-
-
 #' Is an object an expression?
 #'
 #' @description
 #'
-#' `is_expr()` tests for expressions, the set of objects that can be
+#' `is_expression()` tests for expressions, the set of objects that can be
 #' obtained from parsing R code. An expression can be one of two
 #' things: either a symbolic object (for which `is_symbolic()` returns
 #' `TRUE`), or a syntactic literal (testable with
@@ -110,7 +29,7 @@ exprs <- function(..., .ignore_empty = "trailing") {
 #' `is_syntactic_literal()` is a predicate that returns `TRUE` for the
 #' subset of literals that are created by R when parsing text (see
 #' [parse_expr()]): numbers, strings and `NULL`. Along with symbols,
-#' these literals are the terminating nodes in a parse tree.
+#' these literals are the terminating nodes in an AST.
 #'
 #' Note that in the most general sense, a literal is any R object that
 #' evaluates to itself and that can be evaluated in the empty
@@ -119,31 +38,31 @@ exprs <- function(..., .ignore_empty = "trailing") {
 #' literal(in this case an atomic vector).
 #'
 #' Pairlists are also a kind of language objects. However, since they
-#' are mostly an internal data structure, `is_expr()` returns `FALSE`
+#' are mostly an internal data structure, `is_expression()` returns `FALSE`
 #' for pairlists. You can use `is_pairlist()` to explicitly check for
 #' them. Pairlists are the data structure for function arguments. They
 #' usually do not arise from R code because subsetting a call is a
 #' type-preserving operation. However, you can obtain the pairlist of
 #' arguments by taking the CDR of the call object from C code. The
-#' rlang function [lang_tail()] will do it from R. Another way in
+#' rlang function [node_cdr()] will do it from R. Another way in
 #' which pairlist of arguments arise is by extracting the argument
 #' list of a closure with [base::formals()] or [fn_fmls()].
 #'
 #' @param x An object to test.
-#' @seealso [is_lang()] for a call predicate.
+#' @seealso [is_call()] for a call predicate.
 #' @export
 #' @examples
 #' q1 <- quote(1)
-#' is_expr(q1)
+#' is_expression(q1)
 #' is_syntactic_literal(q1)
 #'
 #' q2 <- quote(x)
-#' is_expr(q2)
+#' is_expression(q2)
 #' is_symbol(q2)
 #'
 #' q3 <- quote(x + 1)
-#' is_expr(q3)
-#' is_lang(q3)
+#' is_expression(q3)
+#' is_call(q3)
 #'
 #'
 #' # Atomic expressions are the terminating nodes of a call tree:
@@ -169,27 +88,24 @@ exprs <- function(..., .ignore_empty = "trailing") {
 #'
 #' # Pairlists are also language objects representing argument lists.
 #' # You will usually encounter them with extracted formals:
-#' fmls <- formals(is_expr)
+#' fmls <- formals(is_expression)
 #' typeof(fmls)
 #'
-#' # Since they are mostly an internal data structure, is_expr()
+#' # Since they are mostly an internal data structure, is_expression()
 #' # returns FALSE for pairlists, so you will have to check explicitly
 #' # for them:
-#' is_expr(fmls)
+#' is_expression(fmls)
 #' is_pairlist(fmls)
-#'
-#' # Note that you can also extract call arguments as a pairlist:
-#' lang_tail(quote(fn(arg1, arg2 = "foo")))
-is_expr <- function(x) {
+is_expression <- function(x) {
   is_symbolic(x) || is_syntactic_literal(x)
 }
 #' @export
-#' @rdname is_expr
+#' @rdname is_expression
 is_syntactic_literal <- function(x) {
   typeof(x) == "NULL" || (length(x) == 1 && typeof(x) %in% parsable_atomic_types)
 }
 #' @export
-#' @rdname is_expr
+#' @rdname is_expression
 is_symbolic <- function(x) {
   typeof(x) %in% c("language", "symbol")
 }
@@ -271,13 +187,23 @@ expr_text <- function(expr, width = 60L, nlines = Inf) {
 
   paste0(str, collapse = "\n")
 }
+
 deparse_one <- function(expr) {
-  chr <- deparse(expr)
-  if (length(chr) > 1) {
-    dot_call <- lang(expr[[1]], quote(...))
-    chr <- paste(deparse(dot_call), collapse = "\n")
+  str <- deparse(expr, 60L)
+
+  if (length(str) > 1) {
+    if (is_call(expr, function_sym)) {
+      expr[[3]] <- quote(...)
+      str <- deparse(expr, 60L)
+    } else if (is_call(expr, brace_sym)) {
+      str <- "{ ... }"
+    } else if (is_call(expr)) {
+      str <- deparse(call2(expr[[1]], quote(...)), 60L)
+    }
+    str <- paste(str, collapse = "\n")
   }
-  chr
+
+  str
 }
 
 #' Set and get an expression
@@ -290,13 +216,15 @@ deparse_one <- function(expr) {
 #' expression depending on the input type. Note that `set_expr()` does
 #' not change its input, it creates a new object.
 #'
-#' @param x An expression or one-sided formula. In addition,
+#' @param x An expression, closure, or one-sided formula. In addition,
 #'   `set_expr()` accept frames.
 #' @param value An updated expression.
 #' @param default A default expression to return when `x` is not an
 #'   expression wrapper. Defaults to `x` itself.
 #' @return The updated original input for `set_expr()`. A raw
 #'   expression for `get_expr()`.
+#' @seealso [quo_get_expr()] and [quo_set_expr()] for versions of
+#'   [get_expr()] and [set_expr()] that only work on quosures.
 #' @export
 #' @examples
 #' f <- ~foo(bar)
@@ -310,23 +238,22 @@ deparse_one <- function(expr) {
 #' set_expr(f, quote(baz))
 #' set_expr(e, quote(baz))
 set_expr <- function(x, value) {
-  if (is_quosureish(x)) {
+  if (is_quosure(x)) {
+    x <- quo_set_expr(x, value)
+  } else if (is_formula(x)) {
     f_rhs(x) <- value
-    x
+  } else if (is_closure(x)) {
+    body(x) <- value
   } else {
-    value
+    x <- value
   }
+
+  x
 }
 #' @rdname set_expr
 #' @export
 get_expr <- function(x, default = x) {
-  if (is_quosureish(x)) {
-    f_rhs(x)
-  } else if (inherits(x, "frame")) {
-    x$expr
-  } else {
-    default
-  }
+  .Call(rlang_get_expression, x, default)
 }
 
 expr_type_of <- function(x) {
@@ -343,4 +270,68 @@ expr_type_of <- function(x) {
 }
 switch_expr <- function(.x, ...) {
   switch(expr_type_of(.x), ...)
+}
+
+
+#' Print an expression
+#'
+#' @description
+#'
+#' `expr_print()`, powered by `expr_deparse()`, is an alternative
+#' printer for R expressions with a few improvements over the base R
+#' printer.
+#'
+#' * It colourises [quosures][quotation] according to their environment.
+#'   Quosures from the global environment are printed normally while
+#'   quosures from local environments are printed in unique colour (or
+#'   in italic when all colours are taken).
+#'
+#' * It wraps inlined objects in angular brackets. For instance, an
+#'   integer vector unquoted in a function call (e.g.
+#'   `expr(foo(!!(1:3)))`) is printed like this: `foo(<int: 1L, 2L,
+#'   3L>)` while by default R prints the code to create that vector:
+#'   `foo(1:3)` which is ambiguous.
+#'
+#' * It respects the width boundary (from the global option `width`)
+#'   in more cases.
+#'
+#' @param x An object or expression to print.
+#' @param width The width of the deparsed or printed expression.
+#'   Defaults to the global option `width`.
+#'
+#' @export
+#' @examples
+#' # It supports any object. Non-symbolic objects are always printed
+#' # within angular brackets:
+#' expr_print(1:3)
+#' expr_print(function() NULL)
+#'
+#' # Contrast this to how the code to create these objects is printed:
+#' expr_print(quote(1:3))
+#' expr_print(quote(function() NULL))
+#'
+#' # The main cause of non-symbolic objects in expressions is
+#' # quasiquotation:
+#' expr_print(expr(foo(!!(1:3))))
+#'
+#'
+#' # Quosures from the global environment are printed normally:
+#' expr_print(quo(foo))
+#' expr_print(quo(foo(!!quo(bar))))
+#'
+#' # Quosures from local environments are colourised according to
+#' # their environments (if you have crayon installed):
+#' local_quo <- local(quo(foo))
+#' expr_print(local_quo)
+#'
+#' wrapper_quo <- local(quo(bar(!!local_quo, baz)))
+#' expr_print(wrapper_quo)
+expr_print <- function(x, width = peek_option("width")) {
+  meow(expr_deparse(x, width = width))
+}
+#' @rdname expr_print
+#' @export
+expr_deparse <- function(x, width = peek_option("width")) {
+  deparser <- new_quo_deparser(width = width)
+  quo_deparse(x, deparser)
 }

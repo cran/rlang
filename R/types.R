@@ -16,11 +16,10 @@
 #'   atomic vector or a list. `is.vector` checks for the presence of
 #'   attributes (other than name).
 #'
-#' * `is_function()` returns `TRUE` only for regular functions, not
-#'   special or primitive functions.
-#'
 #' @param x Object to be tested.
 #' @param n Expected length of a vector.
+#' @param finite Whether values must be finite. Examples of non-finite
+#'   values are `Inf`, `-Inf` and `NaN`.
 #' @param encoding Expected encoding of a string or character
 #'   vector. One of `UTF-8`, `latin1`, or `unknown`.
 #' @seealso [bare-type-predicates] [scalar-type-predicates]
@@ -59,9 +58,18 @@ is_integer <- function(x, n = NULL) {
 }
 #' @export
 #' @rdname type-predicates
-is_double <- function(x, n = NULL) {
+is_double <- function(x, n = NULL, finite = NULL) {
   if (typeof(x) != "double") return(FALSE)
   if (!is_null(n) && length(x) != n) return(FALSE)
+
+  if (!is_null(finite)) {
+    if (finite) {
+      return(all(is.finite(x)))
+    } else {
+      return(!any(is.finite(x)))
+    }
+  }
+
   TRUE
 }
 #' @export
@@ -94,7 +102,7 @@ is_bytes <- is_raw
 #' @export
 #' @rdname type-predicates
 is_null <- function(x) {
-  typeof(x) == "NULL"
+  .Call(rlang_is_null, x)
 }
 
 #' Scalar type predicates
@@ -110,42 +118,42 @@ NULL
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_list <- function(x) {
-  is_list(x) && length(x) == 1
+  is_list(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_atomic <- function(x) {
-  is_atomic(x) && length(x) == 1
+  is_atomic(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_vector <- function(x) {
-  is_vector(x) && length(x) == 1
+  is_vector(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_integer <- function(x) {
-  is_integer(x) && length(x) == 1
+  is_integer(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_double <- function(x) {
-  is_double(x) && length(x) == 1
+  is_double(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_character <- function(x, encoding = NULL) {
-  is_character(x, encoding = encoding) && length(x) == 1
+  is_character(x, encoding = encoding, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_logical <- function(x) {
-  is_logical(x) && length(x) == 1
+  is_logical(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_raw <- function(x) {
-  is_raw(x) && length(x) == 1
+  is_raw(x, n = 1)
 }
 #' @export
 #' @rdname scalar-type-predicates
@@ -255,6 +263,10 @@ is_bare_env <- function(x) {
   !is.object(x) && typeof(x) == "environment"
 }
 
+# Anticipate renaming
+is_environment <- is_env
+is_bare_environment <- is_bare_env
+
 #' Is object identical to TRUE or FALSE?
 #'
 #' These functions bypass R's automatic conversion rules and check
@@ -291,13 +303,23 @@ is_false <- function(x) {
 #' @examples
 #' is_integerish(10L)
 #' is_integerish(10.0)
+#' is_integerish(10.0, n = 2)
 #' is_integerish(10.000001)
 #' is_integerish(TRUE)
-is_integerish <- function(x, n = NULL) {
-  if (typeof(x) == "integer") return(TRUE)
-  if (typeof(x) != "double") return(FALSE)
+is_integerish <- function(x, n = NULL, finite = TRUE) {
+  if (!typeof(x) %in% c("double", "integer")) return(FALSE)
   if (!is_null(n) && length(x) != n) return(FALSE)
-  all(x == as.integer(x))
+
+  missing_elts <- is.na(x)
+  finite_elts <- is.finite(x) | missing_elts
+  if (is_true(finite) && !all(finite_elts)) {
+    return(FALSE)
+  } else if (is_false(finite)) {
+    return(!any(finite_elts))
+  }
+
+  x_finite <- x[finite_elts & !missing_elts]
+  all(x_finite == as.integer(x_finite))
 }
 #' @rdname is_integerish
 #' @export
@@ -318,8 +340,14 @@ is_scalar_integerish <- function(x) {
 #' * The type of character vectors of length 1 is "string".
 #' * The type of special and builtin functions is "primitive".
 #'
+#'
+#' @section Life cycle:
+#'
+#' `type_of()` is an experimental function. Expect API changes.
+#'
 #' @param x An R object.
 #' @export
+#' @keywords internal
 #' @examples
 #' type_of(10L)
 #'
@@ -350,7 +378,7 @@ is_scalar_integerish <- function(x) {
 type_of <- function(x) {
   type <- typeof(x)
   if (is_formulaish(x)) {
-    if (identical(node_car(x), sym_def)) {
+    if (identical(node_car(x), colon_equals_sym)) {
       "definition"
     } else {
       "formula"
@@ -372,6 +400,14 @@ type_of <- function(x) {
 #' versions are intended for type conversion and provide a standard
 #' error message when conversion fails.
 #'
+#'
+#' @section Life cycle:
+#'
+#' * Like [type_of()], `switch_type()` and `coerce_type()` are
+#'   experimental functions.
+#'
+#' * `switch_class()` and `coerce_class()` are experimental functions.
+#'
 #' @param .x An object from which to dispatch.
 #' @param ... Named clauses. The names should be types as returned by
 #'   [type_of()].
@@ -382,6 +418,7 @@ type_of <- function(x) {
 #'   `.to` inherits from the S3 class `"AsIs"` (see [base::I()]).
 #' @seealso [switch_lang()]
 #' @export
+#' @keywords internal
 #' @examples
 #' switch_type(3L,
 #'   double = "foo",
@@ -458,10 +495,15 @@ abort_coercion <- function(x, to_type) {
 
 #' Format a type for error messages
 #'
+#' @section Life cycle:
+#'
+#' * Like [type_of()], `friendly_type()` is experimental.
+#'
 #' @param type A type as returned by [type_of()] or [lang_type_of()].
 #' @return A string of the prettified type, qualified with an
 #'   indefinite article.
 #' @export
+#' @keywords internal
 #' @examples
 #' friendly_type("logical")
 #' friendly_type("integer")
@@ -571,7 +613,7 @@ friendly_expr_type_of <- function(type) {
 #'   calls. It is generally a good idea if your function treats
 #'   `bar()` and `foo::bar()` similarly.
 #'
-#' * Finally, it is possible to have a literal (see [is_expr()] for a
+#' * Finally, it is possible to have a literal (see [is_expression()] for a
 #'   definition of literals) as call head. In most cases, this will be
 #'   a function inlined in the call (this is sometimes an expedient
 #'   way of dealing with scoping issues). For calls with a literal
@@ -582,15 +624,22 @@ friendly_expr_type_of <- function(type) {
 #'
 #' The reason we use the term _node head_ is because calls are
 #' structured as tree objects. This makes sense because the best
-#' representation for language code is a parse tree, with the tree
-#' hierarchy determined by the order of operations. See [pairlist] for
-#' more on this.
+#' representation for language code is a tree whose hierarchy is
+#' determined by the order of operations. See [node] for more on this.
+#'
+#'
+#' @section Life cycle:
+#'
+#' * `lang_type_of()` is an experimental function.
+#' * `switch_lang()` and `coerce_lang()` are experimental functions.
 #'
 #' @inheritParams switch_type
 #' @param .x,x A language object (a call). If a formula quote, the RHS
 #'   is extracted first.
 #' @param ... Named clauses. The names should be types as returned by
 #'   `lang_type_of()`.
+#'
+#' @keywords internal
 #' @export
 #' @examples
 #' # Named calls:
@@ -723,4 +772,41 @@ is_equal <- function(x, y) {
 #' is_reference(copy, vec)
 is_reference <- function(x, y) {
   .Call(rlang_is_reference, x, y)
+}
+
+
+# Use different generic name to avoid import warnings when loading
+# packages that import all of rlang after it has been load_all'd
+rlang_type_sum <- function(x) {
+  if (is_installed("pillar")) {
+    pillar::type_sum(x)
+  } else {
+    UseMethod("type_sum")
+  }
+}
+
+type_sum.ordered <- function(x) "ord"
+type_sum.factor <- function(x) "fct"
+type_sum.POSIXct <- function(x) "dttm"
+type_sum.difftime <- function(x) "time"
+type_sum.Date <- function(x) "date"
+type_sum.data.frame <- function(x) class(x)[[1]]
+
+type_sum.default <- function(x) {
+  if (!is.object(x)) {
+    switch(typeof(x),
+      logical = "lgl",
+      integer = "int",
+      double = "dbl",
+      character = "chr",
+      complex = "cpl",
+      closure = "fn",
+      environment = "env",
+      typeof(x)
+    )
+  } else if (!isS4(x)) {
+    paste0("S3: ", class(x)[[1]])
+  } else {
+    paste0("S4: ", methods::is(x)[[1]])
+  }
 }

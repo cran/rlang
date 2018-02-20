@@ -64,12 +64,10 @@ The base R functions take two sorts of arguments to indicate which
 frame to query: \code{which} and \code{n}. The \code{n} argument is
 straightforward: it's the number of frames to go down the stack,
 with \code{n = 1} referring to the current context. The \code{which} argument
-is more complicated and changes meaning for values lower than
-\enumerate{
-\item For the sake of consistency, the lazyeval functions all take the
+is more complicated and changes meaning for values lower than 1.
+For the sake of consistency, the lazyeval functions all take the
 same kind of argument \code{n}. This argument has a single meaning (the
 number of frames to go down the stack) and cannot be lower than 1.
-}
 
 Note finally that \code{parent.frame(1)} corresponds to
 \code{call_frame(2)$env}, as \code{n = 1} always refers to the current
@@ -84,6 +82,15 @@ frame as well. This way, \code{call_stack(call_depth())} is the same as
 [[2]: R:[2
 [base::sys.nframe()]: R:base::sys.nframe()
 }
+\section{Life cycle}{
+
+
+These functions are in the questioning stage. We are no longer
+convinced they belong in rlang as they are mostly for REPL
+interaction and runtime inspection rather than function
+development.
+}
+
 \examples{
 # Expressions within arguments count as contexts
 identity(identity(ctxt_depth())) # returns 2
@@ -145,3 +152,4 @@ g <- function(trim) identity(identity(fn(trim)))
 g(2)
 g(3)
 }
+\keyword{internal}

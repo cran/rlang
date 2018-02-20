@@ -10,7 +10,7 @@
 #'   function. Usually this will be most easily generated with
 #'   [base::quote()]
 #' @param env The parent environment of the function, defaults to the
-#'   calling environment of `make_function`
+#'   calling environment of `new_function()`
 #' @export
 #' @examples
 #' f <- function(x) x + 3
@@ -28,7 +28,7 @@
 #' # Now they are:
 #' stopifnot(identical(f, g))
 new_function <- function(args, body, env = caller_env()) {
-  stopifnot(all(have_name(args)), is_expr(body), is_env(env))
+  stopifnot(all(have_name(args)), is_expression(body), is_env(env))
 
   args <- as.pairlist(args)
   eval_bare(call("function", args, body), env)
@@ -62,9 +62,29 @@ prim_name <- function(prim) {
 #' functions. See [is_function()] for a discussion of primitive and
 #' closure functions.
 #'
+#' Note that the argument names are taken from the closures that are
+#' created when passing the primitive to [as_closure()]. For instance,
+#' while the arguments of the primitive operator `+` are labelled `e1`
+#' and `e2`, `fn_fmls_names()` will return `.x` and `.y`. Note that
+#' for many primitives the base R argument names are purely
+#' placeholders since they don't perform regular argument matching.
+#' E.g. this returns `5` instead of `-5`:
+#'
+#' ```
+#' `-`(e2 = 10, 5)
+#' ```
+#'
+#' To regularise the semantics of primitive functions, it is usually a
+#' good idea to coerce them to a closure first:
+#'
+#' ```
+#' minus <- as_closure(`-`)
+#' minus(.y = 10, 5)
+#' ```
+#'
 #' @param fn A function. It is lookep up in the calling frame if not
 #'   supplied.
-#' @seealso [lang_args()] and [lang_args_names()]
+#' @seealso [call_args()] and [call_args_names()]
 #' @export
 #' @examples
 #' # Extract from current call:
@@ -75,7 +95,14 @@ prim_name <- function(prim) {
 #' fn_fmls(base::switch)
 #'
 #' # fn_fmls_syms() makes it easy to forward arguments:
-#' lang("apply", !!! fn_fmls_syms(lapply))
+#' call2("apply", !!! fn_fmls_syms(lapply))
+#'
+#' # You can also change the formals:
+#' fn_fmls(fn) <- list(A = 10, B = 20)
+#' fn()
+#'
+#' fn_fmls_names(fn) <- c("foo", "bar")
+#' fn()
 fn_fmls <- function(fn = caller_fn()) {
   fn <- as_closure(fn)
   formals(fn)
@@ -89,11 +116,74 @@ fn_fmls_names <- function(fn = caller_fn()) {
 #' @rdname fn_fmls
 #' @export
 fn_fmls_syms <- function(fn = caller_fn()) {
-  nms <- set_names(fn_fmls_names(fn))
+  fmls_nms <- fn_fmls_names(fn)
+  if (is_null(fmls_nms)) {
+    return(list())
+  }
+
+  nms <- set_names(fmls_nms)
   names(nms)[match("...", nms)] <- ""
   syms(nms)
 }
 
+#' @rdname fn_fmls
+#' @param value New formals or formals names for `fn`.
+#' @export
+`fn_fmls<-` <- function(fn, value) {
+  fn <- as_closure(fn)
+  attrs <- attributes(fn)
+
+  formals(fn) <- value
+
+  # Work around bug in base R
+  attributes(fn) <- attrs
+
+  fn
+}
+#' @rdname fn_fmls
+#' @export
+`fn_fmls_names<-` <- function(fn, value) {
+  fn <- as_closure(fn)
+  attrs <- attributes(fn)
+
+  fmls <- formals(fn)
+  names(fmls) <- value
+  formals(fn) <- fmls
+
+  # Work around bug in base R
+  attributes(fn) <- attrs
+
+  fn
+}
+
+#' Get or set function body
+#'
+#' `fn_body()` is a simple wrapper around `base::body()`. The setter
+#' version preserves attributes, unlike `body<-`.
+#'
+#' @inheritParams fn_fmls
+#'
+#' @export
+fn_body <- function(fn = caller_fn()) {
+  if(!is_closure(fn)) {
+    abort("`fn` is not a closure")
+  }
+  body(fn)
+}
+#' @rdname fn_body
+#' @export
+`fn_body<-` <- function(fn, value) {
+  attrs <- attributes(fn)
+
+  body(fn) <- value
+
+  # Work around bug in base R. First remove source references since
+  # the body has changed
+  attrs$srcref <- NULL
+  attributes(fn) <- attrs
+
+  fn
+}
 
 #' Is object a function?
 #'
@@ -235,7 +325,7 @@ is_primitive_lazy <- function(x) {
 #' identical(fn_env(fn), other_env)
 fn_env <- function(fn) {
   if(!is_function(fn)) {
-    abort("`fn` is not a function", "type")
+    abort("`fn` is not a function")
   }
   environment(fn)
 }
@@ -244,7 +334,7 @@ fn_env <- function(fn) {
 #' @rdname fn_env
 `fn_env<-` <- function(x, value) {
   if(!is_function(x)) {
-    abort("`fn` is not a function", "type")
+    abort("`fn` is not a function")
   }
   environment(x) <- value
   x
@@ -257,7 +347,7 @@ fn_env <- function(fn) {
 #'
 #' * `as_function()` transform objects to functions. It fetches
 #'   functions by name if supplied a string or transforms
-#'   [quosures][quosure] to a proper function.
+#'   [quosures][quotation] to a proper function.
 #'
 #' * `as_closure()` first passes its argument to `as_function()`. If
 #'   the result is a primitive function, it regularises it to a proper
@@ -331,11 +421,13 @@ as_closure <- function(x, env = caller_env()) {
       args <- set_names(args)
       names(args)[(names(args) == "...")] <- ""
 
-      prim_call <- lang(fn_name, splice(args))
+      prim_call <- call2(fn_name, splice(args))
       new_function(fmls, prim_call, base_env())
     }
   )
 }
+
+utils::globalVariables(c("!<-", "(<-", "enexpr<-"))
 
 op_as_closure <- function(prim_nm) {
   switch(prim_nm,
@@ -343,24 +435,34 @@ op_as_closure <- function(prim_nm) {
     `<<-` = ,
     `=` = function(.x, .y) {
       op <- sym(prim_nm)
-      expr <- expr(UQ(op)(UQ(enexpr(.x)), UQ(enexpr(.y))))
+      expr <- expr((!!op)(!!enexpr(.x), !!enexpr(.y)))
       eval_bare(expr, caller_env())
     },
     `@` = ,
     `$` = function(.x, .i) {
       op <- sym(prim_nm)
-      expr <- expr(UQ(op)(.x, `!!`(enexpr(.i))))
+      expr <- expr((!!op)(.x, !! quo_expr(enexpr(.i), warn = TRUE)))
       eval_bare(expr)
     },
-    `[[<-` = ,
-    `@<-` = ,
-    `$<-` = function(.x, .i, .value) {
-      op <- sym(prim_nm)
-      expr <- expr(UQ(op)(UQ(enexpr(.x)), UQ(enexpr(.i)), UQ(enexpr(.value))))
+    `[[<-` = function(.x, .i, .value) {
+      expr <- expr((!!enexpr(.x))[[!!enexpr(.i)]] <- !!enexpr(.value))
       eval_bare(expr, caller_env())
     },
     `[<-` = function(.x, ...) {
-      expr <- expr(`[<-`(!! enexpr(.x), !!! exprs(...)))
+      args <- exprs(...)
+      n <- length(args)
+      if (n < 2L) {
+        abort("Must supply operands to `[<-`")
+      }
+      expr <- expr((!!enexpr(.x))[!!!args[-n]] <- !!args[[n]])
+      eval_bare(expr, caller_env())
+    },
+    `@<-` = function(.x, .i, .value) {
+      expr <- expr(`@`(!!enexpr(.x), !!enexpr(.i)) <- !!enexpr(.value))
+      eval_bare(expr, caller_env())
+    },
+    `$<-` = function(.x, .i, .value) {
+      expr <- expr(`$`(!!enexpr(.x), !!enexpr(.i)) <- !!enexpr(.value))
       eval_bare(expr, caller_env())
     },
     `(` = function(.x) .x,
@@ -405,8 +507,43 @@ op_as_closure <- function(prim_nm) {
     `repeat` = ,
     `return` = ,
     `while` = {
-      nm <- chr_quoted(prim_name)
+      nm <- chr_quoted(prim_nm)
       abort(paste0("Can't coerce the primitive function ", nm, " to a closure"))
     }
   )
+}
+
+#' Make an `fn` object
+#'
+#' @noRd
+#' @description
+#'
+#' `new_fn()` takes a function and sets the class to `c("fn",
+#' function)`.
+#'
+#' * Inheriting from `"fn"` enables a print method that strips all
+#'   attributes (except `srcref`) before printing. This is currently
+#'   the only purpose of the `fn` class.
+#'
+#' * Inheriting from `"function"` makes sure your function still
+#'   dispatches on type methods.
+#'
+#' @param fn A closure.
+#' @return An object of class `c("fn", "function")`.
+#' @examples
+#' fn <- set_attrs(function() "foo", attribute = "foobar")
+#' print(fn)
+#'
+#' # The `fn` object doesn't print with attributes:
+#' fn <- new_fn(fn)
+#' print(fn)
+new_fn <- function(fn) {
+  stopifnot(is_closure(fn))
+  set_attrs(fn, class = c("fn", "function"))
+}
+print.fn <- function(x, ...) {
+  srcref <- attr(x, "srcref")
+  x <- set_attrs(x, NULL)
+  x <- set_attrs(x, srcref = srcref)
+  print(x)
 }

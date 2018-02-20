@@ -29,6 +29,12 @@ some subtle implications when evaluting stack sensitive functions
 evaluation stack, and has stack-consistent semantics. It is thus
 more suited for experimenting with the R language.
 }
+\section{Life cycle}{
+
+
+These functions are experimental. Expect API changes.
+}
+
 \examples{
 # with_env() is handy to create formulas with a given environment:
 env <- child_env("rlang")
@@ -52,8 +58,8 @@ g <- function(env) {
 fn()
 
 
-# Since env is passed to as_env(), it can be any object with an
-# as_env() method. For strings, the pkg_env() is returned:
+# Since env is passed to as_environment(), it can be any object with an
+# as_environment() method. For strings, the pkg_env() is returned:
 with_env("base", ~mtcars)
 
 # This can be handy to put dictionaries in scope:

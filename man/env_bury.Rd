@@ -2,18 +2,17 @@
 % Please edit documentation in R/env.R
 \name{env_bury}
 \alias{env_bury}
-\title{Overscope bindings by defining symbols deeper in a scope}
+\title{Mask bindings by defining symbols deeper in a scope}
 \usage{
 env_bury(.env, ...)
 }
 \arguments{
 \item{.env}{An environment or an object bundling an environment,
-e.g. a formula, \link{quosure} or \link[=is_closure]{closure}. This argument
-is passed to \code{\link[=get_env]{get_env()}}.}
+e.g. a formula, \link[=quotation]{quosure} or \link[=is_closure]{closure}.
+This argument is passed to \code{\link[=get_env]{get_env()}}.}
 
-\item{...}{Pairs of names and expressions, values or
-functions. These dots support splicing (with varying semantics,
-see above) and name unquoting.}
+\item{...}{Pairs of names and expressions, values or functions.
+These dots support \link[=tidy-dots]{tidy dots} features.}
 }
 \value{
 A copy of \code{.env} enclosing the new environment containing
