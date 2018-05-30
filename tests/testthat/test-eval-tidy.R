@@ -298,3 +298,36 @@ test_that("pronoun has print() and str() method", {
   data <- as_data_pronoun(list(a = 1))
   expect_output(print(data), "<pronoun>\n1 object")
 })
+
+test_that("data mask can escape", {
+  fn <- eval_tidy(quote(function() cyl), mtcars)
+  expect_identical(fn(), mtcars$cyl)
+})
+
+test_that("inner formulas are evaluated in the current frame", {
+  quo <- quo(local(list(f_env = f_env(~foo), env = environment())))
+  envs <- eval_tidy(quo)
+  expect_identical(envs$f_env, envs$env)
+
+  quo <- quo(as_function(~list(f_env = get_env(~foo), env = environment()))())
+  envs <- eval_tidy(quo)
+  expect_identical(envs$f_env, envs$env)
+})
+
+test_that("names are translated to native when creating data mask", {
+  with_latin1_locale({
+    str_utf8 <- "\u00fc"
+    str_native <- enc2native(str_utf8)
+
+    d <- set_names(list("value"), str_utf8)
+    s <- sym(str_native)
+    expect_identical(eval_tidy(s, data = d), "value")
+
+    foreign_utf8 <- "\u5FCD"
+    foreign_native <- enc2native(foreign_utf8)
+
+    d <- setNames(list("value"), foreign_utf8)
+    s <- sym(foreign_native)
+    expect_identical(eval_tidy(s, data = d), "value")
+  })
+})

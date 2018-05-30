@@ -209,9 +209,13 @@ static sexp* base_tilde_eval(sexp* tilde, sexp* quo_env) {
 static sexp* env_poke_parent_fn = NULL;
 static sexp* env_poke_fn = NULL;
 
-sexp* rlang_tilde_eval(sexp* tilde, sexp* overscope, sexp* overscope_top, sexp* cur_frame) {
+sexp* rlang_tilde_eval(sexp* tilde, sexp* overscope, sexp* overscope_top,
+                       sexp* cur_frame, sexp* caller_frame) {
+  // Remove srcrefs from system call
+  r_poke_attribute(tilde, r_srcref_sym, r_null);
+
   if (!rlang_is_quosure(tilde)) {
-    return base_tilde_eval(tilde, overscope);
+    return base_tilde_eval(tilde, caller_frame);
   }
   if (quo_is_missing(tilde)) {
     return(r_missing_arg());
@@ -347,10 +351,6 @@ sexp* rlang_eval_tidy(sexp* expr, sexp* data, sexp* frame) {
     mask = new_quosure_mask(env);
   } else {
     mask = rlang_as_data_mask(data, env);
-    sexp* exit_args = KEEP(r_new_node(mask, r_null));
-    sexp* exit_call = KEEP(r_new_call_node(data_mask_clean_fn, exit_args));
-    r_on_exit(exit_call, frame);
-    FREE(2);
   }
 
   sexp* out = r_eval(expr, mask);

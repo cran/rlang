@@ -1,4 +1,18 @@
 
+# rlang 0.2.1
+
+This is a maintenance release that fixes several tidy evaluation
+issues.
+
+* Functions with tidy dots support now allow splicing atomic vectors.
+
+* Quosures no longer capture the current `srcref`.
+
+* Formulas are now evaluated in the correct environment by
+  `eval_tidy()`. This fixes issues in dplyr and other tidy-evaluation
+  interfaces.
+
+
 # rlang 0.2.0
 
 This release of rlang is mostly an effort at polishing the tidy
