@@ -1,6 +1,6 @@
-71407c1d03f289a82400d7c70d47238b *DESCRIPTION
+7229c46f0c93b3e32f5027fffe8eae48 *DESCRIPTION
 8986989469c97882d531b6b6505469fd *NAMESPACE
-296beb2972cf1195c6ca65ec3f38350f *NEWS.md
+d71765d80161768f00cfc5eb085931f6 *NEWS.md
 a8c92e452b5010861f5bf7e1ace18d3a *R/arg.R
 a9f036d8e6cf5329f46722c7eab184e2 *R/attr.R
 66261d131eecf6bd7155675cee18fb10 *R/c-api.R
@@ -200,7 +200,7 @@ cca435a2fd60cfa4526bcd53f7e75222 *man/vec_poke_n.Rd
 4276b74a748829a5d44c7bd030092a76 *man/with_handlers.Rd
 baef0a2bfaafceab310a424f60c0fd13 *man/with_restarts.Rd
 05c8f3ee0da0505c57bf0a07c1b5e06d *src/Makevars
-4207bede3a15215abaf8a36962c73457 *src/capture.c
+0a70be5c69b043affb1b3f20eb42f0a8 *src/capture.c
 372738f63854b1faa1e7dc2c3768a7b0 *src/export.c
 424bca744cf6aa17004d54f07912b5d1 *src/export/exported-tests.c
 d30b5c981d24549cd979723001a5a17a *src/export/exported.c
@@ -209,7 +209,7 @@ cc52331dd35946e0e42da10e26bf38b1 *src/export/init.c
 87e61dd32ed6cb2def862f4df241125a *src/internal/arg.c
 9cd0edce26bd2fcc0ac0ebe7c87e5b3d *src/internal/dots.c
 d4b0254f76d5196e0823dbbcfab66320 *src/internal/dots.h
-780b52c10dcbae30104fd978850f214b *src/internal/eval-tidy.c
+f09dbbe1fab487bcd653a05e20d74cb8 *src/internal/eval-tidy.c
 4f59e263727c3af88c2dd0b9028673dc *src/internal/expr-interp-rotate.c
 d94334212a74d3d56e347d85675e5ea5 *src/internal/expr-interp-rotate.h
 4fbe3b8804dadd9b06974ce38067329e *src/internal/expr-interp.c
@@ -223,10 +223,10 @@ e9a9620ab7b7491d43cec9ebfbd5afdd *src/internal/utils.c
 43afc5909482baa8ebb7ad4e338c5c27 *src/lib.c
 beb904363b5b7873d995dbb16533224f *src/lib/attrs.c
 c7c852680c71570b08310d884734a3fd *src/lib/attrs.h
-4270bddc21541809a41abb22ef1cfde0 *src/lib/cnd.c
+61d9298e6850134971aafd5e5ead9443 *src/lib/cnd.c
 b0c4f991491e8541c9b9a1aa5c426075 *src/lib/cnd.h
 61240b6e58497c4c6691df5db385d2d2 *src/lib/debug.h
-b6fc14af43d3f2f840c85b2a3725098c *src/lib/env.c
+7dafc396fa261a308e5f3a369bf288ab *src/lib/env.c
 bdf0965c55e458bbf408eb8c4bdac5d2 *src/lib/env.h
 504c393f53f7aac9d951bfccd1abbdd5 *src/lib/eval.c
 bb39269899a1647fc0d5618ceada47c7 *src/lib/eval.h
@@ -249,9 +249,9 @@ dc6119cd6796dc8bec3d24c4dd30f066 *src/lib/replace-na.c
 0118530a4c06ff62d039985b4bb95cd2 *src/lib/rlang.h
 3d22e89d63de6dbcb53c0352ca1f5bb7 *src/lib/sexp.c
 7d11a7e40ecf953e1ef093ef3977159e *src/lib/sexp.h
-1afb1bf096d7ee30850ab30618f9c6b9 *src/lib/squash.c
+b85b18ee719026afdf7cc61096599ab5 *src/lib/squash.c
 b21ec8fa3f3599696fd677b27631ab92 *src/lib/squash.h
-1bacf3a10138f51fad20f5ca9b8b7f94 *src/lib/stack.c
+3fe630336e23e2eddf1699ca19774c5b *src/lib/stack.c
 ca5ec968a58e31753b06ac34eaa04132 *src/lib/stack.h
 0b96cb0ff95091cf208b92a1a0b0f095 *src/lib/state.h
 bde789a0f2c185be4c1cea2413796697 *src/lib/sym-unescape.c
