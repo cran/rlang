@@ -1,0 +1,1 @@
+#define RLANG_HAS_RINTERFACE_H 1

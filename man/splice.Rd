@@ -13,27 +13,41 @@ is_spliced(x)
 
 is_spliced_bare(x)
 
-dots_splice(..., .ignore_empty = c("trailing", "none", "all"))
+dots_splice(..., .ignore_empty = c("trailing", "none", "all"),
+  .preserve_empty = FALSE, .homonyms = c("keep", "first", "last",
+  "error"), .check_assign = FALSE)
 }
 \arguments{
 \item{x}{A list to splice.}
 
-\item{...}{Arguments with explicit (\code{dots_list()}) or list
-(\code{dots_splice()}) splicing semantics. The contents of spliced
-arguments are embedded in the returned list.}
+\item{...}{Arguments to collect with \code{!!!} support.}
 
 \item{.ignore_empty}{Whether to ignore empty arguments. Can be one
 of \code{"trailing"}, \code{"none"}, \code{"all"}. If \code{"trailing"}, only the
 last argument is ignored if it is empty.}
+
+\item{.preserve_empty}{Whether to preserve the empty arguments that
+were not ignored. If \code{TRUE}, empty arguments are stored with
+\code{\link[=missing_arg]{missing_arg()}} values. If \code{FALSE} (the default) an error is
+thrown when an empty argument is detected.}
+
+\item{.homonyms}{How to treat arguments with the same name. The
+default, \code{"keep"}, preserves these arguments. Set \code{.homonyms} to
+\code{"first"} to only keep the first occurrences, to \code{"last"} to keep
+the last occurrences, and to \code{"error"} to raise an informative
+error and indicate what arguments have duplicated names.}
+
+\item{.check_assign}{Whether to check for \code{<-} calls passed in
+dots. When \code{TRUE} and a \code{<-} call is detected, a warning is
+issued to advise users to use \code{=} if they meant to match a
+function parameter, or wrap the \code{<-} call in braces otherwise.
+This ensures assignments are explicit.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
 \itemize{
 \item \code{splice} marks an object to be spliced. It is equivalent to using
 \code{!!!} in a function with \link[=tidy-dots]{tidy dots semantics}.
-}
-}
-\details{
-\itemize{
 \item \code{dots_splice()} is like \code{\link[=dots_list]{dots_list()}} but automatically splices
 list inputs.
 }
@@ -78,14 +92,14 @@ arguments. To avoid this you can use \code{splice()} instead:\preformatted{purrr
 \section{Life cycle}{
 
 \itemize{
-\item \code{dots_splice()} is in \strong{questioning} stage. It is part of our
+\item \code{dots_splice()} is in the questioning stage. It is part of our
 experiments with dots semantics. Compared to \code{dots_list()},
 \code{dots_splice()} automatically splices lists. We now lean towards
 adopting a single type of dots semantics (those of \code{dots_list()})
 where splicing is explicit.
-\item \code{splice()} is in questioning stage. It is not clear whether it is
+\item \code{splice()} is in the questioning stage. It is not clear whether it is
 really needed as there are other ways to avoid the performance
-issue discussed in the section above.
+issue discussed above.
 }
 }
 

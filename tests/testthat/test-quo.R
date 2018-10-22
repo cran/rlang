@@ -41,7 +41,7 @@ test_that("generic setters work on quosures", {
 })
 
 test_that("can flatten empty quosure", {
-  expect_identical(quo_expr(quo()), missing_arg())
+  expect_identical(quo_squash(quo()), missing_arg())
 })
 
 test_that("new_quosure() checks inputs", {
@@ -50,7 +50,7 @@ test_that("new_quosure() checks inputs", {
 
 test_that("new_quosure() produces expected internal structure", {
   quo <- new_quosure(quote(abc))
-  expect_identical(set_attrs(~abc, class = c("quosure", "formula")), quo)
+  expect_identical(structure(~abc, class = c("quosure", "formula")), quo)
 })
 
 test_that("new_quosure() double wraps", {
@@ -62,7 +62,7 @@ test_that("new_quosure() double wraps", {
 test_that("as_quosure() uses correct env", {
   fn <- function(expr, env = caller_env()) {
     f <- as_quosure(expr, env)
-    list(env = get_env(), quo = g(f))
+    list(env = current_env(), quo = g(f))
   }
   g <- function(expr, env = caller_env()) {
     as_quosure(expr, env)
@@ -72,7 +72,7 @@ test_that("as_quosure() uses correct env", {
 
   out_expr_default <- fn(quote(expr))
   out_quo_default <- fn(quo)
-  expect_identical(quo_get_env(out_expr_default$quo), get_env())
+  expect_identical(quo_get_env(out_expr_default$quo), current_env())
   expect_identical(quo_get_env(out_quo_default$quo), quo_env)
 
   user_env <- child_env(NULL)
@@ -91,7 +91,7 @@ test_that("explicit promise makes a formula", {
 })
 
 test_that("explicit promise works only one level deep", {
-  f <- function(x) list(env = get_env(), f = g(x))
+  f <- function(x) list(env = current_env(), f = g(x))
   g <- function(y) enquo(y)
   out <- f(1 + 2 + 3)
   expected_f <- with_env(out$env, quo(x))
@@ -146,9 +146,9 @@ test_that("as_quosure() coerces formulas", {
   expect_identical(as_quosure(~foo), quo(foo))
 })
 
-test_that("quo_expr() warns", {
-  expect_warning(regex = NA, quo_expr(quo(foo), warn = TRUE))
-  expect_warning(quo_expr(quo(list(!! quo(foo))), warn = TRUE), "inner quosure")
+test_that("quo_squash() warns", {
+  expect_warning(regex = NA, quo_squash(quo(foo), warn = TRUE))
+  expect_warning(quo_squash(quo(list(!! quo(foo))), warn = TRUE), "inner quosure")
 })
 
 test_that("quo_deparse() indicates quosures with `^`", {
@@ -182,4 +182,93 @@ test_that("quosure predicates work", {
   expect_false(quo_is_symbolic(quo(10L)))
   expect_false(quo_is_symbolic(quo(10L)))
   expect_false(quo_is_null(quo(10L)))
+})
+
+test_that("new_quosures() checks that elements are quosures", {
+  expect_error(new_quosures(list(1)), "list of quosures")
+})
+
+test_that("new_quosures() and as_quosures() return named lists", {
+  exp <- structure(list(), names = chr(), class = "quosures")
+  expect_identical(new_quosures(list()), exp)
+  expect_identical(as_quosures(list()), exp)
+})
+
+test_that("as_quosures() applies default environment", {
+  out <- as_quosures(list(quote(foo), quote(bar)), env = base_env())
+  exp <- quos_list(new_quosure(quote(foo), base_env()), new_quosure(quote(bar), base_env()))
+  expect_identical(out, exp)
+})
+
+test_that("as_quosures() auto-names if requested", {
+  x <- list(quote(foo), quote(bar))
+  expect_named(as_quosures(x, global_env(), named = TRUE), c("foo", "bar"))
+})
+
+test_that("quosures class has subset assign methods", {
+  x <- quos(1, 2)
+
+  x[1:2] <- list(quo(3), quo(4))
+  expect_identical(x, quos(3, 4))
+  expect_warning(x[2] <- list(4), "soft-deprecated")
+  ## expect_error(x[2] <- list(4), "Can't assign a double vector to a list of quosures")
+
+  x[[2]] <- quo(10)
+  expect_identical(x, quos(3, 10))
+  ## expect_error(x[[2]] <- list(4), "Can't assign a list to a list of quosures")
+
+  x <- quos(foo = 1, bar = 2)
+
+  x$bar <- quo(100)
+  expect_identical(x, quos(foo = 1, bar = 100))
+  ## expect_error(x$foo <- list(4), "Can't assign a list to a list of quosures")
+})
+
+test_that("can remove quosures by assigning NULL", {
+  x <- quos(1, b = 2)
+
+  x[[1]] <- NULL
+  expect_identical(x, quos(b = 2))
+
+  x$b <- NULL
+  expect_identical(x, quos())
+})
+
+test_that("can't cast a quosure to base types (#523)", {
+  expect_warning(as.character(quo(foo)), "`as.character\\(\\)` on a quosure")
+  expect_identical(as.character(quo(foo)), c("~", "foo"))
+})
+
+test_that("quosures fail with common operations (#478, tidyverse/dplyr#3476)", {
+  q <- quo(NULL)
+
+  expect_error(q + 10, "!!myquosure \\+ rhs")
+  expect_error(q > q, "!!myquosure1 > !!myquosure2")
+  expect_error(10 == q, "lhs == !!myquosure")
+
+  expect_error(abs(q), "abs\\(!!myquosure\\)")
+  expect_error(mean(q), "mean\\(!!myquosure\\)")
+  expect_error(stats::median(q), "median\\(!!myquosure\\)")
+  expect_error(stats::quantile(q), "quantile\\(!!myquosure\\)")
+})
+
+test_that("can cast quosure lists to bare lists", {
+  expect_identical(as.list(quos(a)), named_list(quo(a)))
+})
+
+test_that("can concatenate quosure lists", {
+  expect_identical(c(quos(a, b), quos(foo = c)), quos(a, b, foo = c))
+})
+
+
+# Lifecycle ----------------------------------------------------------
+
+test_that("as_quosure() still provides default env", {
+  quo <- expect_warning(as_quosure(quote(foo)), "explicit environment")
+  expect_reference(quo_get_env(quo), current_env())
+})
+
+test_that("can still concatenate quosure lists and non-quosures", {
+  scoped_silent_retirement()
+  expect_identical(c(quos(foo), list(1)), named_list(quo(foo), 1))
 })

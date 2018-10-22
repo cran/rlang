@@ -1,5 +1,9 @@
 #' Coerce an object to a base type
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#'
 #' These are equivalent to the base functions (e.g. [as.logical()],
 #' [as.list()], etc), but perform coercion rather than conversion.
 #' This means they are not generic and will not call S3 conversion
@@ -7,7 +11,7 @@
 #' input. In addition, they have stricter implicit coercion rules and
 #' will never attempt any kind of parsing. E.g. they will not try to
 #' figure out if a character vector represents integers or booleans.
-#' Finally, they have treat attributes consistently, unlike the base R
+#' Finally, they treat attributes consistently, unlike the base R
 #' functions: all attributes except names are removed.
 #'
 #'
@@ -62,6 +66,8 @@
 #'
 #' @inheritParams string
 #' @param x An object to coerce to a base type.
+#'
+#' @keywords internal
 #' @examples
 #' # Coercing atomic vectors removes attributes with both base R and rlang:
 #' x <- structure(TRUE, class = "foo", bar = "baz")
@@ -105,7 +111,7 @@ NULL
 #' @export
 as_logical <- function(x) {
   coerce_type_vec(x, friendly_type("logical"),
-    logical = set_attrs(x, NULL),
+    logical = { attributes(x) <- NULL; x },
     integer = as_base_type(x, as.logical),
     double = as_integerish_type(x, as.logical, "logical")
   )
@@ -115,7 +121,7 @@ as_logical <- function(x) {
 as_integer <- function(x) {
   coerce_type_vec(x, friendly_type("integer"),
     logical = as_base_type(x, as.integer),
-    integer = set_attrs(x, NULL),
+    integer = { attributes(x) <- NULL; x },
     double = as_integerish_type(x, as.integer, "integer")
   )
 }
@@ -125,7 +131,7 @@ as_double <- function(x) {
   coerce_type_vec(x, friendly_type("double"),
     logical = ,
     integer = as_base_type(x, as.double),
-    double = set_attrs(x, NULL)
+    double = { attributes(x) <- NULL; x }
   )
 }
 #' @rdname vector-coercion
@@ -135,7 +141,7 @@ as_complex <- function(x) {
     logical = ,
     integer = ,
     double = as_base_type(x, as.complex),
-    complex = set_attrs(x, NULL)
+    complex = { attributes(x) <- NULL; x }
   )
 }
 #' @rdname vector-coercion
@@ -143,7 +149,10 @@ as_complex <- function(x) {
 as_character <- function(x, encoding = NULL) {
   coerce_type_vec(x, friendly_type("character"),
     string = ,
-    character = set_chr_encoding(set_attrs(x, NULL), encoding)
+    character = {
+      attributes(x) <- NULL
+      set_chr_encoding(x, encoding)
+    }
   )
 }
 #' @rdname vector-coercion
@@ -156,7 +165,7 @@ as_string <- function(x, encoding = NULL) {
       }
       .Call(rlang_symbol_to_character, x)
     },
-    string = set_attrs(x, NULL)
+    string = { attributes(x) <- NULL; x }
   )
   set_chr_encoding(x, encoding)
 }
@@ -182,7 +191,7 @@ vec_as_list <- function(x) {
     character = ,
     complex = ,
     raw = as_base_type(x, as.list),
-    list = set_attrs(x, NULL)
+    list = { attributes(x) <- NULL; x }
   )
 }
 
@@ -191,13 +200,13 @@ as_base_type <- function(x, as_type) {
   # method dispatch, but we also want to avoid an extra copy of atomic
   # vectors: the first when unclassing, the second when coercing. This
   # is also useful for uncopyable types like environments.
-  attrs <- .Call(rlang_get_attrs, x)
-  .Call(rlang_zap_attrs, x)
+  attrs <- .Call(rlang_get_attributes, x)
+  .Call(rlang_poke_attributes, x, NULL)
 
   # This function assumes that the target type is different than the
   # input type, otherwise no duplication is done and the output will
   # be modified by side effect when we restore the input attributes.
-  on.exit(.Call(rlang_set_attrs, x, attrs))
+  on.exit(.Call(rlang_poke_attributes, x, attrs))
 
   as_type(x)
 }
@@ -220,7 +229,7 @@ coerce_type_vec <- function(.x, .to, ...) {
     # Avoid a copy of `out` when we restore the names, since it could be
     # a heavy atomic vector. We own `out`, so it is ok to change its
     # attributes inplace.
-    .Call(rlang_set_attrs, out, pairlist(names = names(.x)))
+    .Call(rlang_poke_attributes, out, pairlist(names = names(.x)))
   }
 
   out

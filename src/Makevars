@@ -4,7 +4,9 @@ lib-files = \
         lib/rlang.h \
         lib/attrs.c \
         lib/cnd.c \
+        lib/debug.c \
         lib/env.c \
+        lib/env-binding.c \
         lib/eval.c \
         lib/export.c \
         lib/fn.c \
@@ -28,6 +30,8 @@ lib-files = \
 internal-files = \
         internal/arg.c \
         internal/dots.c \
+        internal/env.c \
+        internal/env-binding.c \
         internal/eval-tidy.c \
         internal/expr-interp.c \
         internal/expr-interp-rotate.c \
@@ -43,7 +47,7 @@ export-files = \
 
 all: $(SHLIB)
 
-$(SHLIB): lib.c internal.c export.c
+$(SHLIB): lib.o internal.o export.o
 
 lib.c: $(lib-files)
 	touch lib.c

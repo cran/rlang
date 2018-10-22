@@ -8,10 +8,10 @@
 #' than one expression (separated by semicolons or new lines), an error is
 #' issued. On the other hand `parse_exprs()` can handle multiple
 #' expressions. It always returns a list of expressions (compare to
-#' [base::parse()] which returns an base::expression vector). All
+#' [base::parse()] which returns a base::expression vector). All
 #' functions also support R connections.
 #'
-#' The versions suffixed with `_quo` and `quos` return
+#' The versions suffixed with `_quo` and `_quos` return
 #' [quosures][quotation] rather than raw expressions.
 #'
 #'
@@ -32,7 +32,10 @@
 #'   R code in an isolated context (perhaps a child of the global
 #'   environment or of the [base environment][base_env]).
 #' @return `parse_expr()` returns an [expression][is_expression],
-#'   `parse_exprs()` returns a list of expressions.
+#'   `parse_exprs()` returns a list of expressions. Note that for the
+#'   plural variants the length of the output may be greater than the
+#'   length of the input. This would happen is one of the strings
+#'   contain several expressions (such as `"foo; bar"`).
 #' @seealso [base::parse()]
 #' @export
 #' @examples
@@ -70,16 +73,18 @@ parse_exprs <- function(x) {
       on.exit(close(x))
     }
     exprs <- parse(file = x)
-  } else if (is_scalar_character(x)) {
+  } else if (is_string(x)) {
+    exprs <- parse(text = x)
+  } else if (is.character(x)) {
+    x <- paste(x, collapse = "; ")
     exprs <- parse(text = x)
   } else {
-    abort("`x` must be a string or a R connection")
+    abort("`x` must be a character vector or an R connection")
   }
   as.list(exprs)
 }
 
 #' @rdname parse_expr
-#' @usage NULL
 #' @export
 parse_quo <- function(x, env) {
   if (missing(env)) {
@@ -88,11 +93,11 @@ parse_quo <- function(x, env) {
   new_quosure(parse_expr(x), as_environment(env))
 }
 #' @rdname parse_expr
-#' @usage NULL
 #' @export
 parse_quos <- function(x, env) {
   if (missing(env)) {
     abort("The quosure environment should be explicitly supplied as `env`")
   }
-  map(parse_exprs(x), new_quosure, env = as_environment(env))
+  out <- map(parse_exprs(x), new_quosure, env = as_environment(env))
+  new_quosures(out)
 }

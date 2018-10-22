@@ -6,19 +6,21 @@
 \alias{is_scalar_integerish}
 \title{Is a vector integer-like?}
 \usage{
-is_integerish(x, n = NULL, finite = TRUE)
+is_integerish(x, n = NULL, finite = NULL)
 
-is_bare_integerish(x, n = NULL)
+is_bare_integerish(x, n = NULL, finite = NULL)
 
-is_scalar_integerish(x)
+is_scalar_integerish(x, finite = NULL)
 }
 \arguments{
 \item{x}{Object to be tested.}
 
 \item{n}{Expected length of a vector.}
 
-\item{finite}{Whether values must be finite. Examples of non-finite
-values are \code{Inf}, \code{-Inf} and \code{NaN}.}
+\item{finite}{Whether all values of the vector are finite. The
+non-finite values are \code{NA}, \code{Inf}, \code{-Inf} and \code{NaN}. Setting this
+to something other than \code{NULL} can be expensive because the whole
+vector needs to be traversed and checked.}
 }
 \description{
 These predicates check whether R considers a number vector to be
@@ -26,6 +28,16 @@ integer-like, according to its own tolerance check (which is in
 fact delegated to the C library). This function is not adapted to
 data analysis, see the help for \code{\link[base:is.integer]{base::is.integer()}} for examples
 of how to check for whole numbers.
+
+Things to consider when checking for integer-like doubles:
+\itemize{
+\item This check can be expensive because the whole double vector has
+to be traversed and checked.
+\item Large double values may be integerish but may still not be
+coercible to integer. This is because integers in R only support
+values up to \code{2^31 - 1} while numbers stored as double can be
+much larger.
+}
 }
 \examples{
 is_integerish(10L)

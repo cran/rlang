@@ -9,7 +9,7 @@ void r_on_exit(sexp* expr, sexp* frame) {
     on_exit_prim = r_base_ns_get("on.exit");
   }
 
-  sexp* args = r_build_pairlist2(expr, r_scalar_lgl(1));
+  sexp* args = r_build_pairlist2(expr, r_lgl(1));
   sexp* lang = KEEP(r_build_call_node(on_exit_prim, args));
 
   r_eval(lang, frame);
@@ -59,11 +59,11 @@ sexp* r_sys_call(int n, sexp* frame) {
 
 
 static sexp* generate_sys_call(const char* name, int** n_addr) {
-  sexp* sys_n = KEEP(r_scalar_int(0));
+  sexp* sys_n = KEEP(r_int(0));
   *n_addr = r_int_deref(sys_n);
 
   sexp* sys_args = KEEP(r_new_node(sys_n, r_null));
-  sexp* sys_call = KEEP(r_new_call_node(r_base_ns_get(name), sys_args));
+  sexp* sys_call = KEEP(r_new_call(r_base_ns_get(name), sys_args));
   r_mark_precious(sys_call);
 
   FREE(3);
@@ -72,16 +72,16 @@ static sexp* generate_sys_call(const char* name, int** n_addr) {
 
 void r_init_library_stack() {
   sexp* current_frame_args;
-  current_frame_args = KEEP(r_scalar_int(-1));
+  current_frame_args = KEEP(r_int(-1));
   current_frame_args = KEEP(r_new_node(current_frame_args, r_null));
-  sexp* current_frame_body = r_new_call_node(r_base_ns_get("sys.frame"),
+  sexp* current_frame_body = r_new_call(r_base_ns_get("sys.frame"),
                                              current_frame_args);
 
   sexp* current_frame_fn = KEEP(r_new_function(r_null,
                                                current_frame_body,
                                                r_empty_env));
 
-  current_frame_call = r_new_call_node(current_frame_fn, r_null);
+  current_frame_call = r_new_call(current_frame_fn, r_null);
   r_mark_precious(current_frame_call);
   FREE(3);
 

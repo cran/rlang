@@ -17,6 +17,8 @@ environment currently on the stack.}
 \item{value}{The return value.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+
 While \code{\link[base:return]{base::return()}} can only return from the current local
 frame, these two functions will return from any frame on the
 current evaluation stack, between the global and the currently
@@ -37,15 +39,17 @@ perform non-local jumps.
 \section{Life cycle}{
 
 
-The support for \code{frame} object is experimental. The stack and frame
-objects are likely to be moved from rlang to another package.
-Please pass simple environments to \code{return_from()} and \code{return_to()}.
+The support for \code{frame} object is soft-deprecated.  Please pass
+simple environments to \code{return_from()} and \code{return_to()}.
+
+These functions are in the questioning lifecycle because we are
+considering simpler alternatives.
 }
 
 \examples{
 # Passing fn() evaluation frame to g():
 fn <- function() {
-  val <- g(get_env())
+  val <- g(current_env())
   cat("g returned:", val, "\\n")
   "normal return"
 }

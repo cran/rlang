@@ -13,14 +13,15 @@ eval_tidy(expr, data = NULL, env = caller_env())
 data mask created with \code{\link[=as_data_mask]{as_data_mask()}} or \code{\link[=new_data_mask]{new_data_mask()}}.}
 
 \item{env}{The environment in which to evaluate \code{expr}. This
-environment is always ignored when evaluating quosures. Quosures
-are evaluated in their own environment.}
+environment is not applicable for quosures because they have
+their own environments.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+
 \code{eval_tidy()} is a variant of \code{\link[base:eval]{base::eval()}} that powers the tidy
 evaluation framework. Like \code{eval()} it accepts user data as
-argument. If supplied, it evaluates its input \code{expr} in a \link[=as_data_mask]{data
-mask}. In additon \code{eval_tidy()} supports:
+argument. If supplied, it evaluates its input \code{expr} in a \link[=as_data_mask]{data mask}. In addition \code{eval_tidy()} supports:
 \itemize{
 \item \link[=quotation]{Quosures}. The expression wrapped in the quosure
 evaluates in its original context (masked by \code{data} if supplied).
@@ -34,7 +35,10 @@ values and throw errors if you try to access non-existent values.
 \section{Life cycle}{
 
 
-\code{eval_tidy()} is stable.
+\strong{rlang 0.3.0}
+
+Passing an environment to \code{data} is deprecated. Please construct an
+rlang data mask with \code{\link[=new_data_mask]{new_data_mask()}}.
 }
 
 \examples{
@@ -63,7 +67,7 @@ with_data(NULL, apple)
 with_data(data, apple)
 with_data(data, list(apple, kiwi))
 
-# Secondly eval_tidy() installs handy pronouns that allows users to
+# Secondly eval_tidy() installs handy pronouns that allow users to
 # be explicit about where to find symbols:
 with_data(data, .data$apple)
 with_data(data, .env$apple)

@@ -23,12 +23,33 @@ test_that("%|% fails with wrong types", {
 })
 
 test_that("%@% returns attribute", {
+  expect_identical(mtcars %@% row.names, row.names(mtcars))
   expect_identical(mtcars %@% "row.names", row.names(mtcars))
   expect_null(mtcars %@% "row")
+})
+
+test_that("%@% has replacement version", {
+  x <- structure(list(), foo = "bar")
+  x %@% foo <- NULL
+  x %@% baz <- "quux"
+  expect_identical(x, structure(list(), baz = "quux"))
 })
 
 test_that("new_definition() returns new `:=` call", {
   def <- "foo" ~ "bar"
   node_poke_car(def, quote(`:=`))
   expect_identical(new_definition("foo", "bar"), def)
+})
+
+test_that("%@% works with S4 objects (#207)", {
+  .Person <- setClass("Person", slots = c(name = "character", species = "character"))
+  fievel <- .Person(name = "Fievel", species = "mouse")
+
+  expect_identical(fievel %@% name, "Fievel")
+  expect_identical(fievel %@% "species", "mouse")
+
+  fievel %@% name <- "Bernard"
+  fievel %@% "species" <- "MOUSE"
+  expect_identical(fievel@name, "Bernard")
+  expect_identical(fievel@species, "MOUSE")
 })

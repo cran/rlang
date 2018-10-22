@@ -33,6 +33,8 @@ an encoding mark. This is only declarative, no encoding
 conversion is performed.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+
 These are equivalent to the base functions (e.g. \code{\link[=as.logical]{as.logical()}},
 \code{\link[=as.list]{as.list()}}, etc), but perform coercion rather than conversion.
 This means they are not generic and will not call S3 conversion
@@ -40,7 +42,7 @@ methods. They only attempt to coerce the base type of their
 input. In addition, they have stricter implicit coercion rules and
 will never attempt any kind of parsing. E.g. they will not try to
 figure out if a character vector represents integers or booleans.
-Finally, they have treat attributes consistently, unlike the base R
+Finally, they treat attributes consistently, unlike the base R
 functions: all attributes except names are removed.
 }
 \section{Coercion to logical and numeric atomic vectors}{
@@ -135,3 +137,4 @@ x <- structure(as_environment(mtcars[1:2]), class = "foobar")
 as.list.foobar <- function(x) abort("dont call me")
 as_list(x)
 }
+\keyword{internal}

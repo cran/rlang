@@ -12,7 +12,6 @@
 \alias{quo_get_env}
 \alias{quo_set_expr}
 \alias{quo_set_env}
-\alias{is_quosures}
 \title{Quosure getters, setters and testers}
 \usage{
 is_quosure(x)
@@ -34,8 +33,6 @@ quo_get_env(quo)
 quo_set_expr(quo, expr)
 
 quo_set_env(quo, env)
-
-is_quosures(x)
 }
 \arguments{
 \item{x}{An object to test.}
@@ -52,7 +49,11 @@ match.}
 doesn't participate in the pattern-matching. If an empty string
 \code{""} and \code{x} is a namespaced call, \code{is_call()} returns
 \code{FALSE}. If any other string, \code{is_call()} checks that \code{x} is
-namespaced within \code{ns}.}
+namespaced within \code{ns}.
+
+Can be a character vector of namespaces, in which case the call
+has to match at least one of them, otherwise \code{is_call()} returns
+\code{FALSE}.}
 
 \item{expr}{A new expression for the quosure.}
 
@@ -63,10 +64,15 @@ You can access the quosure components (its expression and its
 environment) with:
 \itemize{
 \item \code{\link[=get_expr]{get_expr()}} and \code{\link[=get_env]{get_env()}}. These getters also support other
-kinds of objects such as formulas
+kinds of objects such as formulas.
 \item \code{quo_get_expr()} and \code{quo_get_env()}. These getters only work
 with quosures and throw an error with other types of input.
 }
+
+Note that a quosure usually does not carry environments for
+\link[=is_syntactic_literal]{literal objects} like strings or
+numbers. \code{\link[=quo]{quo()}} and \code{\link[=enquo]{enquo()}} only capture an environment for
+\link[=is_symbolic]{symbolic expressions}.
 
 Test if an object is a quosure with \code{is_quosure()}. If you know an
 object is a quosure, use the \code{quo_} prefixed predicates to check

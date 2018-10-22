@@ -16,10 +16,15 @@
 #'   immediately in the surrounding context.
 #'
 #' - The `!!!` operator unquotes and splices its argument. The
-#'   argument should represents a list or a vector. Each element will
+#'   argument should represent a list or a vector. Each element will
 #'   be embedded in the surrounding call, i.e. each element is
 #'   inserted as an argument. If the vector is named, the names are
 #'   used as argument names.
+#'
+#'   If the vector is a classed object (like a factor), it is
+#'   converted to a list with [base::as.list()] to ensure proper
+#'   dispatch. If it is an S4 objects, it is converted to a list with
+#'   [methods::as()].
 #'
 #' Use `qq_show()` to experiment with quasiquotation or debug the
 #' effect of unquoting operators. `qq_show()` quotes its input,
@@ -48,7 +53,7 @@
 #' ```
 #' name <- "Jane"
 #'
-#' dots_list(!!name := 1 + 2)
+#' list2(!!name := 1 + 2)
 #' exprs(!!name := 1 + 2)
 #' quos(!!name := 1 + 2)
 #' ```
@@ -70,12 +75,23 @@
 #' @section Life cycle:
 #'
 #' * Calling `UQ()` and `UQS()` with the rlang namespace qualifier is
-#'   soft-deprecated as of rlang 0.2.0. Just use the unqualified forms
-#'   instead.
+#'   deprecated as of rlang 0.3.0. Just use the unqualified forms
+#'   instead:
+#'
+#'   ```
+#'   # Bad
+#'   rlang::expr(mean(rlang::UQ(var) * 100))
+#'
+#'   # Ok
+#'   rlang::expr(mean(UQ(var) * 100))
+#'
+#'   # Good
+#'   rlang::expr(mean(!!var * 100))
+#'   ```
 #'
 #'   Supporting namespace qualifiers complicates the implementation of
 #'   unquotation and is misleading as to the nature of unquoting
-#'   operators (these are syntactic operators that operates at
+#'   operators (which are syntactic operators that operates at
 #'   quotation-time rather than function calls at evaluation-time).
 #'
 #' * `UQ()` and `UQS()` were soft-deprecated in rlang 0.2.0 in order
@@ -101,22 +117,8 @@
 #'   operation. The operator form makes it clearer that unquoting is
 #'   special.
 #'
-#' * `UQE()` was deprecated in rlang 0.2.0 in order to make the is
-#'   deprecated in order to simplify the quasiquotation syntax. You
-#'   can replace its use by a combination of `!!` and `get_expr()`.
-#'   E.g. `!! get_expr(x)` is equivalent to `UQE(x)`.
-#'
-#' * The use of `:=` as alias of `~` is defunct as of rlang 0.2.0. It
-#'   caused surprising results when invoked in wrong places. For
-#'   instance in the expression `dots_list(name := 1)` this operator
-#'   was interpreted as a synonym to `=` that supports quasiquotation,
-#'   but not in `dots_list(list(name := 1))`. Since `:=` was an alias
-#'   for `~` the inner list would contain formula-like object. This
-#'   kind of mistakes now trigger an error.
-#'
-#' @param x An expression to unquote.
 #' @name quasiquotation
-#' @aliases UQ UQE UQS
+#' @aliases UQ UQS
 #' @examples
 #' # Quasiquotation functions quote expressions like base::quote()
 #' quote(how_many(this))
@@ -139,7 +141,7 @@
 #'
 #'
 #' # Note that when you unquote complex objects into an expression,
-#' # the base R printer may be a bit misleading. For anstance compare
+#' # the base R printer may be a bit misleading. For instance compare
 #' # the output of `expr()` and `quo()` (which uses a custom printer)
 #' # when we unquote an integer vector:
 #' expr(how_many(!!(1:10)))
@@ -174,7 +176,7 @@
 #'
 #' # All these features apply to dots captured by enquos():
 #' fn <- function(...) enquos(...)
-#' fn(!!! args, !!var := penny)
+#' fn(!!!args, !!var := penny)
 #'
 #'
 #' # Unquoting is especially useful for building an expression by
@@ -190,35 +192,31 @@
 NULL
 
 #' @rdname quasiquotation
+#' @usage NULL
 #' @export
 UQ <- function(x) {
   abort("`UQ()` can only be used within a quasiquoted argument")
 }
 #' @rdname quasiquotation
-#' @export
-UQE <- function(x) {
-  warn("`UQE()` is deprecated. Please use `!! get_expr(x)`")
-  abort("`UQE()` can only be used within a quasiquoted argument")
-}
-#' @rdname quasiquotation
+#' @usage NULL
 #' @export
 UQS <- function(x) {
   abort("`UQS()` can only be used within a quasiquoted argument")
 }
 #' @rdname quasiquotation
+#' @usage NULL
 #' @export
 `!!` <- function(x) {
   abort("`!!` can only be used within a quasiquoted argument")
 }
 #' @rdname quasiquotation
-#' @export
 #' @usage NULL
+#' @export
 `!!!` <- function(x) {
   abort("`!!!` can only be used within a quasiquoted argument")
 }
 #' @rdname quasiquotation
-#' @param y An R expression that will be given the argument name
-#'   supplied to `x`.
+#' @usage NULL
 #' @export
 `:=` <- function(x, y) {
   abort("`:=` can only be used within a quasiquoted argument")

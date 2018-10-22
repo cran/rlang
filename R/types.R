@@ -12,14 +12,16 @@
 #' * Unlike `is.atomic()`, `is_atomic()` does not return `TRUE` for
 #'   `NULL`.
 #'
-#' * Unlike `is.vector()`, `is_vector()` test if an object is an
+#' * Unlike `is.vector()`, `is_vector()` tests if an object is an
 #'   atomic vector or a list. `is.vector` checks for the presence of
 #'   attributes (other than name).
 #'
 #' @param x Object to be tested.
 #' @param n Expected length of a vector.
-#' @param finite Whether values must be finite. Examples of non-finite
-#'   values are `Inf`, `-Inf` and `NaN`.
+#' @param finite Whether all values of the vector are finite. The
+#'   non-finite values are `NA`, `Inf`, `-Inf` and `NaN`. Setting this
+#'   to something other than `NULL` can be expensive because the whole
+#'   vector needs to be traversed and checked.
 #' @param encoding Expected encoding of a string or character
 #'   vector. One of `UTF-8`, `latin1`, or `unknown`.
 #' @seealso [bare-type-predicates] [scalar-type-predicates]
@@ -29,9 +31,7 @@ NULL
 #' @export
 #' @rdname type-predicates
 is_list <- function(x, n = NULL) {
-  if (typeof(x) != "list") return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-  TRUE
+  .Call(rlang_is_list, x, n)
 }
 
 parsable_atomic_types <- c("logical", "integer", "double", "complex", "character")
@@ -39,61 +39,55 @@ atomic_types <- c(parsable_atomic_types, "raw")
 #' @export
 #' @rdname type-predicates
 is_atomic <- function(x, n = NULL) {
-  if (!typeof(x) %in% atomic_types) return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-  TRUE
+  .Call(rlang_is_atomic, x, n)
 }
 #' @export
 #' @rdname type-predicates
 is_vector <- function(x, n = NULL) {
-  is_atomic(x, n) || is_list(x, n)
+  .Call(rlang_is_vector, x, n)
+}
+
+# Mostly for unit testing
+is_finite <- function(x) {
+  .Call(rlang_is_finite, x)
 }
 
 #' @export
 #' @rdname type-predicates
 is_integer <- function(x, n = NULL) {
-  if (typeof(x) != "integer") return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-  TRUE
+  .Call(rlang_is_integer, x, n)
 }
 #' @export
 #' @rdname type-predicates
 is_double <- function(x, n = NULL, finite = NULL) {
-  if (typeof(x) != "double") return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-
-  if (!is_null(finite)) {
-    if (finite) {
-      return(all(is.finite(x)))
-    } else {
-      return(!any(is.finite(x)))
-    }
-  }
-
-  TRUE
+  .Call(rlang_is_double, x, n, finite)
 }
 #' @export
 #' @rdname type-predicates
 is_character <- function(x, n = NULL, encoding = NULL) {
-  if (typeof(x) != "character") return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-  stopifnot(typeof(encoding) %in% c("character", "NULL"))
-  if (!is_null(encoding) && !all(chr_encoding(x) %in% encoding)) return(FALSE)
+  if (!is_null(encoding)) {
+    warn_deprecated("The `encoding` argument is deprecated as of rlang 0.3.0.")
+  }
+  if (!.Call(rlang_is_character, x, n)) {
+    return(FALSE)
+  }
+  if (!is_null(encoding)) {
+    stopifnot(typeof(encoding) == "character")
+    if (!all(chr_encoding(x) %in% encoding)) {
+      return(FALSE)
+    }
+  }
   TRUE
 }
 #' @export
 #' @rdname type-predicates
 is_logical <- function(x, n = NULL) {
-  if (typeof(x) != "logical") return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-  TRUE
+  .Call(rlang_is_logical, x, n)
 }
 #' @export
 #' @rdname type-predicates
 is_raw <- function(x, n = NULL) {
-  if (typeof(x) != "raw") return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-  TRUE
+  .Call(rlang_is_raw, x, n)
 }
 #' @export
 #' @rdname type-predicates
@@ -118,46 +112,54 @@ NULL
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_list <- function(x) {
-  is_list(x, n = 1)
+  .Call(rlang_is_list, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_atomic <- function(x) {
-  is_atomic(x, n = 1)
+  .Call(rlang_is_atomic, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_vector <- function(x) {
-  is_vector(x, n = 1)
+  .Call(rlang_is_vector, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_integer <- function(x) {
-  is_integer(x, n = 1)
+  .Call(rlang_is_integer, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_double <- function(x) {
-  is_double(x, n = 1)
+  .Call(rlang_is_double, x, 1L, NULL)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_character <- function(x, encoding = NULL) {
-  is_character(x, encoding = encoding, n = 1)
+  if (!is_null(encoding)) {
+    warn_deprecated("The `encoding` argument is deprecated as of rlang 0.3.0.")
+  }
+  is_character(x, encoding = encoding, n = 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_logical <- function(x) {
-  is_logical(x, n = 1)
+  .Call(rlang_is_logical, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_raw <- function(x) {
-  is_raw(x, n = 1)
+  .Call(rlang_is_raw, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
-is_string <- is_scalar_character
+is_string <- function(x, encoding = NULL) {
+  if (!is_null(encoding)) {
+    warn_deprecated("The `encoding` argument is deprecated as of rlang 0.3.0.")
+  }
+  is_character(x, encoding = encoding, n = 1L) && !is.na(x)
+}
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_bytes <- is_scalar_raw
@@ -215,6 +217,9 @@ is_bare_numeric <- function(x, n = NULL) {
 #' @export
 #' @rdname bare-type-predicates
 is_bare_character <- function(x, n = NULL, encoding = NULL) {
+  if (!is_null(encoding)) {
+    warn_deprecated("The `encoding` argument is deprecated as of rlang 0.3.0.")
+  }
   !is.object(x) && is_character(x, n, encoding = encoding)
 }
 #' @export
@@ -249,23 +254,19 @@ is_empty <- function(x) length(x) == 0
 
 #' Is object an environment?
 #'
-#' `is_bare_env()` tests whether `x` is an environment without a s3 or
+#' `is_bare_environment()` tests whether `x` is an environment without a s3 or
 #' s4 class.
 #'
 #' @inheritParams is_empty
 #' @export
-is_env <- function(x) {
+is_environment <- function(x) {
   typeof(x) == "environment"
 }
-#' @rdname is_env
+#' @rdname is_environment
 #' @export
-is_bare_env <- function(x) {
+is_bare_environment <- function(x) {
   !is.object(x) && typeof(x) == "environment"
 }
-
-# Anticipate renaming
-is_environment <- is_env
-is_bare_environment <- is_bare_env
 
 #' Is object identical to TRUE or FALSE?
 #'
@@ -290,11 +291,23 @@ is_false <- function(x) {
 
 #' Is a vector integer-like?
 #'
+#' @description
+#'
 #' These predicates check whether R considers a number vector to be
 #' integer-like, according to its own tolerance check (which is in
 #' fact delegated to the C library). This function is not adapted to
 #' data analysis, see the help for [base::is.integer()] for examples
 #' of how to check for whole numbers.
+#'
+#' Things to consider when checking for integer-like doubles:
+#'
+#' * This check can be expensive because the whole double vector has
+#'   to be traversed and checked.
+#'
+#' * Large double values may be integerish but may still not be
+#'   coercible to integer. This is because integers in R only support
+#'   values up to `2^31 - 1` while numbers stored as double can be
+#'   much larger.
 #'
 #' @seealso [is_bare_numeric()] for testing whether an object is a
 #'   base numeric type (a bare double or integer vector).
@@ -306,33 +319,26 @@ is_false <- function(x) {
 #' is_integerish(10.0, n = 2)
 #' is_integerish(10.000001)
 #' is_integerish(TRUE)
-is_integerish <- function(x, n = NULL, finite = TRUE) {
-  if (!typeof(x) %in% c("double", "integer")) return(FALSE)
-  if (!is_null(n) && length(x) != n) return(FALSE)
-
-  missing_elts <- is.na(x)
-  finite_elts <- is.finite(x) | missing_elts
-  if (is_true(finite) && !all(finite_elts)) {
-    return(FALSE)
-  } else if (is_false(finite)) {
-    return(!any(finite_elts))
-  }
-
-  x_finite <- x[finite_elts & !missing_elts]
-  all(x_finite == as.integer(x_finite))
+is_integerish <- function(x, n = NULL, finite = NULL) {
+  .Call(rlang_is_integerish, x, n, finite)
 }
 #' @rdname is_integerish
 #' @export
-is_bare_integerish <- function(x, n = NULL) {
-  !is.object(x) && is_integerish(x, n)
+is_bare_integerish <- function(x, n = NULL, finite = NULL) {
+  !is.object(x) && is_integerish(x, n, finite)
 }
 #' @rdname is_integerish
 #' @export
-is_scalar_integerish <- function(x) {
-  !is.object(x) && is_integerish(x, 1L)
+is_scalar_integerish <- function(x, finite = NULL) {
+  .Call(rlang_is_integerish, x, 1L, finite)
 }
 
 #' Base type of an object
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
 #'
 #' This is equivalent to [base::typeof()] with a few differences that
 #' make dispatching easier:
@@ -393,6 +399,11 @@ type_of <- function(x) {
 }
 
 #' Dispatch on base types
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
 #'
 #' `switch_type()` is equivalent to
 #' \code{\link[base]{switch}(\link{type_of}(x, ...))}, while
@@ -486,9 +497,9 @@ coerce_class <- function(.x, .to, ...) {
   switch(class(.x), ..., abort_coercion(.x, .to))
 }
 abort_coercion <- function(x, to_type) {
-  x_type <- friendly_type(type_of(x))
+  x_type <- friendly_type_of(x)
   if (!inherits(to_type, "AsIs")) {
-    to_type <- friendly_type(to_type)
+    to_type <- as_friendly_type(to_type)
   }
   abort(paste0("Can't convert ", x_type, " to ", to_type))
 }
@@ -510,7 +521,7 @@ abort_coercion <- function(x, to_type) {
 #' friendly_type("string")
 #' @export
 friendly_type <- function(type) {
-  friendly <- friendly_type_of(type)
+  friendly <- as_friendly_type(type)
   if (!is_null(friendly)) {
     return(friendly)
   }
@@ -528,7 +539,14 @@ friendly_type <- function(type) {
   type
 }
 
-friendly_type_of <- function(type) {
+friendly_type_of <- function(x) {
+  if (is.object(x)) {
+    sprintf("a `%s` object", class(x)[[1]])
+  } else {
+    as_friendly_type(typeof(x))
+  }
+}
+as_friendly_type <- function(type) {
   switch(type,
     logical = "a logical vector",
     integer = "an integer vector",
@@ -552,6 +570,7 @@ friendly_type_of <- function(type) {
     pairlist = "a pairlist node",
     expression = "an expression vector",
     quosure = "a quosure",
+    formula = "a formula",
 
     char = "an internal string",
     promise = "an internal promise",
@@ -562,7 +581,9 @@ friendly_type_of <- function(type) {
     primitive = ,
     builtin = ,
     special = "a primitive function",
-    closure = "a function"
+    closure = "a function",
+
+    type
   )
 }
 
@@ -589,9 +610,16 @@ friendly_expr_type_of <- function(type) {
 
 #' Dispatch on call type
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#'
 #' `switch_lang()` dispatches clauses based on the subtype of call, as
 #' determined by `lang_type_of()`. The subtypes are based on the type
 #' of call head (see details).
+#'
+#' @details
 #'
 #' Calls (objects of type `language`) do not necessarily call a named
 #' function. They can also call an anonymous function or the result of
@@ -630,8 +658,8 @@ friendly_expr_type_of <- function(type) {
 #'
 #' @section Life cycle:
 #'
-#' * `lang_type_of()` is an experimental function.
-#' * `switch_lang()` and `coerce_lang()` are experimental functions.
+#' All these functions are in the questioning stage and likely to be
+#' removed from the package.
 #'
 #' @inheritParams switch_type
 #' @param .x,x A language object (a call). If a formula quote, the RHS
@@ -686,6 +714,10 @@ lang_type_of <- function(x) {
     abort("corrupt language object")
   }
 }
+
+# Exported `switch_lang()` function is likely to be deprecated in the
+# future. Use switch_call() internally:
+switch_call <- switch_lang
 
 #' Is an object copyable?
 #'
@@ -800,8 +832,16 @@ type_sum.default <- function(x) {
       double = "dbl",
       character = "chr",
       complex = "cpl",
+      builtin = ,
+      special = ,
       closure = "fn",
       environment = "env",
+      symbol =
+        if (is_missing(x)) {
+          "missing"
+        } else {
+          "sym"
+        },
       typeof(x)
     )
   } else if (!isS4(x)) {

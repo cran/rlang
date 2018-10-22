@@ -1,5 +1,9 @@
 #' Establish a restart point on the stack
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#'
 #' Restart points are named functions that are established with
 #' `with_restarts()`. Once established, you can interrupt the normal
 #' execution of R code, jump to the restart, and resume execution from
@@ -7,10 +11,6 @@
 #' that is executed after the jump and that provides a return value
 #' from the establishing point (i.e., a return value for
 #' `with_restarts()`).
-#'
-#' Restarts are not the only way of jumping to a previous call frame
-#' (see [return_from()] or [return_to()]). However, they have the advantage of
-#' being callable by name once established.
 #'
 #' @param .expr An expression to execute with new restarts established
 #'   on the stack. This argument is passed by expression and supports
@@ -21,6 +21,19 @@
 #'   dots support [tidy dots][tidy-dots] features.
 #' @seealso [return_from()] and [return_to()] for a more flexible way
 #'   of performing a non-local jump to an arbitrary call frame.
+#'
+#' @details
+#'
+#' Restarts are not the only way of jumping to a previous call frame
+#' (see [return_from()] or [return_to()]). However, they have the
+#' advantage of being callable by name once established.
+#'
+#' @section Life cycle:
+#'
+#' All the restart functions are in the questioning stage. It is not
+#' clear yet whether we want to recommend restarts as a style of
+#' programming in R.
+#'
 #' @export
 #' @examples
 #' # Restarts are not the only way to jump to a previous frame, but
@@ -32,7 +45,7 @@
 #'
 #' # Whereas a non-local return requires to manually pass the calling
 #' # frame to the return function:
-#' fn <- function() g(get_env())
+#' fn <- function() g(current_env())
 #' g <- function(env) h(env)
 #' h <- function(env) { return_from(env, "returned"); "not returned" }
 #' fn()
@@ -96,22 +109,25 @@
 #' fn(FALSE)
 #'
 #' # Change the default value if you need an empty character vector by
-#' # defining an inplace handler that jumps to the restart. It has to
-#' # be inplace because exiting handlers jump to the place where they
+#' # defining a calling handler that jumps to the restart. It has to
+#' # be calling because exiting handlers jump to the place where they
 #' # are established before being executed, and the restart is not
 #' # defined anymore at that point:
-#' rst_handler <- inplace(function(c) rst_jump("rst_empty_chr"))
+#' rst_handler <- calling(function(c) rst_jump("rst_empty_chr"))
 #' with_handlers(fn(FALSE), default_empty_string = rst_handler)
 #'
 #' # You can use restarting() to create restarting handlers easily:
 #' with_handlers(fn(FALSE), default_empty_string = restarting("rst_null"))
 with_restarts <- function(.expr, ...) {
-  quo <- quo(withRestarts(expr = !! enquo(.expr), !!! dots_list(...)))
-  eval_tidy(quo)
+  do.call("withRestarts", list2(expr = quote(.expr), ...))
 }
 
 
 #' Restarts utilities
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
 #'
 #' Restarts are named jumping points established by [with_restarts()].
 #' `rst_list()` returns the names of all restarts currently
@@ -124,7 +140,14 @@ with_restarts <- function(.expr, ...) {
 #' @param .restart The name of a restart.
 #' @param ... Arguments passed on to the restart function. These
 #'   dots support [tidy dots][tidy-dots] features.
-#' @seealso [with_restarts()], [rst_muffle()].
+#' @seealso [with_restarts()]
+#'
+#' @section Life cycle:
+#'
+#' All the restart functions are in the questioning stage. It is not
+#' clear yet whether we want to recommend restarts as a style of
+#' programming in R.
+#'
 #' @export
 rst_list <- function() {
   computeRestarts()
@@ -144,19 +167,29 @@ rst_jump <- function(.restart, ...) {
 #' @export
 rst_maybe_jump <- function(.restart, ...) {
   if (rst_exists(.restart)) {
-    args <- c(list(r = .restart), dots_list(...))
+    args <- list2(r = .restart, ...)
     do.call("invokeRestart", args)
   }
 }
 
 #' Jump to the abort restart
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#'
 #' The abort restart is the only restart that is established at top
 #' level. It is used by R as a top-level target, most notably when an
 #' error is issued (see [abort()]) that no handler is able
 #' to deal with (see [with_handlers()]).
 #'
-#' @seealso [rst_jump()], [abort()] and [cnd_abort()].
+#' @section Life cycle:
+#'
+#' All the restart functions are in the questioning stage. It is not
+#' clear yet whether we want to recommend restarts as a style of
+#' programming in R.
+#'
+#' @seealso [rst_jump()], [abort()]
 #' @export
 #' @examples
 #' # The `abort` restart is a bit special in that it is always
@@ -199,85 +232,4 @@ rst_maybe_jump <- function(.restart, ...) {
 #' }
 rst_abort <- function() {
   rst_jump("abort")
-}
-
-#' Jump to a muffling restart
-#'
-#' Muffle restarts are established at the same location as where a
-#' condition is signalled. They are useful for two non-exclusive
-#' purposes: muffling signalling functions and muffling conditions. In
-#' the first case, `rst_muffle()` prevents any further side effects of
-#' a signalling function (a warning or message from being displayed,
-#' an aborting jump to top level, etc). In the second case, the
-#' muffling jump prevents a condition from being passed on to other
-#' handlers. In both cases, execution resumes normally from the point
-#' where the condition was signalled.
-#'
-#' @param c A condition to muffle.
-#' @seealso The `muffle` argument of [inplace()], and the `mufflable`
-#'   argument of [cnd_signal()].
-#' @export
-#' @examples
-#' side_effect <- function() cat("side effect!\n")
-#' handler <- inplace(function(c) side_effect())
-#'
-#' # A muffling handler is an inplace handler that jumps to a muffle
-#' # restart:
-#' muffling_handler <- inplace(function(c) {
-#'   side_effect()
-#'   rst_muffle(c)
-#' })
-#'
-#' # You can also create a muffling handler simply by setting
-#' # muffle = TRUE:
-#' muffling_handler <- inplace(function(c) side_effect(), muffle = TRUE)
-#'
-#' # You can then muffle the signalling function:
-#' fn <- function(signal, msg) {
-#'   signal(msg)
-#'   "normal return value"
-#' }
-#' with_handlers(fn(message, "some message"), message = handler)
-#' with_handlers(fn(message, "some message"), message = muffling_handler)
-#' with_handlers(fn(warning, "some warning"), warning = muffling_handler)
-#'
-#' # Note that exiting handlers are thrown to the establishing point
-#' # before being executed. At that point, the restart (established
-#' # within the signalling function) does not exist anymore:
-#' \dontrun{
-#' with_handlers(fn(warning, "some warning"),
-#'   warning = exiting(function(c) rst_muffle(c)))
-#' }
-#'
-#'
-#' # Another use case for muffle restarts is to muffle conditions
-#' # themselves. That is, to prevent other condition handlers from
-#' # being called:
-#' undesirable_handler <- inplace(function(c) cat("please don't call me\n"))
-#'
-#' with_handlers(foo = undesirable_handler,
-#'   with_handlers(foo = muffling_handler, {
-#'     cnd_signal("foo", mufflable = TRUE)
-#'     "return value"
-#'   }))
-#'
-#' # See the `mufflable` argument of cnd_signal() for more on this point
-rst_muffle <- function(c) {
-  UseMethod("rst_muffle")
-}
-#' @export
-rst_muffle.default <- function(c) {
-  abort("No muffle restart defined for this condition", "control")
-}
-#' @export
-rst_muffle.simpleMessage <- function(c) {
-  rst_jump("muffleMessage")
-}
-#' @export
-rst_muffle.simpleWarning <- function(c) {
-  rst_jump("muffleWarning")
-}
-#' @export
-rst_muffle.mufflable <- function(c) {
-  rst_jump("muffle")
 }

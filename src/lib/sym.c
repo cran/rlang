@@ -19,7 +19,7 @@ sexp* r_new_symbol(sexp* x, int* err) {
       *err = -1;
       return r_null;
     } else {
-      const char* type = r_type_c_string(r_typeof(x));
+      const char* type = r_type_as_c_string(r_typeof(x));
       r_abort("Can't create a symbol with a %s", type);
     }
   }}
@@ -55,7 +55,7 @@ bool r_is_special_op_sym(sexp* x) {
   }
 
   const char* name = CHAR(PRINTNAME(x));
-  size_t len = strlen(name);
+  int len = strlen(name);
 
   return
     len > 2 &&
@@ -69,9 +69,19 @@ sexp* r_function_sym;
 sexp* r_srcref_sym;
 sexp* r_tilde_sym;
 
+sexp* r_w_sym;
+sexp* r_x_sym;
+sexp* r_y_sym;
+sexp* r_z_sym;
+
 void r_init_library_sym() {
   r_dot_environment_sym = r_sym(".Environment");
   r_function_sym = r_sym("function");
   r_srcref_sym = r_sym("srcref");
   r_tilde_sym = r_sym("~");
+
+  r_w_sym = r_sym("w");
+  r_x_sym = r_sym("x");
+  r_y_sym = r_sym("y");
+  r_z_sym = r_sym("z");
 }

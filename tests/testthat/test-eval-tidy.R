@@ -15,10 +15,10 @@ test_that("eval_tidy uses quosure environment", {
 })
 
 test_that("data must be uniquely named", {
-  expect_error(eval_tidy(NULL, list(x = 1, x = 2)), "has duplicate elements")
+  expect_error(eval_tidy(NULL, list(x = 1, x = 2)), "has duplicate columns")
 
   data <- set_names(data.frame(x = 1, x = 2, y = 3, y = 4), c("x", "x", "y", "y"))
-  expect_error(eval_tidy(NULL, data), "has duplicate elements")
+  expect_error(eval_tidy(NULL, data), "has duplicate columns")
 })
 
 test_that("can supply unnamed empty data", {
@@ -152,7 +152,7 @@ test_that("two-sided formulas are not treated as quosures", {
 
 test_that("formulas are evaluated in evaluation environment", {
   f <- eval_tidy(quo(foo ~ bar), list(foo = "bar"))
-  expect_false(identical(f_env(f), get_env()))
+  expect_false(identical(f_env(f), current_env()))
 })
 
 test_that("evaluation env is cleaned up", {
@@ -164,42 +164,15 @@ test_that("evaluation env is cleaned up", {
 
 test_that("inner formulas are rechained to evaluation env", {
   env <- child_env(NULL)
-  f1 <- quo(env$eval_env1 <- get_env())
+  f1 <- quo(env$eval_env1 <- current_env())
   f2 <- quo({
     !! f1
-    env$eval_env2 <- get_env()
+    env$eval_env2 <- current_env()
   })
 
   eval_tidy(f2, mtcars)
   expect_identical(env$eval_env1, env$eval_env2)
   expect_true(env_inherits(env$eval_env2, get_env(f2)))
-})
-
-test_that("dyn scope is chained to lexical env", {
-  foo <- "bar"
-  overscope <- child_env(NULL)
-  expect_identical(eval_tidy_(quo(foo), overscope), "bar")
-})
-
-test_that("whole scope is purged", {
-  outside <- child_env(NULL, important = TRUE)
-  top <- child_env(outside, foo = "bar", hunoz = 1)
-  mid <- child_env(top, bar = "baz", hunoz = 2)
-
-  data_mask_objects <- list(
-    .top_env = top,
-    .env = 1,
-    `~` = 2,
-    .__tidyeval_data_mask__. = env()
-  )
-  bottom <- child_env(mid, !!! data_mask_objects)
-
-  overscope_clean(bottom)
-
-  expect_identical(names(bottom), character(0))
-  expect_identical(names(mid), character(0))
-  expect_identical(names(top), character(0))
-  expect_identical(names(outside), "important")
 })
 
 test_that("empty quosure self-evaluates", {
@@ -208,17 +181,11 @@ test_that("empty quosure self-evaluates", {
 })
 
 test_that("cannot replace elements of pronouns", {
-  expect_error(eval_tidy(quo(.data$foo <- "bar")), "Can't modify the data pronoun")
+  expect_error(eval_tidy(quo(.data$foo <- "bar"), mtcars), "Can't modify the data pronoun")
 })
 
 test_that("formulas are not evaluated as quosures", {
   expect_identical(eval_tidy(~letters), ~letters)
-})
-
-test_that("can supply environment as data", {
-  `_x` <- "foo"
-  expect_identical(eval_tidy(quo(`_x`), environment()), "foo")
-  expect_error(eval_tidy(quo(`_y`), environment()), "not found")
 })
 
 test_that("tilde calls are evaluated in overscope", {
@@ -259,20 +226,6 @@ test_that("Arguments to formulas are not stripped from their attributes (#227)",
   expect_identical(f_lhs(f), quo)
 })
 
-test_that("tilde thunks are unique", {
-  new_tilde_thunk <- function(data_mask, data_mask_top) {
-    .Call(rlang_new_tilde_thunk, data_mask, data_mask_top)
-  }
-
-  thunk1 <- new_tilde_thunk(1, 2)
-  thunk2 <- new_tilde_thunk(1, 2)
-  expect_false(is_reference(thunk1, thunk2))
-
-  body1 <- body(thunk1)
-  body2 <- body(thunk2)
-  expect_false(is_reference(body1, body2))
-})
-
 test_that("evaluating an empty quosure fails", {
   expect_error(eval_tidy(quo()), "not found")
 })
@@ -286,17 +239,33 @@ test_that("can supply a data mask as data", {
 test_that("as_data_pronoun() creates pronoun", {
   data <- as_data_pronoun(mtcars)
   expect_is(data, "rlang_data_pronoun")
+
+  data_env <- .subset2(data, 1)
+  expect_reference(env_parent(data_env), empty_env())
+  expect_true(all(env_names(data_env) %in% names(mtcars)))
+
   expect_error(data$foobar, "Column `foobar` not found in `.data`")
   expect_identical(data[["cyl"]], mtcars$cyl)
 })
 
+test_that("can create pronoun from a mask", {
+  top <- env(a = 1)
+  bottom <- env(top, b = 2)
+  mask <- new_data_mask(bottom, top)
+
+  .data <- as_data_pronoun(mask)
+  expect_is(.data, "rlang_data_pronoun")
+  expect_identical(.data$a, 1)
+  expect_identical(.data$b, 2)
+})
+
 test_that("pronoun has print() and str() method", {
   data <- as_data_pronoun(mtcars)
-  expect_output(print(data), "<pronoun>\n11 objects")
-  expect_output(str(data), "32 obs")
+  expect_output(print(data), "<pronoun>")
+  expect_output(str(data), "<pronoun>")
 
   data <- as_data_pronoun(list(a = 1))
-  expect_output(print(data), "<pronoun>\n1 object")
+  expect_output(print(data), "<pronoun>")
 })
 
 test_that("data mask can escape", {
@@ -305,11 +274,11 @@ test_that("data mask can escape", {
 })
 
 test_that("inner formulas are evaluated in the current frame", {
-  quo <- quo(local(list(f_env = f_env(~foo), env = environment())))
+  quo <- quo(local(list(f_env = f_env(~foo), env = current_env())))
   envs <- eval_tidy(quo)
   expect_identical(envs$f_env, envs$env)
 
-  quo <- quo(as_function(~list(f_env = get_env(~foo), env = environment()))())
+  quo <- quo(as_function(~list(f_env = get_env(~foo), env = current_env()))())
   envs <- eval_tidy(quo)
   expect_identical(envs$f_env, envs$env)
 })
@@ -330,4 +299,125 @@ test_that("names are translated to native when creating data mask", {
     s <- sym(foreign_native)
     expect_identical(eval_tidy(s, data = d), "value")
   })
+})
+
+test_that("new_data_mask() checks `top` is a parent of `bottom`", {
+  top <- env()
+  bottom <- env(top)
+  expect_no_error(new_data_mask(bottom, top))
+  expect_error(new_data_mask(top, bottom), "`top` is not a parent of `bottom`")
+})
+
+test_that("data mask inherits from last environment", {
+  mask <- new_data_mask(NULL, NULL)
+  expect_reference(env_parent(mask), empty_env())
+
+  eval_tidy(NULL, mask)
+  expect_reference(env_parent(mask), current_env())
+
+  env <- env()
+  quo <- new_quosure(NULL, env)
+  eval_tidy(quo, mask)
+  expect_reference(env_parent(mask), env)
+})
+
+test_that("is_data_pronoun() detects pronouns", {
+  expect_true(!!is_data_pronoun(quote(.data$foo)))
+  expect_true(!!is_data_pronoun(quote(.data[[foo]])))
+  expect_false(!!is_data_pronoun(quote(.data[foo])))
+  expect_false(!!is_data_pronoun(quote(data[[foo]])))
+})
+
+test_that("data_pronoun_name() extracts name", {
+  expr <- quote(.data[[foo]])
+  expect_null(data_pronoun_name(expr))
+
+  expr <- quote(.data[[toupper("foo")]])
+  expect_null(data_pronoun_name(expr))
+
+  expr <- quote(`$`(.data, toupper("foo")))
+  expect_null(data_pronoun_name(expr))
+
+  expect_identical(data_pronoun_name(quote(.data[["foo"]])), "foo")
+  expect_identical(data_pronoun_name(quote(.data$foo)), "foo")
+})
+
+test_that(".data pronoun walks the ancestry of environments", {
+  e  <- 0
+  e1 <- env(a = 1, b = 1, c = 1)
+  e2 <- env(a = 2, b = 2, e1)
+  e3 <- env(a = 3, e2)
+
+  data_mask <- new_data_mask(e3, e1)
+  .data <- as_data_pronoun(data_mask)
+
+  expect_equal(.data$a, 3)
+  expect_equal(.data$b, 2)
+  expect_equal(.data$c, 1)
+  expect_error(.data$d, "Column `d` not found in `.data`")
+  expect_error(.data$e, "Column `e` not found in `.data`")
+  expect_error(.data$.data, "Column `.data` not found in `.data`")
+  expect_error(.data$.env, "Column `.env` not found in `.data`")
+  expect_error(.data$.top_env, "Column `.top_env` not found in `.data`")
+
+  expect_equal(.data[["a"]], 3)
+  expect_equal(.data[["b"]], 2)
+  expect_equal(.data[["c"]], 1)
+  expect_error(.data[["d"]], "Column `d` not found in `.data`")
+  expect_error(.data[["e"]], "Column `e` not found in `.data`")
+  expect_error(.data[[".data"]], "Column `.data` not found in `.data`")
+  expect_error(.data[[".env"]], "Column `.env` not found in `.data`")
+  expect_error(.data[[".top_env"]], "Column `.top_env` not found in `.data`")
+
+  expect_error(.data["a"])
+  expect_warning(names(.data), "deprecated")
+  expect_warning(length(.data), "deprecated")
+})
+
+test_that("can inspect the exported pronoun", {
+  expect_output(print(rlang::.data), "<pronoun>")
+})
+
+test_that("data pronoun always skips functions", {
+  top <- env(c = "c")
+  bottom <- env(top, c = base::c)
+  mask <- new_data_mask(bottom, top)
+
+  .data <- as_data_pronoun(mask)
+  expect_identical(.data$c, "c")
+})
+
+test_that("leaked quosure masks are not mistaken with data masks", {
+  scoped_silent_retirement()
+  e <- eval_tidy(quote(current_env()))
+  expect_no_error(eval_tidy("foo", e))
+})
+
+test_that("quosures look for data masks lexically", {
+  out <- eval_tidy(data = mtcars, expr({
+    fn <- as_function(~ !!quo(cyl))
+    list(
+      fn(),
+      local(!!quo(disp))
+    )
+  }))
+  expect_identical(out, list(mtcars$cyl, mtcars$disp))
+})
+
+
+# Lifecycle ----------------------------------------------------------
+
+test_that("as_data_mask() and new_data_mask() warn once when passed a parent", {
+  expect_warning(as_data_mask(mtcars, env()), "deprecated")
+  expect_no_warning(as_data_mask(mtcars, env()))
+
+  expect_warning(new_data_mask(NULL, NULL, parent = env()), "deprecated")
+  expect_no_warning(new_data_mask(NULL, NULL, parent = env()))
+})
+
+test_that("supplying environment as data is deprecated", {
+  `_x` <- "foo"
+  expect_warning(eval_tidy("foo", current_env()), "deprecated")
+  expect_identical(eval_tidy(quo(`_x`), current_env()), "foo")
+  expect_error(eval_tidy(quo(`_y`), current_env()), "not found")
 })

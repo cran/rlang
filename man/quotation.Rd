@@ -18,16 +18,18 @@ expr(expr)
 
 enexpr(arg)
 
-exprs(..., .named = FALSE, .ignore_empty = c("trailing", "none", "all"),
-  .unquote_names = TRUE)
+exprs(..., .named = FALSE, .ignore_empty = c("trailing", "none",
+  "all"), .unquote_names = TRUE)
 
-enexprs(..., .named = FALSE, .ignore_empty = c("trailing", "none", "all"),
-  .unquote_names = TRUE)
+enexprs(..., .named = FALSE, .ignore_empty = c("trailing", "none",
+  "all"), .unquote_names = TRUE, .homonyms = c("keep", "first", "last",
+  "error"), .check_assign = FALSE)
 
 ensym(arg)
 
-ensyms(..., .named = FALSE, .ignore_empty = c("trailing", "none", "all"),
-  .unquote_names = TRUE)
+ensyms(..., .named = FALSE, .ignore_empty = c("trailing", "none",
+  "all"), .unquote_names = TRUE, .homonyms = c("keep", "first", "last",
+  "error"), .check_assign = FALSE)
 
 quo(expr)
 
@@ -36,8 +38,9 @@ enquo(arg)
 quos(..., .named = FALSE, .ignore_empty = c("trailing", "none", "all"),
   .unquote_names = TRUE)
 
-enquos(..., .named = FALSE, .ignore_empty = c("trailing", "none", "all"),
-  .unquote_names = TRUE)
+enquos(..., .named = FALSE, .ignore_empty = c("trailing", "none",
+  "all"), .unquote_names = TRUE, .homonyms = c("keep", "first", "last",
+  "error"), .check_assign = FALSE)
 }
 \arguments{
 \item{expr}{An expression.}
@@ -52,19 +55,34 @@ arguments to capture without evaluation (including \code{...}). For
 (including expressions contained in \code{...}).}
 
 \item{.named}{Whether to ensure all dots are named. Unnamed
-elements are processed with \code{\link[=expr_text]{expr_text()}} to figure out a default
-name. If an integer, it is passed to the \code{width} argument of
-\code{expr_text()}, if \code{TRUE}, the default width is used. See
-\code{\link[=exprs_auto_name]{exprs_auto_name()}}.}
+elements are processed with \code{\link[=quo_name]{quo_name()}} to build a default
+name. See also \code{\link[=quos_auto_name]{quos_auto_name()}}.}
 
 \item{.ignore_empty}{Whether to ignore empty arguments. Can be one
 of \code{"trailing"}, \code{"none"}, \code{"all"}. If \code{"trailing"}, only the
-last argument is ignored if it is empty.}
+last argument is ignored if it is empty. Note that \code{"trailing"}
+applies only to arguments passed in \code{...}, not to named
+arguments. On the other hand, \code{"all"} also applies to named
+arguments.}
 
 \item{.unquote_names}{Whether to treat \code{:=} as \code{=}. Unlike \code{=}, the
 \code{:=} syntax supports \code{!!} unquoting on the LHS.}
+
+\item{.homonyms}{How to treat arguments with the same name. The
+default, \code{"keep"}, preserves these arguments. Set \code{.homonyms} to
+\code{"first"} to only keep the first occurrences, to \code{"last"} to keep
+the last occurrences, and to \code{"error"} to raise an informative
+error and indicate what arguments have duplicated names.}
+
+\item{.check_assign}{Whether to check for \code{<-} calls passed in
+dots. When \code{TRUE} and a \code{<-} call is detected, a warning is
+issued to advise users to use \code{=} if they meant to match a
+function parameter, or wrap the \code{<-} call in braces otherwise.
+This ensures assignments are explicit.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+
 Quotation is a mechanism by which an expression supplied as
 argument is captured by a function. Instead of seeing the value of
 the argument, the function sees the recipe (the R code) to make
@@ -114,12 +132,12 @@ is supplied they throw an error.
 }
 
 In terms of base functions, \code{enexpr(arg)} corresponds to
-\code{base::substitute(arg)} (though that function has complex
-semantics) and \code{expr()} is like \code{\link[=quote]{quote()}} (and \code{\link[=bquote]{bquote()}} if we
-consider unquotation syntax). The plural variant \code{exprs()} is
-equivalent to \code{\link[base:alist]{base::alist()}}. Finally there is no function in base
-R that is equivalent to \code{enexprs()} but you can reproduce its
-behaviour with \code{eval(substitute(alist(...)))}.
+\code{base::substitute(arg)} (though that function also features complex
+substitution semantics) and \code{expr()} is like \code{\link[=quote]{quote()}} (and
+\code{\link[=bquote]{bquote()}} if we consider unquotation syntax). The plural variant
+\code{exprs()} is equivalent to \code{\link[base:alist]{base::alist()}}. Finally there is no
+function in base R that is equivalent to \code{enexprs()} but you can
+reproduce its behaviour with \code{eval(substitute(alist(...)))}.
 }
 
 \section{Capture expressions in quosures}{
@@ -134,7 +152,7 @@ functions and objects mentioned in the expression are defined.
 
 Quosures are objects that can be evaluated with \code{\link[=eval_tidy]{eval_tidy()}} just
 like symbols or function calls. Since they always evaluate in their
-original environment, quosures can be seen as a vehicle that allow
+original environment, quosures can be seen as vehicles that allow
 expressions to travel from function to function but that beam back
 instantly to their original environment upon evaluation.
 
@@ -144,8 +162,7 @@ See the \link{quosure} help topic about tools to work with quosures.
 \section{Quasiquotation}{
 
 
-All quotation functions in rlang have support for \link[=quasiquotation]{unquoting
-operators}. The combination of quotation and
+All quotation functions in rlang have support for \link[=quasiquotation]{unquoting operators}. The combination of quotation and
 unquotation is called \emph{quasiquotation}.
 
 Unquotation provides a way to refer to variables during quotation.
@@ -167,12 +184,6 @@ that are unquoted).
 
 See the \link{quasiquotation} help topic for more about this as well as
 \href{https://adv-r.hadley.nz/quasiquotation.html}{the chapter in Advanced R}.
-}
-
-\section{Life cycle}{
-
-
-All the quotation functions mentioned here are stable.
 }
 
 \examples{
@@ -206,7 +217,7 @@ what <- sym("bonjour")
 expr(say(what))
 expr(say(!!what))
 
-# This also applies to the expressions supplied the user. This is
+# This also applies to expressions supplied by the user. This is
 # like an escape hatch that allows control over the captured
 # expression:
 expr_inputs(say(!!what), !!what)

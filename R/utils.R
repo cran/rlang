@@ -65,7 +65,7 @@ map_around <- function(.x, .neighbour = c("right", "left"), .f, ...) {
 }
 
 discard_unnamed <- function(x) {
-  if (is_env(x)) {
+  if (is_environment(x)) {
     x
   } else {
     discard(x, names2(x) == "")
@@ -81,10 +81,10 @@ captureDots <- function() {
   .Call(rlang_capturedots, NULL, NULL, args, environment())
 }
 
-meow <- function(..., .trailing = TRUE) {
-  cat(chr_lines(..., .trailing = .trailing))
+cat_line <- function(..., .trailing = TRUE) {
+  cat(paste_line(..., .trailing = .trailing))
 }
-chr_lines <- function(..., .trailing = FALSE) {
+paste_line <- function(..., .trailing = FALSE) {
   lines <- paste(chr(...), collapse = "\n")
   if (.trailing) {
     lines <- paste0(lines, "\n")
@@ -92,65 +92,38 @@ chr_lines <- function(..., .trailing = FALSE) {
   lines
 }
 
-red <- function(x) {
-  if (is_installed("crayon")) {
-    crayon::red(x)
-  } else {
-    x
-  }
-}
-blue <- function(x) {
-  if (is_installed("crayon")) {
-    crayon::blue(x)
-  } else {
-    x
-  }
-}
-green <- function(x) {
-  if (is_installed("crayon")) {
-    crayon::green(x)
-  } else {
-    x
-  }
-}
-yellow <- function(x) {
-  if (is_installed("crayon")) {
-    crayon::yellow(x)
-  } else {
-    x
-  }
-}
-magenta <- function(x) {
-  if (is_installed("crayon")) {
-    crayon::magenta(x)
-  } else {
-    x
-  }
-}
-cyan <- function(x) {
-  if (is_installed("crayon")) {
-    crayon::cyan(x)
-  } else {
-    x
-  }
-}
-
 has_crayon <- function() {
   is_installed("crayon") && crayon::has_color()
 }
-open_red <- function() if (has_crayon()) open_style("red")
-open_blue <- function() if (has_crayon()) open_style("blue")
-open_green <- function() if (has_crayon()) open_style("green")
-open_yellow <- function() if (has_crayon()) open_style("yellow")
-open_magenta <- function() if (has_crayon()) open_style("magenta")
-open_cyan <- function() if (has_crayon()) open_style("cyan")
 
+red       <- function(x) if (has_crayon()) crayon::red(x)       else x
+blue      <- function(x) if (has_crayon()) crayon::blue(x)      else x
+green     <- function(x) if (has_crayon()) crayon::green(x)     else x
+yellow    <- function(x) if (has_crayon()) crayon::yellow(x)    else x
+magenta   <- function(x) if (has_crayon()) crayon::magenta(x)   else x
+cyan      <- function(x) if (has_crayon()) crayon::cyan(x)      else x
+blurred   <- function(x) if (has_crayon()) crayon::blurred(x)   else x
+silver    <- function(x) if (has_crayon()) crayon::silver(x)    else x
+bold      <- function(x) if (has_crayon()) crayon::bold(x)      else x
+italic    <- function(x) if (has_crayon()) crayon::italic(x)    else x
+underline <- function(x) if (has_crayon()) crayon::underline(x) else x
+
+open_red     <- function() if (has_crayon()) open_style("red")
+open_blue    <- function() if (has_crayon()) open_style("blue")
+open_green   <- function() if (has_crayon()) open_style("green")
+open_yellow  <- function() if (has_crayon()) open_style("yellow")
+open_magenta <- function() if (has_crayon()) open_style("magenta")
+open_cyan    <- function() if (has_crayon()) open_style("cyan")
 close_colour <- function() if (has_crayon()) "\u001b[39m"
 close_italic <- function() if (has_crayon()) "\u001b[23m"
 
-open_yellow_italic <- function() if (has_crayon()) "\u001b[33m\u001b[3m"
-open_blurred_italic <- function() if (has_crayon()) "\u001b[2m\u001b[3m"
+open_yellow_italic   <- function() if (has_crayon()) "\u001b[33m\u001b[3m"
+open_blurred_italic  <- function() if (has_crayon()) "\u001b[2m\u001b[3m"
 close_blurred_italic <- function() if (has_crayon()) "\u001b[23m\u001b[22m"
+
+bullet <- function(x) {
+  paste0(bold(silver("* ")), x)
+}
 
 
 open_style <- function(style) {
@@ -214,7 +187,7 @@ codes <- list(
   }
 }
 r6lite <- function(...) {
-  structure(new_environment(dots_list(...)), class = "r6lite")
+  structure(new_environment(list2(...)), class = "r6lite")
 }
 child_r6lite <- function(.parent, ...) {
   structure(child_env(.parent, ...), class = "r6lite")
@@ -225,4 +198,18 @@ inc <- function(x) {
 }
 dec <- function(x) {
   x - 1L
+}
+
+pluralise <- function(n, singular, plural) {
+  if (n == 1) {
+    singular
+  } else {
+    plural
+  }
+}
+pluralise_along <- function(x, singular, plural) {
+  pluralise(length(x), singular, plural)
+}
+pluralise_n <- function(n, singular, plural) {
+  pluralise(n, singular, plural)
 }

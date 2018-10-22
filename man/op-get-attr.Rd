@@ -3,9 +3,12 @@
 \name{op-get-attr}
 \alias{op-get-attr}
 \alias{\%@\%}
-\title{Infix attribute accessor}
+\alias{\%@\%<-}
+\title{Infix attribute accessor and setter}
 \usage{
 x \%@\% name
+
+x %@% name <- value
 }
 \arguments{
 \item{x}{Object}
@@ -13,9 +16,20 @@ x \%@\% name
 \item{name}{Attribute name}
 }
 \description{
-Infix attribute accessor
+This operator extracts or sets attributes for regular objects and
+S4 fields for S4 objects.
 }
 \examples{
+# Unlike `@`, this operator extracts attributes for any kind of
+# objects:
 factor(1:3) \%@\% "levels"
-mtcars \%@\% "class"
+mtcars \%@\% class
+
+mtcars \%@\% class <- NULL
+mtcars
+
+# It also works on S4 objects:
+.Person <- setClass("Person", slots = c(name = "character", species = "character"))
+fievel <- .Person(name = "Fievel", species = "mouse")
+fievel \%@\% name
 }

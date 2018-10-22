@@ -110,7 +110,148 @@ test_that("dots_node() doesn't trim attributes from arguments", {
   expect_identical(node_car(dots), x)
 })
 
+test_that("dots_split() splits named and unnamed dots", {
+  dots <- dots_split(1, 2)
+  expect_identical(dots$named, list())
+  expect_identical(dots$unnamed, list(1, 2))
+
+  dots <- dots_split(a = 1, 2)
+  expect_identical(dots$named, list(a = 1))
+  expect_identical(dots$unnamed, list(2))
+
+  dots <- dots_split(a = 1, b = 2)
+  expect_identical(dots$named, list(a = 1, b = 2))
+  expect_identical(dots$unnamed, list())
+})
+
+test_that("dots_split() handles empty dots", {
+  dots <- dots_split()
+  expect_identical(dots$named, list())
+  expect_identical(dots$unnamed, list())
+})
+
+test_that("dots_split() fails if .n_unnamed doesn't match", {
+  expect_error(dots_split(1, 2, .n_unnamed = 1), "Expected 1 unnamed")
+  expect_error(dots_split(1, 2, .n_unnamed = 0:1), "Expected 0 or 1 unnamed")
+
+  dots <- dots_split(a = 1, 2, .n_unnamed = 1)
+  expect_identical(dots$named, list(a = 1))
+  expect_identical(dots$unnamed, list(2))
+})
+
 test_that("can splice NULL and atomic vectors", {
   expect_identical(list2(!!!letters), as.list(letters))
   expect_identical(list2(!!!NULL), list())
+})
+
+test_that("can unquote quosures in LHS", {
+  quo <- quo(foo)
+  expect_identical(list2(!!quo := NULL), list(foo = NULL))
+  expect_identical(exprs(!!quo := bar), exprs(foo = bar))
+})
+
+test_that("can preserve empty arguments", {
+  list3 <- function(...) unname(dots_list(..., .preserve_empty = TRUE))
+  expect_identical(list3(, ), list(missing_arg()))
+  expect_identical(list3(, , .ignore_empty = "none"), list(missing_arg(), missing_arg()))
+  expect_identical(list3(, , .ignore_empty = "all"), list())
+})
+
+test_that("forced symbolic objects are not evaluated", {
+  x <- list(quote(`_foo`))
+  expect_identical_(lapply(x, list2), list(x))
+  expect_identical_(list2(!!!x), x)
+
+  x <- unname(exprs(stop("tilt")))
+  expect_identical_(lapply(x, list2), list(x))
+})
+
+test_that("dots collectors do not warn by default with bare `<-` arguments", {
+  expect_no_warning(list2(a <- 1))
+  expect_no_warning(dots_list(a <- 1))
+
+  expect_no_warning(exprs(a <- 1))
+  expect_no_warning(quos(a <- 1))
+
+  myexprs <- function(...) enexprs(...)
+  myquos <- function(...) enexprs(...)
+  expect_no_warning(myexprs(a <- 1))
+  expect_no_warning(myquos(a <- 1))
+})
+
+test_that("dots collectors can elect to warn with bare `<-` arguments", {
+  expect_warning(dots_list(a <- 1, .check_assign = TRUE), "`<-` as argument")
+  myexprs <- function(...) enexprs(..., .check_assign = TRUE)
+  myquos <- function(...) enexprs(..., .check_assign = TRUE)
+  expect_warning(myexprs(TRUE, a <- 1), "`<-` as argument")
+  expect_warning(myquos(TRUE, a <- 1), "`<-` as argument")
+})
+
+test_that("dots collectors never warn for <- when option is set", {
+  scoped_options(rlang_dots_disable_assign_warning = TRUE)
+
+  expect_no_warning(list2(a <- 1))
+  myexprs <- function(...) enexprs(..., .check_assign = TRUE)
+  myquos <- function(...) enquos(..., .check_assign = TRUE)
+  expect_no_warning(myexprs(a <- 1))
+  expect_no_warning(myquos(a <- 1))
+})
+
+test_that("`.homonyms` is matched exactly", {
+  expect_error(dots_list(.homonyms = "k"), "must be one of")
+})
+
+test_that("`.homonyms = 'first'` matches first homonym", {
+  list_first <- function(...) {
+    dots_list(..., .homonyms = "first")
+  }
+
+  out <- list_first(1, 2)
+  expect_identical(out, named_list(1, 2))
+
+  out <- list_first(a = 1, b = 2, 3, 4)
+  expect_identical(out, list(a = 1, b = 2, 3, 4))
+
+  out <- list_first(a = 1, b = 2, a = 3, a = 4, 5, 6)
+  expect_identical(out, list(a = 1, b = 2, 5, 6))
+})
+
+test_that("`.homonyms = 'last'` matches last homonym", {
+  list_last <- function(...) {
+    dots_list(..., .homonyms = "last")
+  }
+
+  out <- list_last(1, 2)
+  expect_identical(out, named_list(1, 2))
+
+  out <- list_last(a = 1, b = 2, 3, 4)
+  expect_identical(out, list(a = 1, b = 2, 3, 4))
+
+  out <- list_last(a = 1, b = 2, a = 3, a = 4, 5, 6)
+  expect_identical(out, list(b = 2, a = 4, 5, 6))
+})
+
+test_that("`.homonyms` = 'error' fails with homonyms", {
+  list_error <- function(...) {
+    dots_list(..., .homonyms = "error")
+  }
+
+  expect_identical(list_error(1, 2), named_list(1, 2))
+  expect_identical(list_error(a = 1, b = 2), list(a = 1, b = 2))
+
+  expect_error(list_error(1, a = 2, a = 3), "multiple arguments named `a` at positions 2 and 3")
+
+  expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `a` at positions 2 and 8")
+  expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `b` at positions 3, 5 and 6")
+})
+
+test_that("`.homonyms` works with spliced arguments", {
+  args <- list(a = 1, b = 2, a = 3, a = 4, 5, 6)
+  expect_identical(dots_list(!!!args, .homonyms = "first"), list(a = 1, b = 2, 5, 6))
+
+  myexprs <- function(...) enexprs(..., .homonyms = "last")
+  expect_identical(myexprs(!!!args), list(b = 2, a = 4, 5, 6))
+
+  myquos <- function(...) enquos(..., .homonyms = "first")
+  expect_identical(myquos(!!!args), quos_list(a = quo(1), b = quo(2), quo(5), quo(6)))
 })

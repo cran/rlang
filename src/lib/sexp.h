@@ -2,8 +2,8 @@
 #define RLANG_SEXP_H
 
 
-static inline r_ssize_t r_length(sexp* x) {
-  return Rf_length(x);
+static inline r_ssize r_length(sexp* x) {
+  return Rf_xlength(x);
 }
 
 static inline enum r_type r_typeof(sexp* x) {
@@ -34,37 +34,6 @@ static inline bool r_inherits(sexp* x, const char* tag) {
   return Rf_inherits(x, tag);
 }
 
-static inline void r_poke_attribute(sexp* x, sexp* sym, sexp* value) {
-  Rf_setAttrib(x, sym, value);
-}
-static inline void r_poke_class(sexp* x, sexp* classes) {
-  Rf_setAttrib(x, R_ClassSymbol, classes);
-}
-
-sexp* r_set_attribute(sexp* x, sexp* sym, sexp* attr);
-
-static inline sexp* r_set_class(sexp* x, sexp* classes) {
-  return r_set_attribute(x, R_ClassSymbol, classes);
-}
-
-static inline sexp* r_get_class(sexp* x) {
-  return Rf_getAttrib(x, R_ClassSymbol);
-}
-
-// From attrs.c
-sexp* r_get_attribute(sexp* x, sexp* tag);
-
-static inline sexp* r_vec_names(sexp* x) {
-  return r_get_attribute(x, R_NamesSymbol);
-}
-
-static inline void r_poke_names(sexp* x, sexp* nms) {
-  Rf_setAttrib(x, R_NamesSymbol, nms);
-}
-
-bool r_has_name_at(sexp* x, r_ssize_t i);
-bool r_is_named(sexp* x);
-
 static inline sexp* r_missing_arg() {
   return R_MissingArg;
 }
@@ -82,6 +51,12 @@ static inline sexp* r_duplicate(sexp* x, bool shallow) {
   } else {
     return Rf_duplicate(x);
   }
+}
+static inline sexp* r_copy(sexp* x) {
+  return Rf_duplicate(x);
+}
+static inline sexp* r_clone(sexp* x) {
+  return Rf_shallow_duplicate(x);
 }
 
 static inline sexp* r_maybe_duplicate(sexp* x, bool shallow) {
@@ -101,7 +76,7 @@ static inline sexp* r_poke_str_type(sexp* x, const char* type) {
   return x;
 }
 
-static inline const char* r_type_c_string(enum r_type type) {
+static inline const char* r_type_as_c_string(enum r_type type) {
   return CHAR(Rf_type2str(type));
 }
 
@@ -111,7 +86,7 @@ static inline bool r_is_symbolic(sexp* x) {
     r_typeof(x) == SYMSXP;
 }
 
-static inline void r_sxp_print(sexp* x) {
+static inline void r_sexp_print(sexp* x) {
   Rf_PrintValue(x);
 }
 

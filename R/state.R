@@ -54,7 +54,7 @@
 #' peek_options("my_option")
 #' peek_options("my_option", "digits")
 scoped_options <- function(..., .frame = caller_env()) {
-  options <- dots_list(...)
+  options <- list2(...)
   stopifnot(is_named(options))
 
   old <- options(options)
@@ -74,7 +74,7 @@ with_options <- function(.expr, ...) {
 #' @rdname scoped_options
 #' @export
 push_options <- function(...) {
-  options(dots_list(...))
+  options(list2(...))
 }
 #' @rdname scoped_options
 #' @export
@@ -87,4 +87,15 @@ peek_options <- function(...) {
 #' @export
 peek_option <- function(name) {
   getOption(name)
+}
+
+
+# Easier to test than `interactive()`
+is_interactive <- function() {
+  opt <- peek_option("rlang_force_interactive")
+  if (!is_null(opt)) {
+    return(is_true(opt))
+  }
+
+  interactive()
 }

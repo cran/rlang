@@ -178,6 +178,30 @@ test_that("call_deparse() handles multi-line arguments", {
   expect_identical(sexp_deparse(quote(foo(one = 1, two = nested(one = 1, two = 2))), ctxt), c("foo(one = 1, two = nested(", "  one = 1, two = 2))"))
 })
 
+test_that("call_deparse() delimits CAR when needed", {
+  call <- expr((!!quote(function() x + 1))())
+  expect_identical(call_deparse(call), "(function() x + 1)()")
+
+  # Only equal because of the extra parentheses
+  expect_equal(parse_expr(expr_deparse(call)), call)
+
+  call <- expr((!!quote(f + g))(x))
+  expect_identical(call_deparse(call), "`+`(f, g)(x)")
+  expect_identical(parse_expr(expr_deparse(call)), call)
+
+  call <- expr((!!quote(+f))(x))
+  expect_identical(call_deparse(call), "`+`(f)(x)")
+  expect_identical(parse_expr(expr_deparse(call)), call)
+
+  call <- expr((!!quote(while (TRUE) NULL))(x))
+  expect_identical(call_deparse(call), "`while`(TRUE, NULL)(x)")
+  expect_identical(parse_expr(expr_deparse(call)), call)
+
+  call <- expr(foo::bar(x))
+  expect_identical(call_deparse(call), "foo::bar(x)")
+  expect_identical(parse_expr(expr_deparse(call)), call)
+})
+
 test_that("literal functions are deparsed", {
   expect_identical_(sexp_deparse(function(a) 1), "<function(a) 1>")
   expect_identical_(sexp_deparse(expr(foo(!!function(a) 1))), "foo(<function(a) 1>)")
@@ -275,4 +299,85 @@ test_that("missing values are deparsed", {
   expect_identical(sexp_deparse(quote(call(NA_real_))), "call(<dbl: NA>)")
   expect_identical(sexp_deparse(quote(call(NA_complex_))), "call(<cpl: NA>)")
   expect_identical(sexp_deparse(quote(call(NA_character_))), "call(<chr: NA>)")
+})
+
+test_that("needs_backticks() detects non-syntactic symbols", {
+  expect_true(all(map_lgl(reserved_words, needs_backticks)))
+
+  expect_false(any(map_lgl(c(".", "a", "Z"), needs_backticks)))
+
+  expect_true(all(map_lgl(c("1", ".1", "~", "!"), needs_backticks)))
+  expect_true(all(map_lgl(c("_", "_foo", "1foo"), needs_backticks)))
+  expect_true(all(map_lgl(c(".fo!o", "b&ar", "baz <- _baz", "~quux.", "h~unoz_"), needs_backticks)))
+
+  expect_false(any(map_lgl(c(".foo", "._1", "bar", "baz_baz", "quux.", "hunoz_", "..."), needs_backticks)))
+
+  expect_false(needs_backticks(expr()))
+})
+
+test_that("expr_text() and expr_name() interpret unicode tags (#611)", {
+  expect_identical(expr_text(quote(`<U+006F>`)), "o")
+  expect_identical(expr_name(quote(`~f<U+006F><U+006F>`)), "~foo")
+  expect_identical(label(quote(`~f<U+006F><U+006F>`)), "~foo")
+})
+
+test_that("expr_text() deparses non-syntactic symbols with backticks (#211)", {
+  expect_identical(expr_text(sym("~foo")), "`~foo`")
+  expect_identical(expr_text(sym("~f<U+006F><U+006F>")), "`~foo`")
+  expect_identical(expr_text(call("~foo")), "`~foo`()")
+})
+
+test_that("expr_text() deparses empty arguments", {
+  expect_identical(expr_text(expr()), "")
+  expect_identical(quo_text(expr()), "")
+  expect_identical(quo_text(quo()), "")
+})
+
+test_that("expr_name() deparses empty arguments", {
+  expect_identical(expr_name(expr()), "")
+  expect_identical(quo_name(quo()), "")
+  expect_identical(names(quos_auto_name(quos(, ))), "<empty>")
+  expect_identical(label(expr()), "<empty>")
+})
+
+test_that("expr_deparse() handles newlines in strings (#484)", {
+  x <- "foo\n"
+
+  expect_identical(expr_deparse(x), "\"foo\\n\"")
+  expect_output(expr_print(x), "foo\\n", fixed = TRUE)
+
+  roundtrip <- parse_expr(expr_deparse(x))
+  expect_identical(x, roundtrip)
+})
+
+test_that("expr_deparse() handles ANSI escapes in strings", {
+  expect_identical(expr_deparse("\\"), deparse("\\"))
+  expect_identical(expr_deparse("\\a"), deparse("\\a"))
+  expect_identical(expr_deparse("\\b"), deparse("\\b"))
+  expect_identical(expr_deparse("\\f"), deparse("\\f"))
+  expect_identical(expr_deparse("\\n"), deparse("\\n"))
+  expect_identical(expr_deparse("\\r"), deparse("\\r"))
+  expect_identical(expr_deparse("\\t"), deparse("\\t"))
+  expect_identical(expr_deparse("\\v"), deparse("\\v"))
+  expect_identical(expr_deparse("\\0"), deparse("\\0"))
+})
+
+test_that("label() and expr_name() handles .data pronoun", {
+  expect_identical(expr_name(quote(.data[["bar"]])), "bar")
+  expect_identical(quo_name(quo(.data[["bar"]])), "bar")
+  expect_identical(label(quote(.data[["bar"]])), "bar")
+  expect_identical(label(quo(.data[["bar"]])), "bar")
+})
+
+test_that("label() handles literals", {
+  expect_identical(label(1:2), "<int>")
+  expect_identical(label(c(1, 2)), "<dbl>")
+  expect_identical(label(letters), "<chr>")
+  expect_identical(label(base::list), "<fn>")
+  expect_identical(label(base::mean), "<fn>")
+})
+
+test_that("label() handles objects", {
+  expect_identical(label(mtcars), "<data.frame>")
+  expect_identical(label(structure(1, class = "foo")), "<S3: foo>")
 })

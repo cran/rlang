@@ -58,29 +58,47 @@ struct expansion_info which_bang_op(sexp* first) {
 // future
 void signal_uq_soft_deprecation() {
   return ;
-  signal_soft_deprecation(
+  signal_soft_deprecated(
     "`UQ()` is soft-deprecated as of rlang 0.2.0. "
     "Please use the prefix form of `!!` instead."
   );
 }
 void signal_uqs_soft_deprecation() {
   return ;
-  signal_soft_deprecation(
+  signal_soft_deprecated(
     "`UQS()` is soft-deprecated as of rlang 0.2.0. "
     "Please use the prefix form of `!!!` instead."
   );
 }
 
 void signal_namespaced_uq_deprecation() {
-  signal_soft_deprecation(
-    "Prefixing `UQ()` with a namespace is soft-deprecated as of rlang 0.2.0. "
-    "Please use the unprefixed form instead."
+  r_warn_deprecated("namespaced rlang::UQ()",
+    "Prefixing `UQ()` with the rlang namespace is deprecated as of rlang 0.3.0.\n"
+    "Please use the non-prefixed form or `!!` instead.\n"
+    "\n"
+    "  # Bad:\n"
+    "  rlang::expr(mean(rlang::UQ(var) * 100))\n"
+    "\n"
+    "  # Ok:\n"
+    "  rlang::expr(mean(UQ(var) * 100))\n"
+    "\n"
+    "  # Good:\n"
+    "  rlang::expr(mean(!!var * 100))\n"
   );
 }
 void signal_namespaced_uqs_deprecation() {
-  signal_soft_deprecation(
-    "Prefixing `UQS()` with a namespace is soft-deprecated as of rlang 0.2.0. "
-    "Please use the unprefixed form instead."
+  r_warn_deprecated("namespaced rlang::UQS()",
+    "Prefixing `UQS()` with the rlang namespace is deprecated as of rlang 0.3.0.\n"
+    "Please use the non-prefixed form or `!!!` instead.\n"
+    "\n"
+    "  # Bad:\n"
+    "  rlang::expr(mean(rlang::UQS(args)))\n"
+    "\n"
+    "  # Ok:\n"
+    "  rlang::expr(mean(UQS(args)))\n"
+    "\n"
+    "  # Good:\n"
+    "  rlang::expr(mean(!!!args))\n"
   );
 }
 
@@ -96,7 +114,7 @@ void maybe_poke_big_bang_op(sexp* x, struct expansion_info* info) {
 
   // Handle expressions like foo::`!!`(bar) or foo$`!!`(bar)
   if (r_is_prefixed_call(x, "!!!")) {
-    const char* name = r_sym_c_str(r_node_caar(x));
+    const char* name = r_sym_get_c_string(r_node_caar(x));
     r_abort("Prefix form of `!!!` can't be used with `%s`", name);
   }
 
@@ -111,6 +129,8 @@ void maybe_poke_big_bang_op(sexp* x, struct expansion_info* info) {
     return ;
   }
 }
+
+static sexp* dot_data_sym = NULL;
 
 struct expansion_info which_expansion_op(sexp* x, bool unquote_names) {
   struct expansion_info info = which_bang_op(x);
@@ -196,6 +216,23 @@ struct expansion_info which_expansion_op(sexp* x, bool unquote_names) {
     return info;
   }
 
+  if (r_is_call(x, "[[") && r_node_cadr(x) == dot_data_sym) {
+    info.op = OP_EXPAND_DOT_DATA;
+    info.root = x;
+    info.parent = r_node_cddr(x);
+    info.operand = r_node_car(info.parent);
+
+    // User had to unquote operand manually before .data[[ was unquote syntax
+    struct expansion_info nested = which_expansion_op(info.operand, false);
+    if (nested.op == OP_EXPAND_UQ) {
+      const char* msg = "It is no longer necessary to unquote within the `.data` pronoun";
+      r_signal_soft_deprecated(msg, msg, "dplyr", r_empty_env);
+      info.operand = nested.operand;
+    }
+
+    return info;
+  }
+
   return info;
 }
 
@@ -211,6 +248,8 @@ struct expansion_info is_big_bang_op(sexp* x) {
 
 
 static sexp* bang_bang_teardown(sexp* value, struct expansion_info info) {
+  r_mark_shared(value);
+
   if (info.parent != r_null) {
     r_node_poke_car(info.parent, value);
   }
@@ -238,33 +277,57 @@ static sexp* bang_bang_expression(struct expansion_info info, sexp* env) {
   return value;
 }
 
-sexp* big_bang_coerce(sexp* expr) {
-  switch (r_typeof(expr)) {
+// From dots.c
+void signal_retired_splice();
+
+// Maintain parity with dots_big_bang_coerce() in dots.c
+static sexp* deep_big_bang_coerce(sexp* x) {
+  switch (r_typeof(x)) {
   case r_type_null:
-    return expr;
+    return x;
   case r_type_pairlist:
-    return r_duplicate(expr, true);
+    return r_duplicate(x, true);
   case r_type_logical:
   case r_type_integer:
   case r_type_double:
   case r_type_complex:
   case r_type_character:
   case r_type_raw:
-  case r_type_list:
-    return r_vec_coerce(expr, r_type_pairlist);
+  case r_type_list: {
+    int n_protect = 0;
+    if (r_is_object(x)) {
+      x = KEEP_N(r_eval_with_x(as_list_call, r_base_env, x), n_protect);
+    }
+    x = r_vec_coerce(x, r_type_pairlist);
+    FREE(n_protect);
+    return x;
+  }
+  case r_type_s4: {
+    x = KEEP(r_eval_with_x(as_list_s4_call, r_methods_ns_env, x));
+    x = r_vec_coerce(x, r_type_pairlist);
+    FREE(1);
+    return x;
+  }
   case r_type_call:
-    if (r_is_symbol(r_node_car(expr), "{")) {
-      return r_node_cdr(expr);
+    if (r_is_symbol(r_node_car(x), "{")) {
+      return r_node_cdr(x);
     }
     // else fallthrough
+  case r_type_symbol: {
+    signal_retired_splice();
+    return r_new_node(x, r_null);
+  }
   default:
-    return r_new_node(expr, r_null);
+    r_abort(
+      "Can't splice an object of type `%s` because it is not a vector",
+      r_type_as_c_string(r_typeof(x))
+    );
   }
 }
 
 sexp* big_bang(sexp* operand, sexp* env, sexp* node, sexp* next) {
   sexp* value = KEEP(r_eval(operand, env));
-  value = big_bang_coerce(value);
+  value = deep_big_bang_coerce(value);
 
   if (value == r_null) {
     r_node_poke_cdr(node, r_node_cdr(next));
@@ -281,6 +344,7 @@ sexp* big_bang(sexp* operand, sexp* env, sexp* node, sexp* next) {
 
 // Defined below
 static sexp* node_list_interp(sexp* x, sexp* env);
+static void call_maybe_poke_string_head(sexp* call);
 
 sexp* call_interp(sexp* x, sexp* env)  {
   struct expansion_info info = which_expansion_op(x, false);
@@ -289,10 +353,10 @@ sexp* call_interp(sexp* x, sexp* env)  {
 
 sexp* call_interp_impl(sexp* x, sexp* env, struct expansion_info info) {
   if (info.op && r_node_cdr(x) == r_null) {
-    r_abort("`UQ()`, `UQE()` and `UQS()` must be called with an argument");
+    r_abort("`UQ()` and `UQS()` must be called with an argument");
   }
   if (info.op == OP_EXPAND_UQE) {
-    r_warn("`UQE()` is deprecated. Please use `!! get_expr(x)`");
+    r_abort_defunct("`UQE()` is defunct. Please use `!!get_expr(x)`");
   }
 
   switch (info.op) {
@@ -300,9 +364,12 @@ sexp* call_interp_impl(sexp* x, sexp* env, struct expansion_info info) {
     if (r_typeof(x) != r_type_call) {
       return x;
     } else {
-      return node_list_interp(x, env);
+      sexp* out = node_list_interp(x, env);
+      call_maybe_poke_string_head(out);
+      return out;
     }
   case OP_EXPAND_UQ:
+  case OP_EXPAND_DOT_DATA:
     return bang_bang(info, env);
   case OP_EXPAND_UQE:
     return bang_bang_expression(info, env);
@@ -320,6 +387,20 @@ sexp* call_interp_impl(sexp* x, sexp* env, struct expansion_info info) {
 
   // Silence mistaken noreturn warning on GCC
   r_abort("Never reached");
+}
+
+// Make (!!"foo")() and "foo"() equivalent
+static void call_maybe_poke_string_head(sexp* call) {
+  sexp* head = r_node_car(call);
+  if (r_typeof(head) != r_type_character) {
+    return ;
+  }
+
+  r_ssize n = r_length(head);
+  if (n != 1) {
+    r_abort("Unquoted function name must be a character vector of length 1");
+  }
+  r_node_poke_car(call, r_sym(r_chr_get_c_string(head, 0)));
 }
 
 static sexp* node_list_interp(sexp* x, sexp* env) {
@@ -351,4 +432,9 @@ sexp* rlang_interp(sexp* x, sexp* env) {
 
   FREE(1);
   return x;
+}
+
+
+void rlang_init_expr_interp() {
+  dot_data_sym = r_sym(".data");
 }

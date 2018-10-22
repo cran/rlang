@@ -3,7 +3,7 @@
 
 
 typedef struct {
-  r_ssize_t size;
+  r_ssize size;
   bool named;
   bool warned;
   bool recursive;
@@ -21,8 +21,8 @@ static squash_info_t squash_info_init(bool recursive) {
 
 // Atomic squashing ---------------------------------------------------
 
-static r_ssize_t atom_squash(enum r_type kind, squash_info_t info,
-                            sexp* outer, sexp* out, r_ssize_t count,
+static r_ssize atom_squash(enum r_type kind, squash_info_t info,
+                            sexp* outer, sexp* out, r_ssize count,
                             bool (*is_spliceable)(sexp*), int depth) {
   if (r_typeof(outer) != VECSXP) {
     r_abort("Only lists can be spliced");
@@ -30,10 +30,10 @@ static r_ssize_t atom_squash(enum r_type kind, squash_info_t info,
 
   sexp* inner;
   sexp* out_names = KEEP(r_vec_names(out));
-  r_ssize_t n_outer = r_length(outer);
-  r_ssize_t n_inner;
+  r_ssize n_outer = r_length(outer);
+  r_ssize n_inner;
 
-  for (r_ssize_t i = 0; i != n_outer; ++i) {
+  for (r_ssize i = 0; i != n_outer; ++i) {
     inner = VECTOR_ELT(outer, i);
     n_inner = r_vec_length(inner);
 
@@ -44,7 +44,7 @@ static r_ssize_t atom_squash(enum r_type kind, squash_info_t info,
 
       if (info.named) {
         sexp* nms = r_vec_names(inner);
-        if (r_is_character(nms)) {
+        if (r_typeof(nms) == r_type_character) {
           r_vec_poke_n(out_names, count, nms, 0, n_inner);
         } else if (n_inner == 1 && r_has_name_at(outer, i)) {
           SET_STRING_ELT(out_names, count, STRING_ELT(r_vec_names(outer), i));
@@ -62,8 +62,8 @@ static r_ssize_t atom_squash(enum r_type kind, squash_info_t info,
 
 // List squashing -----------------------------------------------------
 
-static r_ssize_t list_squash(squash_info_t info, sexp* outer,
-                            sexp* out, r_ssize_t count,
+static r_ssize list_squash(squash_info_t info, sexp* outer,
+                            sexp* out, r_ssize count,
                             bool (*is_spliceable)(sexp*), int depth) {
   if (r_typeof(outer) != VECSXP) {
     r_abort("Only lists can be spliced");
@@ -71,9 +71,9 @@ static r_ssize_t list_squash(squash_info_t info, sexp* outer,
 
   sexp* inner;
   sexp* out_names = KEEP(r_vec_names(out));
-  r_ssize_t n_outer = r_length(outer);
+  r_ssize n_outer = r_length(outer);
 
-  for (r_ssize_t i = 0; i != n_outer; ++i) {
+  for (r_ssize i = 0; i != n_outer; ++i) {
     inner = VECTOR_ELT(outer, i);
 
     if (depth != 0 && is_spliceable(inner)) {
@@ -81,7 +81,7 @@ static r_ssize_t list_squash(squash_info_t info, sexp* outer,
     } else {
       SET_VECTOR_ELT(out, count, inner);
 
-      if (info.named && r_is_character(r_vec_names(outer))) {
+      if (info.named && r_typeof(r_vec_names(outer)) == r_type_character) {
         sexp* name = STRING_ELT(r_vec_names(outer), i);
         SET_STRING_ELT(out_names, count, name);
       }
@@ -101,14 +101,14 @@ static void squash_warn_names(void) {
   Rf_warningcall(r_null, "Outer names are only allowed for unnamed scalar atomic inputs");
 }
 
-static void update_info_outer(squash_info_t* info, sexp* outer, r_ssize_t i) {
+static void update_info_outer(squash_info_t* info, sexp* outer, r_ssize i) {
   if (!info->warned && info->recursive && r_has_name_at(outer, i)) {
     squash_warn_names();
     info->warned = true;
   }
 }
-static void update_info_inner(squash_info_t* info, sexp* outer, r_ssize_t i, sexp* inner) {
-  r_ssize_t n_inner = info->recursive ? 1 : r_vec_length(inner);
+static void update_info_inner(squash_info_t* info, sexp* outer, r_ssize i, sexp* inner) {
+  r_ssize n_inner = info->recursive ? 1 : r_vec_length(inner);
   info->size += n_inner;
 
   // Return early if possible
@@ -116,7 +116,7 @@ static void update_info_inner(squash_info_t* info, sexp* outer, r_ssize_t i, sex
     return;
   }
 
-  bool named = r_is_character(r_vec_names(inner));
+  bool named = r_typeof(r_vec_names(inner)) == r_type_character;
   bool recursive = info->recursive;
 
   bool copy_outer = recursive || n_inner == 1;
@@ -140,10 +140,10 @@ static void update_info_inner(squash_info_t* info, sexp* outer, r_ssize_t i, sex
 static void squash_info(squash_info_t* info, sexp* outer,
                         bool (*is_spliceable)(sexp*), int depth) {
   sexp* inner;
-  r_ssize_t n_inner;
-  r_ssize_t n_outer = r_length(outer);
+  r_ssize n_inner;
+  r_ssize n_outer = r_length(outer);
 
-  for (r_ssize_t i = 0; i != n_outer; ++i) {
+  for (r_ssize i = 0; i != n_outer; ++i) {
     inner = VECTOR_ELT(outer, i);
     n_inner = info->recursive ? 1 : r_vec_length(inner);
 
@@ -185,10 +185,19 @@ static sexp* squash(enum r_type kind, sexp* dots, bool (*is_spliceable)(sexp*), 
 typedef bool (*is_spliceable_t)(sexp*);
 
 bool r_is_spliced_bare(sexp* x) {
-  return r_is_list(x) && (!r_is_object(x) || Rf_inherits(x, "spliced"));
+  if (r_typeof(x) != r_type_list) {
+    return false;
+  }
+  if (!r_is_object(x)) {
+    return true;
+  }
+  return r_inherits(x, "spliced");
 }
 bool r_is_spliced(sexp* x) {
-  return r_is_list(x) && Rf_inherits(x, "spliced");
+  if (r_typeof(x) != r_type_list) {
+    return false;
+  }
+  return r_inherits(x, "spliced");
 }
 
 static is_spliceable_t predicate_pointer(sexp* x) {
@@ -243,7 +252,7 @@ static bool is_spliceable_closure(sexp* x) {
   SETCADR(clo_spliceable, x);
 
   sexp* out = r_eval(clo_spliceable, R_GlobalEnv);
-  return r_as_bool(out);
+  return r_lgl_get(out, 0);
 }
 
 
@@ -281,15 +290,17 @@ sexp* rlang_squash(sexp* dots, sexp* type, sexp* pred, sexp* depth_) {
 
   is_spliceable_t is_spliceable;
 
-  if (r_typeof(pred) == CLOSXP) {
+  switch (r_typeof(pred)) {
+  case r_type_closure:
     is_spliceable = predicate_internal(pred);
     if (is_spliceable) {
       return r_squash_if(dots, kind, is_spliceable, depth);
-    } else {
-      return rlang_squash_closure(dots, kind, pred, depth);
-    }
+    } // else fallthrough
+  case r_type_builtin:
+  case r_type_special:
+    return rlang_squash_closure(dots, kind, pred, depth);
+  default:
+    is_spliceable = predicate_pointer(pred);
+    return r_squash_if(dots, kind, is_spliceable, depth);
   }
-
-  is_spliceable = predicate_pointer(pred);
-  return r_squash_if(dots, kind, is_spliceable, depth);
 }

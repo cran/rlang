@@ -1,86 +1,11 @@
-#' Add attributes to an object
-#'
-#' `set_attrs()` adds, changes, or zaps attributes of objects. Pass a
-#' single unnamed `NULL` as argument to zap all attributes. For
-#' [uncopyable][is_copyable] types, use `mut_attrs()`.
-#'
-#' Unlike [structure()], these setters have no special handling of
-#' internal attributes names like `.Dim`, `.Dimnames` or `.Names`.
-#'
-#'
-#' @section Life cycle:
-#'
-#' These functions are experimental, expect API changes.
-#'
-#' * `set_attrs()` should probably set the attributes as a
-#'   whole. Another function with `add_` prefix would be in charge of
-#'   adding an attribute to the set.
-#'
-#' * `mut_attrs()` should be renamed to use the `poke_` prefix. Also
-#'   it may be useful to allow any kind of objects, not just
-#'   [non-copyable][is_copyable] ones.
-#'
-#' @param .x An object to decorate with attributes.
-#' @param ... A list of named attributes. These have [explicit
-#'   splicing semantics][tidy-dots]. Pass a single unnamed `NULL` to
-#'   zap all attributes from `.x`.
-#' @return `set_attrs()` returns a modified [shallow copy][duplicate]
-#'   of `.x`. `mut_attrs()` invisibly returns the original `.x`
-#'   modified in place.
-#'
-#' @keywords internal
-#' @export
-#' @examples
-#' set_attrs(letters, names = 1:26, class = "my_chr")
-#'
-#' # Splice a list of attributes:
-#' attrs <- list(attr = "attr", names = 1:26, class = "my_chr")
-#' obj <- set_attrs(letters, splice(attrs))
-#' obj
-#'
-#' # Zap attributes by passing a single unnamed NULL argument:
-#' set_attrs(obj, NULL)
-#' set_attrs(obj, !!! list(NULL))
-#'
-#' # Note that set_attrs() never modifies objects in place:
-#' obj
-#'
-#' # For uncopyable types, mut_attrs() lets you modify in place:
-#' env <- env()
-#' mut_attrs(env, foo = "bar")
-#' env
-set_attrs <- function(.x, ...) {
-  if (!is_copyable(.x)) {
-    abort("`.x` is uncopyable: use `mut_attrs()` to change attributes in place")
-  }
-  set_attrs_impl(.x, ...)
-}
-#' @rdname set_attrs
-#' @export
-mut_attrs <- function(.x, ...) {
-  if (is_copyable(.x)) {
-    abort("`.x` is copyable: use `set_attrs()` to change attributes without side effect")
-  }
-  invisible(set_attrs_impl(.x, ...))
-}
-set_attrs_impl <- function(.x, ...) {
-  attrs <- dots_list(...)
 
-  # If passed a single unnamed NULL, zap attributes
-  if (identical(attrs, set_attrs_null)) {
-    attributes(.x) <- NULL
-  } else {
-    attributes(.x) <- c(attributes(.x), attrs)
-  }
-
-  .x
+structure2 <- function(.x, ...) {
+  exec("structure", .Data = .x, ...)
 }
-set_attrs_null <- list(NULL)
-names(set_attrs_null) <- ""
 
-add_attributes <- set_attrs
 set_class <- function(x, class) {
-  add_attributes(x, class = class)
+  attr(x, "class") <- class
+  x
 }
 
 #' Is object named?
@@ -141,7 +66,7 @@ is_named <- function(x) {
     return(FALSE)
   }
 
-  if (any(nms == "" | is.na(nms))) {
+  if (any(nms_are_invalid(nms))) {
     return(FALSE)
   }
 
@@ -163,8 +88,12 @@ have_name <- function(x) {
   if (is.null(nms)) {
     rep(FALSE, length(x))
   } else {
-    !(is.na(nms) | nms == "")
+    !nms_are_invalid(nms)
   }
+}
+
+nms_are_invalid <- function(x) {
+  x == "" | is.na(x)
 }
 
 #' Does an object have an element with this name?
@@ -187,6 +116,10 @@ has_name <- function(x, name) {
 }
 
 #' Set names of a vector
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
 #'
 #' This is equivalent to [stats::setNames()], with more features and
 #' stricter argument checking.
@@ -254,6 +187,10 @@ set_names_impl <- function(x, mold, nm, ...) {
 }
 
 #' Get names of a vector
+#'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
 #'
 #' This names getter always returns a character vector, even when an
 #' object does not have a `names` attribute. In this case, it returns

@@ -39,8 +39,10 @@ is_null(x)
 
 \item{n}{Expected length of a vector.}
 
-\item{finite}{Whether values must be finite. Examples of non-finite
-values are \code{Inf}, \code{-Inf} and \code{NaN}.}
+\item{finite}{Whether all values of the vector are finite. The
+non-finite values are \code{NA}, \code{Inf}, \code{-Inf} and \code{NaN}. Setting this
+to something other than \code{NULL} can be expensive because the whole
+vector needs to be traversed and checked.}
 
 \item{encoding}{Expected encoding of a string or character
 vector. One of \code{UTF-8}, \code{latin1}, or \code{unknown}.}
@@ -57,7 +59,7 @@ Compared to base R functions:
 pattern-matching on the vector length.
 \item Unlike \code{is.atomic()}, \code{is_atomic()} does not return \code{TRUE} for
 \code{NULL}.
-\item Unlike \code{is.vector()}, \code{is_vector()} test if an object is an
+\item Unlike \code{is.vector()}, \code{is_vector()} tests if an object is an
 atomic vector or a list. \code{is.vector} checks for the presence of
 attributes (other than name).
 }

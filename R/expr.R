@@ -113,6 +113,10 @@ is_symbolic <- function(x) {
 
 #' Turn an expression to a label
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#'
 #' `expr_text()` turns the expression into a single string, which
 #' might be multi-line. `expr_name()` is suitable for formatting
 #' names. It works best with symbols and scalar types, but also
@@ -120,7 +124,12 @@ is_symbolic <- function(x) {
 #' in messages.
 #'
 #' @param expr An expression to labellise.
-#' @export
+#'
+#' @section Life cycle:
+#'
+#' These functions are in the questioning stage because they are
+#' redundant with the `quo_` variants and do not handle quosures.
+#'
 #' @examples
 #' # To labellise a function argument, first capture it with
 #' # substitute():
@@ -139,6 +148,7 @@ is_symbolic <- function(x) {
 #'   1 + 2
 #'   print(x)
 #' })))
+#' @export
 expr_label <- function(expr) {
   if (is.character(expr)) {
     encodeString(expr, quote = '"')
@@ -155,13 +165,17 @@ expr_label <- function(expr) {
 #' @export
 expr_name <- function(expr) {
   switch_type(expr,
+    NULL = "NULL",
     symbol = as_string(expr),
     quosure = ,
-    language = {
-      name <- deparse_one(expr)
-      name <- gsub("\n.*$", "...", name)
-      name
-    },
+    language =
+      if (is_data_pronoun(expr)) {
+        data_pronoun_name(expr) %||% "<unknown>"
+      } else {
+        name <- deparse_one(expr)
+        name <- gsub("\n.*$", "...", name)
+        name
+      },
     if (is_scalar_atomic(expr)) {
       # So 1L is translated to "1" and not "1L"
       as.character(expr)
@@ -174,18 +188,61 @@ expr_name <- function(expr) {
     }
   )
 }
+label <- function(expr) {
+  expr <- quo_squash(expr)
+
+  if (is_missing(expr)) {
+    return("<empty>")
+  }
+
+  switch(typeof(expr),
+    NULL = "NULL",
+    symbol = as_string(expr),
+    language = {
+      if (is_data_pronoun(expr)) {
+        data_pronoun_name(expr) %||% "<unknown>"
+      } else {
+        name <- deparse_one(expr)
+        name <- gsub("\n.*$", "...", name)
+        name
+      }
+    },
+    if (is_bare_atomic(expr, n = 1)) {
+      name <- expr_text(expr)
+      name <- gsub("\n.*$", "...", name)
+      name
+    } else {
+      paste0("<", rlang_type_sum(expr), ">")
+    }
+  )
+}
 #' @rdname expr_label
 #' @export
 #' @param width Width of each line.
 #' @param nlines Maximum number of lines to extract.
 expr_text <- function(expr, width = 60L, nlines = Inf) {
-  str <- deparse(expr, width.cutoff = width)
+  if (is_symbol(expr)) {
+    return(sym_text(expr))
+  }
+
+  str <- deparse(expr, width.cutoff = width, backtick = TRUE)
 
   if (length(str) > nlines) {
     str <- c(str[seq_len(nlines - 1)], "...")
   }
 
   paste0(str, collapse = "\n")
+}
+
+sym_text <- function(sym) {
+  # Use as_string() to translate unicode tags
+  text <- as_string(sym)
+
+  if (needs_backticks(text)) {
+    text <- sprintf("`%s`", text)
+  }
+
+  text
 }
 
 deparse_one <- function(expr) {
@@ -327,7 +384,7 @@ switch_expr <- function(.x, ...) {
 #' wrapper_quo <- local(quo(bar(!!local_quo, baz)))
 #' expr_print(wrapper_quo)
 expr_print <- function(x, width = peek_option("width")) {
-  meow(expr_deparse(x, width = width))
+  cat_line(expr_deparse(x, width = width))
 }
 #' @rdname expr_print
 #' @export

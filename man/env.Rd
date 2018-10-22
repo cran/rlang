@@ -10,24 +10,24 @@ env(...)
 
 child_env(.parent, ...)
 
-new_environment(data = list())
+new_environment(data = list(), parent = empty_env())
 }
 \arguments{
-\item{..., data}{Named values. These dots support \link[=tidy-dots]{tidy
-dots} features.}
+\item{..., data}{Named values. You can supply one unnamed to specify
+a custom parent, otherwise it defaults to the current
+environment. These dots support \link[=tidy-dots]{tidy dots}
+features.}
 
-\item{.parent}{A parent environment. Can be an object supported by
-\code{\link[=as_environment]{as_environment()}}.}
+\item{.parent, parent}{A parent environment. Can be an object
+supported by \code{\link[=as_environment]{as_environment()}}.}
 }
 \description{
 These functions create new environments.
 \itemize{
-\item \code{env()} always creates a child of the current environment.
-\item \code{child_env()} lets you specify a parent (see section on
-inheritance).
-\item \code{new_environment()} creates a child of the empty environment. It
-is useful e.g. for using environments as containers of data
-rather than as part of a scope hierarchy.
+\item \code{env()} creates a child of the current environment by default
+and takes a variable number of named objects to populate it.
+\item \code{new_environment()} creates a child of the empty environment by
+default and takes a named list of objects to populate it.
 }
 }
 \section{Environments as objects}{
@@ -37,7 +37,7 @@ Environments are containers of uniquely named objects. Their most
 common use is to provide a scope for the evaluation of R
 expressions. Not all languages have first class environments,
 i.e. can manipulate scope as regular objects. Reification of scope
-is one of the most powerful feature of R as it allows you to change
+is one of the most powerful features of R as it allows you to change
 what objects a function or expression sees when it is evaluated.
 
 Environments also constitute a data structure in their own
@@ -45,7 +45,7 @@ right. They are a collection of uniquely named objects, subsettable
 by name and modifiable by reference. This latter property (see
 section on reference semantics) is especially useful for creating
 mutable OO systems (cf the \href{https://github.com/wch/R6}{R6 package}
-and the \href{http://ggplot2.tidyverse.org/articles/extending-ggplot2.html}{ggprotosystem}
+and the \href{http://ggplot2.tidyverse.org/articles/extending-ggplot2.html}{ggproto system}
 for extending ggplot2).
 }
 
@@ -55,7 +55,7 @@ for extending ggplot2).
 All R environments (except the \link[=empty_env]{empty environment}) are
 defined with a parent environment. An environment and its
 grandparents thus form a linear hierarchy that is the basis for
-\href{https://en.wikipedia.org/wiki/Scope_(computer_science)}{lexicalscoping} in
+\href{https://en.wikipedia.org/wiki/Scope_(computer_science)}{lexical scoping} in
 R. When R evaluates an expression, it looks up symbols in a given
 environment. If it cannot find these symbols there, it keeps
 looking them up in parent environments. This way, objects defined
@@ -79,12 +79,24 @@ as argument to a function), modifying the bindings of one of those
 references changes all other references as well.
 }
 
+\section{Life cycle}{
+
+\itemize{
+\item \code{child_env()} is in the questioning stage. It is redundant now
+that \code{env()} accepts parent environments.
+}
+}
+
 \examples{
 # env() creates a new environment which has the current environment
 # as parent
 env <- env(a = 1, b = "foo")
 env$b
-identical(env_parent(env), get_env())
+identical(env_parent(env), current_env())
+
+# Supply one unnamed argument to override the default:
+env <- env(base_env(), a = 1, b = "foo")
+identical(env_parent(env), base_env())
 
 
 # child_env() lets you specify a parent:
@@ -145,5 +157,5 @@ env_parent(env)
 new_environment(list(a = "foo", b = "bar"))
 }
 \seealso{
-\code{scoped_env}, \code{\link[=env_has]{env_has()}}, \code{\link[=env_bind]{env_bind()}}.
+\code{\link[=env_has]{env_has()}}, \code{\link[=env_bind]{env_bind()}}.
 }

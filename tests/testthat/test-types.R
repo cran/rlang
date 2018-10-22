@@ -17,16 +17,6 @@ test_that("can bypass string serialisation", {
   expect_identical(str_encoding(bar[[2]]), "latin1")
 })
 
-test_that("pattern match on string encoding", {
-  expect_true(is_character(letters, encoding = "unknown"))
-  expect_false(is_character(letters, encoding = "UTF-8"))
-
-  chr <- chr(c("foo", "fo\uE9"))
-  expect_false(is_character(chr, encoding = "UTF-8"))
-  expect_false(is_character(chr, encoding = "unknown"))
-  expect_true(is_character(chr, encoding = c("unknown", "UTF-8")))
-})
-
 test_that("type_of() returns correct type", {
   expect_identical(type_of("foo"), "string")
   expect_identical(type_of(letters), "character")
@@ -58,6 +48,11 @@ test_that("types are friendly", {
   expect_identical(friendly_type("language"), "a call")
 })
 
+test_that("friendly_type_of() supports objects", {
+  expect_identical(friendly_type_of(mtcars), "a `data.frame` object")
+  expect_identical(friendly_type_of(quo(1)), "a `quosure` object")
+})
+
 test_that("is_integerish() heeds type requirement", {
   for (n in 0:2) {
     expect_true(is_integerish(integer(n)))
@@ -84,15 +79,37 @@ test_that("non finite double values are integerish", {
   expect_true(is_integerish(int(1, NA)))
 })
 
+test_that("is_finite handles numeric types", {
+  expect_true(is_finite(1L))
+  expect_false(is_finite(na_int))
+
+  expect_true(is_finite(1))
+  expect_false(is_finite(na_dbl))
+  expect_false(is_finite(Inf))
+  expect_false(is_finite(-Inf))
+  expect_false(is_finite(NaN))
+  expect_false(is_finite(c(1, 2, NaN)))
+
+  # Should we upcoerce later on?
+  expect_error(expect_false(is_finite(NA)), "expected a numeric vector")
+
+  expect_true(is_finite(0i))
+  expect_false(is_finite(complex(real = NA)))
+  expect_false(is_finite(complex(imaginary = Inf)))
+})
+
 test_that("check finiteness", {
   expect_true(    is_double(dbl(1, 2), finite = TRUE))
   expect_true(is_integerish(dbl(1, 2), finite = TRUE))
 
+  expect_false(    is_double(dbl(1, 2), finite = FALSE))
+  expect_false(is_integerish(dbl(1, 2), finite = FALSE))
+
   expect_false(    is_double(dbl(1, Inf), finite = TRUE))
   expect_false(is_integerish(dbl(1, Inf), finite = TRUE))
 
-  expect_false(    is_double(dbl(1, Inf), finite = FALSE))
-  expect_false(is_integerish(dbl(1, Inf), finite = FALSE))
+  expect_true(    is_double(dbl(1, Inf), finite = FALSE))
+  expect_true(is_integerish(dbl(1, Inf), finite = FALSE))
 
   expect_true(    is_double(dbl(-Inf, Inf), finite = FALSE))
   expect_true(is_integerish(dbl(-Inf, Inf), finite = FALSE))
@@ -116,4 +133,15 @@ test_that("scalar predicates heed type and length", {
   expect_true_false(is_scalar_logical, logical(1), logical(2), character(1))
   expect_true_false(is_scalar_raw, raw(1), raw(2), NULL)
   expect_true_false(is_scalar_bytes, raw(1), raw(2), NULL)
+})
+
+test_that("is_integerish() supports large numbers (#578)", {
+  expect_true(is_integerish(1e10))
+  expect_true(is_integerish(2^52))
+
+  expect_false(is_integerish(2^52 + 1))
+
+  expect_false(is_integerish(2^50 - 0.1))
+  expect_false(is_integerish(2^49 - 0.05))
+  expect_false(is_integerish(2^40 - 0.0001))
 })

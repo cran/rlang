@@ -1,9 +1,13 @@
 #' Create a function
 #'
-#' This constructs a new function given it's three components:
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+#'
+#' This constructs a new function given its three components:
 #' list of arguments, body code and parent environment.
 #'
-#' @param args A named list of default arguments.  Note that if you
+#' @param args A named list of default arguments. Note that if you
 #'   want arguments that don't have defaults, you'll need to use the
 #'   special function [alist], e.g. `alist(a = , b = 1)`
 #' @param body A language object representing the code inside the
@@ -28,7 +32,7 @@
 #' # Now they are:
 #' stopifnot(identical(f, g))
 new_function <- function(args, body, env = caller_env()) {
-  stopifnot(all(have_name(args)), is_expression(body), is_env(env))
+  stopifnot(all(have_name(args)), is_environment(env))
 
   args <- as.pairlist(args)
   eval_bare(call("function", args, body), env)
@@ -158,17 +162,34 @@ fn_fmls_syms <- function(fn = caller_fn()) {
 
 #' Get or set function body
 #'
-#' `fn_body()` is a simple wrapper around `base::body()`. The setter
+#' `fn_body()` is a simple wrapper around [base::body()]. It always
+#' returns a `\{` expression and throws an error when the input is a
+#' primitive function (whereas `body()` returns `NULL`). The setter
 #' version preserves attributes, unlike `body<-`.
 #'
 #' @inheritParams fn_fmls
 #'
 #' @export
+#' @examples
+#' # fn_body() is like body() but always returns a block:
+#' fn <- function() do()
+#' body(fn)
+#' fn_body(fn)
+#'
+#' # It also throws an error when used on a primitive function:
+#' try(fn_body(base::list))
 fn_body <- function(fn = caller_fn()) {
   if(!is_closure(fn)) {
     abort("`fn` is not a closure")
   }
-  body(fn)
+
+  body <- body(fn)
+
+  if (is_call(body, "{")) {
+    body
+  } else {
+    call("{", body)
+  }
 }
 #' @rdname fn_body
 #' @export
@@ -193,7 +214,7 @@ fn_body <- function(fn = caller_fn()) {
 #'
 #' Closures are functions written in R, named after the way their
 #' arguments are scoped within nested environments (see
-#' https://en.wikipedia.org/wiki/Closure_(computer_programming)).  The
+#' https://en.wikipedia.org/wiki/Closure_(computer_programming)). The
 #' root environment of the closure is called the closure
 #' environment. When closures are evaluated, a new environment called
 #' the evaluation frame is created with the closure environment as
@@ -204,11 +225,11 @@ fn_body <- function(fn = caller_fn()) {
 #'
 #' Primitive functions are more efficient than closures for two
 #' reasons. First, they are written entirely in fast low-level
-#' code. Secondly, the mechanism by which they are passed arguments is
+#' code. Second, the mechanism by which they are passed arguments is
 #' more efficient because they often do not need the full procedure of
 #' argument matching (dealing with positional versus named arguments,
 #' partial matching, etc). One practical consequence of the special
-#' way in which primitives are passed arguments this is that they
+#' way in which primitives are passed arguments is that they
 #' technically do not have formal arguments, and [formals()] will
 #' return `NULL` if called on a primitive function. See [fn_fmls()]
 #' for a function that returns a representation of formal arguments
@@ -324,10 +345,15 @@ is_primitive_lazy <- function(x) {
 #' fn_env(fn) <- other_env
 #' identical(fn_env(fn), other_env)
 fn_env <- function(fn) {
-  if(!is_function(fn)) {
-    abort("`fn` is not a function")
+  if (is_primitive(fn)) {
+    return(ns_env("base"))
   }
-  environment(fn)
+
+  if(is_closure(fn)) {
+    return(environment(fn))
+  }
+
+  abort("`fn` is not a function")
 }
 
 #' @export
@@ -345,9 +371,11 @@ fn_env <- function(fn) {
 #'
 #' @description
 #'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+#'
 #' * `as_function()` transform objects to functions. It fetches
-#'   functions by name if supplied a string or transforms
-#'   [quosures][quotation] to a proper function.
+#'   functions by name if supplied a string or transforms formulas to
+#'   function.
 #'
 #' * `as_closure()` first passes its argument to `as_function()`. If
 #'   the result is a primitive function, it regularises it to a proper
@@ -360,12 +388,18 @@ fn_env <- function(fn) {
 #'   If a **formula**, e.g. `~ .x + 2`, it is converted to a function
 #'   with two arguments, `.x` or `.` and `.y`. This allows you to
 #'   create very compact anonymous functions with up to two inputs.
+#'   Functions created from formulas have a special class. Use
+#'   `is_lambda()` to test for it.
 #' @param env Environment in which to fetch the function in case `x`
 #'   is a string.
 #' @export
 #' @examples
 #' f <- as_function(~ . + 1)
 #' f(10)
+#'
+#' # Functions created from a formula have a special class:
+#' is_lambda(f)
+#' is_lambda(as_function(function() "foo"))
 #'
 #' # Primitive functions are regularised as closures
 #' as_closure(list)
@@ -385,14 +419,30 @@ as_function <- function(x, env = caller_env()) {
       if (length(x) > 2) {
         abort("Can't convert a two-sided formula to a function")
       }
-      args <- list(... = missing_arg(), .x = quote(..1), .y = quote(..2), . = quote(..1))
-      new_function(args, f_rhs(x), f_env(x))
+      if (is_quosure(x)) {
+        eval(expr(function(...) eval_tidy(!!x)))
+      } else {
+        args <- list(... = missing_arg(), .x = quote(..1), .y = quote(..2), . = quote(..1))
+        fn <- new_function(args, f_rhs(x), f_env(x))
+        structure(fn, class = "rlang_lambda_function")
+      }
     },
     string = {
       get(x, envir = env, mode = "function")
     }
   )
 }
+#' @export
+print.rlang_lambda_function <- function(x, ...) {
+  cat_line("<lambda>")
+  NextMethod()
+}
+#' @rdname as_function
+#' @export
+is_lambda <- function(x) {
+  inherits(x, "rlang_lambda_function")
+}
+
 #' @rdname as_function
 #' @export
 as_closure <- function(x, env = caller_env()) {
@@ -441,7 +491,7 @@ op_as_closure <- function(prim_nm) {
     `@` = ,
     `$` = function(.x, .i) {
       op <- sym(prim_nm)
-      expr <- expr((!!op)(.x, !! quo_expr(enexpr(.i), warn = TRUE)))
+      expr <- expr((!!op)(.x, !!quo_squash(enexpr(.i), warn = TRUE)))
       eval_bare(expr)
     },
     `[[<-` = function(.x, .i, .value) {
@@ -531,7 +581,7 @@ op_as_closure <- function(prim_nm) {
 #' @param fn A closure.
 #' @return An object of class `c("fn", "function")`.
 #' @examples
-#' fn <- set_attrs(function() "foo", attribute = "foobar")
+#' fn <- structure(function() "foo", attribute = "foobar")
 #' print(fn)
 #'
 #' # The `fn` object doesn't print with attributes:
@@ -539,11 +589,11 @@ op_as_closure <- function(prim_nm) {
 #' print(fn)
 new_fn <- function(fn) {
   stopifnot(is_closure(fn))
-  set_attrs(fn, class = c("fn", "function"))
+  structure(fn, class = c("fn", "function"))
 }
 print.fn <- function(x, ...) {
   srcref <- attr(x, "srcref")
-  x <- set_attrs(x, NULL)
-  x <- set_attrs(x, srcref = srcref)
+  attributes(x) <- NULL
+  x <- structure(x, srcref = srcref)
   print(x)
 }

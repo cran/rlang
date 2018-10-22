@@ -4,14 +4,12 @@
 #'
 #' These functions create new environments.
 #'
-#' * `env()` always creates a child of the current environment.
+#' * `env()` creates a child of the current environment by default
+#'   and takes a variable number of named objects to populate it.
 #'
-#' * `child_env()` lets you specify a parent (see section on
-#'   inheritance).
+#' * `new_environment()` creates a child of the empty environment by
+#'   default and takes a named list of objects to populate it.
 #'
-#' * `new_environment()` creates a child of the empty environment. It
-#'   is useful e.g. for using environments as containers of data
-#'   rather than as part of a scope hierarchy.
 #'
 #' @section Environments as objects:
 #'
@@ -19,7 +17,7 @@
 #' common use is to provide a scope for the evaluation of R
 #' expressions. Not all languages have first class environments,
 #' i.e. can manipulate scope as regular objects. Reification of scope
-#' is one of the most powerful feature of R as it allows you to change
+#' is one of the most powerful features of R as it allows you to change
 #' what objects a function or expression sees when it is evaluated.
 #'
 #' Environments also constitute a data structure in their own
@@ -30,6 +28,7 @@
 #' and the [ggproto
 #' system](http://ggplot2.tidyverse.org/articles/extending-ggplot2.html)
 #' for extending ggplot2).
+#'
 #'
 #' @section Inheritance:
 #'
@@ -49,6 +48,7 @@
 #' common use of masking is to put data frame columns in scope. See
 #' for example [as_data_mask()].
 #'
+#'
 #' @section Reference semantics:
 #'
 #' Unlike regular objects such as vectors, environments are an
@@ -58,18 +58,30 @@
 #' as argument to a function), modifying the bindings of one of those
 #' references changes all other references as well.
 #'
-#' @param ...,data Named values. These dots support [tidy
-#'   dots][tidy-dots] features.
-#' @param .parent A parent environment. Can be an object supported by
-#'   [as_environment()].
-#' @seealso `scoped_env`, [env_has()], [env_bind()].
+#'
+#' @section Life cycle:
+#'
+#' - `child_env()` is in the questioning stage. It is redundant now
+#'   that `env()` accepts parent environments.
+#'
+#' @param ...,data Named values. You can supply one unnamed to specify
+#'   a custom parent, otherwise it defaults to the current
+#'   environment. These dots support [tidy dots][tidy-dots]
+#'   features.
+#' @param .parent,parent A parent environment. Can be an object
+#'   supported by [as_environment()].
+#' @seealso [env_has()], [env_bind()].
 #' @export
 #' @examples
 #' # env() creates a new environment which has the current environment
 #' # as parent
 #' env <- env(a = 1, b = "foo")
 #' env$b
-#' identical(env_parent(env), get_env())
+#' identical(env_parent(env), current_env())
+#'
+#' # Supply one unnamed argument to override the default:
+#' env <- env(base_env(), a = 1, b = "foo")
+#' identical(env_parent(env), base_env())
 #'
 #'
 #' # child_env() lets you specify a parent:
@@ -129,20 +141,31 @@
 #' # Like other new_ constructors, it takes an object rather than dots:
 #' new_environment(list(a = "foo", b = "bar"))
 env <- function(...) {
-  env <- new.env(parent = caller_env())
-  env_bind_impl(env, dots_list(...))
+  dots <- dots_split(..., .n_unnamed = 0:1)
+
+  if (length(dots$unnamed)) {
+    parent <- dots$unnamed[[1]]
+  } else {
+    parent = caller_env()
+  }
+
+  env <- new.env(parent = parent)
+  env_bind_impl(env, dots$named)
+  env
 }
 #' @rdname env
 #' @export
 child_env <- function(.parent, ...) {
   env <- new.env(parent = as_environment(.parent))
-  env_bind_impl(env, dots_list(...))
+  env_bind_impl(env, list2(...))
+  env
 }
 #' @rdname env
 #' @export
-new_environment <- function(data = list()) {
-  env <- new.env(parent = empty_env())
+new_environment <- function(data = list(), parent = empty_env()) {
+  env <- new.env(parent = parent)
   env_bind_impl(env, data)
+  env
 }
 
 #' Coerce to an environment
@@ -227,15 +250,27 @@ as_env_ <- function(x, parent = NULL) {
 #'   which has [empty_env()] as parent.
 #'
 #' - `env_parents()` returns the list of all parents, including the
-#'   empty environment.
+#'   empty environment. This list is named using [env_name()].
 #'
 #' See the section on _inheritance_ in [env()]'s documentation.
 #'
+#'
+#' @section Life cycle:
+#'
+#' The `sentinel` argument of `env_tail()` has been deprecated in
+#' rlang 0.2.0 and renamed to `last`.
+#'
 #' @inheritParams get_env
 #' @param n The number of generations to go up.
-#' @param sentinel The environment signalling the end of the linear
-#'   search. `env_tail()` returns the environment which has `sentinel`
-#'   as parent.
+#' @param last The environment at which to stop. Defaults to the
+#'   global environment. The empty environment is always a stopping
+#'   condition so it is safe to leave the default even when taking the
+#'   tail or the parents of an environment on the search path.
+#'
+#'   `env_tail()` returns the environment which has `last` as parent
+#'   and `env_parents()` returns the list of environments up to `last`.
+#' @param sentinel This argument is soft-deprecated, please use `last`
+#'   instead.
 #' @return An environment for `env_parent()` and `env_tail()`, a list
 #'   of environments for `env_parents()`.
 #' @export
@@ -259,11 +294,11 @@ as_env_ <- function(x, parent = NULL) {
 #' fn <- set_env(function() env_parent(), enclos_env)
 #' identical(enclos_env, fn())
 env_parent <- function(env = caller_env(), n = 1) {
-  env_ <- get_env(env)
+  env_ <- get_env_retired(env, "env_parent()")
 
   while (n > 0) {
     if (is_empty_env(env_)) {
-      return(env_)
+      abort("The empty environment has no parent")
     }
     n <- n - 1
     env_ <- parent.env(env_)
@@ -273,30 +308,60 @@ env_parent <- function(env = caller_env(), n = 1) {
 }
 #' @rdname env_parent
 #' @export
-env_tail <- function(env = caller_env(), sentinel = empty_env()) {
-  env_ <- get_env(env)
-  next_env <- parent.env(env_)
+env_tail <- function(env = caller_env(), last = global_env(),
+                     sentinel = NULL) {
+  if (!is_null(sentinel)) {
+    warn_deprecated(paste_line(
+      "`sentinel` is deprecated as of version 0.3.0.",
+      "Please use `last` instead."
+    ))
+    last <- sentinel
+  }
 
-  while (!is_reference(next_env, sentinel)) {
-    env_ <- next_env
-    next_env <- parent.env(next_env)
+  env_ <- get_env_retired(env, "env_tail()")
+  parent <- env_parent(env_)
+
+  while (!is_reference(parent, last) && !is_empty_env(parent)) {
+    env_ <- parent
+    parent <- env_parent(parent)
   }
 
   env_
 }
 #' @rdname env_parent
 #' @export
-env_parents <- function(env = caller_env()) {
-  out <- new_list(env_depth(env))
-
-  i <- 1L
-  while (!is_empty_env(env)) {
-    env <- env_parent(env)
-    out[[i]] <- env
-    i <- i + 1L
+env_parents <- function(env = caller_env(), last = global_env()) {
+  if (is_empty_env(env)) {
+    return(new_environments(list()))
   }
 
-  out
+  n <- env_depth(env)
+  out <- new_list(n)
+
+  if (!typeof(last) %in% c("environment", "NULL")) {
+    abort("`last` must be `NULL` or an environment")
+  }
+
+  i <- 1L
+  parent <- env_parent(env)
+
+  while (TRUE) {
+    out[[i]] <- parent
+
+    if (is_reference(parent, last) || is_empty_env(parent)) {
+      break
+    }
+
+    i <- i + 1L
+    env <- parent
+    parent <- env_parent(env)
+  }
+
+  if (i < n) {
+    out <- out[seq_len(i)]
+  }
+
+  new_environments(out)
 }
 
 #' Depth of an environment chain
@@ -314,7 +379,7 @@ env_parents <- function(env = caller_env()) {
 #' env_depth(empty_env())
 #' env_depth(pkg_env("rlang"))
 env_depth <- function(env) {
-  env_ <- get_env(env)
+  env_ <- get_env_retired(env, "env_depth()")
 
   n <- 0L
   while (!is_empty_env(env_)) {
@@ -346,8 +411,20 @@ is_empty_env <- function(env) {
 #' that you don't own, e.g. a parent environment of a function from a
 #' package.
 #'
-#' @param env An environment or an object bundling an environment,
-#'   e.g. a formula, [quosure][quotation] or [closure][is_closure].
+#'
+#' @section Life cycle:
+#'
+#' - Using `get_env()` without supplying `env` is soft-deprecated as
+#'   of rlang 0.3.0. Please use [current_env()] to retrieve the
+#'   current environment.
+#'
+#' - Passing environment wrappers like formulas or functions instead
+#'   of bare environments is soft-deprecated as of rlang 0.3.0. This
+#'   internal genericity was causing confusion (see issue #427). You
+#'   should now extract the environment separately before calling
+#'   these functions.
+#'
+#' @param env An environment.
 #' @param default The default environment in case `env` does not wrap
 #'   an environment. If `NULL` and no environment could be extracted,
 #'   an error is issued.
@@ -356,17 +433,8 @@ is_empty_env <- function(env) {
 #'   [get_env()] and [set_env()] that only work on quosures.
 #' @export
 #' @examples
-#' # Get the environment of frame objects. If no argument is supplied,
-#' # the current frame is used:
-#' fn <- function() {
-#'   list(
-#'     get_env(call_frame()),
-#'     get_env()
-#'   )
-#' }
-#' fn()
-#'
 #' # Environment of closure functions:
+#' fn <- function() "foo"
 #' get_env(fn)
 #'
 #' # Or of quosures or formulas:
@@ -387,7 +455,12 @@ is_empty_env <- function(env) {
 #' # functions accepting formulas as input:
 #' default <- env()
 #' identical(get_env(f, default), default)
-get_env <- function(env = caller_env(), default = NULL) {
+get_env <- function(env, default = NULL) {
+  if (missing(env)) {
+    signal_soft_deprecated("The `env` argument of `get_env()` must now be supplied")
+    env <- caller_env()
+  }
+
   out <- switch_type(env,
     environment = env,
     definition = ,
@@ -406,9 +479,22 @@ get_env <- function(env = caller_env(), default = NULL) {
     out
   }
 }
+get_env_retired <- function(x, fn, env = caller_env(2)) {
+  if (is_environment(x)) {
+    return(x)
+  }
+
+  type <- friendly_type_of(x)
+  signal_soft_deprecated(env = env, paste_line(
+    sprintf("Passing an environment wrapper like %s is deprecated.", type),
+    sprintf("Please retrieve the environment before calling `%s`", fn)
+  ))
+
+  get_env(x)
+}
+
 #' @rdname get_env
-#' @param new_env An environment to replace `env` with. Can be an
-#'   object handled by `get_env()`.
+#' @param new_env An environment to replace `env` with.
 #' @export
 #' @examples
 #'
@@ -419,7 +505,7 @@ get_env <- function(env = caller_env(), default = NULL) {
 #'
 #' # That function now has `env` as enclosure:
 #' identical(get_env(fn), env)
-#' identical(get_env(fn), get_env())
+#' identical(get_env(fn), current_env())
 #'
 #' # set_env() does not work by side effect. Setting a new environment
 #' # for fn has no effect on the original function:
@@ -432,14 +518,16 @@ get_env <- function(env = caller_env(), default = NULL) {
 #' fn <- set_env(fn, other_env)
 #' identical(get_env(fn), other_env)
 set_env <- function(env, new_env = caller_env()) {
+  new_env <- get_env_retired(new_env, "set_env()")
+
   switch_type(env,
     definition = ,
     formula = ,
     closure = {
-      environment(env) <- get_env(new_env)
+      environment(env) <- new_env
       env
     },
-    environment = get_env(new_env),
+    environment = new_env,
     abort(paste0(
       "Can't set environment for ", friendly_type(type_of(env)), ""
     ))
@@ -448,513 +536,15 @@ set_env <- function(env, new_env = caller_env()) {
 #' @rdname get_env
 #' @export
 env_poke_parent <- function(env, new_env) {
-  .Call(rlang_env_poke_parent, get_env(env), get_env(new_env))
+  env <- get_env_retired(env, "env_poke_parent()")
+  new_env <- get_env_retired(new_env, "env_poke_parent()")
+  .Call(rlang_env_poke_parent, env, new_env)
 }
 `env_parent<-` <- function(x, value) {
-  .Call(rlang_env_poke_parent, get_env(x), value)
+  env <- get_env_retired(x, "env_poke_parent<-")
+  .Call(rlang_env_poke_parent, env, value)
 }
 
-
-#' Bind symbols to objects in an environment
-#'
-#' @description
-#'
-#' These functions create bindings in an environment. The bindings are
-#' supplied through `...` as pairs of names and values or expressions.
-#' `env_bind()` is equivalent to evaluating a `<-` expression within
-#' the given environment. This function should take care of the
-#' majority of use cases but the other variants can be useful for
-#' specific problems.
-#'
-#' - `env_bind()` takes named _values_ which are bound in `.env`.
-#'   `env_bind()` is equivalent to [base::assign()].
-#'
-#' - `env_bind_fns()` takes named _functions_ and creates active
-#'   bindings in `.env`. This is equivalent to
-#'   [base::makeActiveBinding()]. An active binding executes a
-#'   function each time it is evaluated. `env_bind_fns()` takes dots
-#'   with [implicit splicing][dots_splice], so that you can supply
-#'   both named functions and named lists of functions.
-#'
-#'   If these functions are [closures][is_closure] they are lexically
-#'   scoped in the environment that they bundle. These functions can
-#'   thus refer to symbols from this enclosure that are not actually
-#'   in scope in the dynamic environment where the active bindings are
-#'   invoked. This allows creative solutions to difficult problems
-#'   (see the implementations of `dplyr::do()` methods for an
-#'   example).
-#'
-#' - `env_bind_exprs()` takes named _expressions_. This is equivalent
-#'   to [base::delayedAssign()]. The arguments are captured with
-#'   [exprs()] (and thus support call-splicing and unquoting) and
-#'   assigned to symbols in `.env`. These expressions are not
-#'   evaluated immediately but lazily. Once a symbol is evaluated, the
-#'   corresponding expression is evaluated in turn and its value is
-#'   bound to the symbol (the expressions are thus evaluated only
-#'   once, if at all).
-#'
-#' @section Side effects:
-#'
-#' Since environments have reference semantics (see relevant section
-#' in [env()] documentation), modifying the bindings of an environment
-#' produces effects in all other references to that environment. In
-#' other words, `env_bind()` and its variants have side effects.
-#'
-#' As they are called primarily for their side effects, these
-#' functions follow the convention of returning their input invisibly.
-#'
-#' @param .env An environment or an object bundling an environment,
-#'   e.g. a formula, [quosure][quotation] or [closure][is_closure].
-#'   This argument is passed to [get_env()].
-#' @param ... Pairs of names and expressions, values or functions.
-#'   These dots support [tidy dots][tidy-dots] features.
-#' @return The input object `.env`, with its associated environment
-#'   modified in place, invisibly.
-#' @export
-#' @examples
-#' # env_bind() is a programmatic way of assigning values to symbols
-#' # with `<-`. We can add bindings in the current environment:
-#' env_bind(get_env(), foo = "bar")
-#' foo
-#'
-#' # Or modify those bindings:
-#' bar <- "bar"
-#' env_bind(get_env(), bar = "BAR")
-#' bar
-#'
-#' # It is most useful to change other environments:
-#' my_env <- env()
-#' env_bind(my_env, foo = "foo")
-#' my_env$foo
-#'
-#' # A useful feature is to splice lists of named values:
-#' vals <- list(a = 10, b = 20)
-#' env_bind(my_env, !!! vals, c = 30)
-#' my_env$b
-#' my_env$c
-#'
-#' # You can also unquote a variable referring to a symbol or a string
-#' # as binding name:
-#' var <- "baz"
-#' env_bind(my_env, !!var := "BAZ")
-#' my_env$baz
-#'
-#'
-#' # env_bind() and its variants are generic over formulas, quosures
-#' # and closures. To illustrate this, let's create a closure function
-#' # referring to undefined bindings:
-#' fn <- function() list(a, b)
-#' fn <- set_env(fn, child_env("base"))
-#'
-#' # This would fail if run since `a` etc are not defined in the
-#' # enclosure of fn() (a child of the base environment):
-#' # fn()
-#'
-#' # Let's define those symbols:
-#' env_bind(fn, a = "a", b = "b")
-#'
-#' # fn() now sees the objects:
-#' fn()
-env_bind <- function(.env, ...) {
-  invisible(env_bind_impl(.env, dots_list(...)))
-}
-env_bind_impl <- function(env, data) {
-  if (!is_vector(data) || (length(data) && !is_named(data))) {
-    abort("Can't bind data because it is not uniquely named")
-  }
-
-  nms <- names(data)
-  env_ <- get_env(env)
-
-  for (i in seq_along(data)) {
-    nm <- nms[[i]]
-    base::assign(nm, data[[nm]], envir = env_)
-  }
-
-  env
-}
-
-# FIXME: Should these be env_bind_promises() and env_bind_actives()?
-
-#' Bind lazy or active bindings
-#'
-#' @keywords internal
-#' @section Life cycle:
-#'
-#' These functions are experimental. Expect API changes.
-#'
-#' @inheritParams env_bind
-#' @param .eval_env The environment where the expressions will be
-#'   evaluated when the symbols are forced.
-#' @export
-#' @examples
-#'
-#' # env_bind_exprs() assigns expressions lazily:
-#' env <- env()
-#' env_bind_exprs(env, name = cat("forced!\n"))
-#' env$name
-#' env$name
-#'
-#' # You can unquote expressions. Note that quosures are not
-#' # supported, only raw expressions:
-#' expr <- quote(message("forced!"))
-#' env_bind_exprs(env, name = !! expr)
-#' env$name
-env_bind_exprs <- function(.env, ..., .eval_env = caller_env()) {
-  exprs <- exprs(...)
-  stopifnot(is_named(exprs))
-
-  nms <- names(exprs)
-  env_ <- get_env(.env)
-
-  for (i in seq_along(exprs)) {
-    do.call("delayedAssign", list(
-      x = nms[[i]],
-      value = exprs[[i]],
-      eval.env = .eval_env,
-      assign.env = env_
-    ))
-  }
-
-  invisible(.env)
-}
-#' @rdname env_bind_exprs
-#' @export
-#' @examples
-#'
-#' # You can create active bindings with env_bind_fns()
-#' # Let's create some bindings in the lexical enclosure of `fn`:
-#' counter <- 0
-#'
-#' # And now a function that increments the counter and returns a
-#' # string with the count:
-#' fn <- function() {
-#'   counter <<- counter + 1
-#'   paste("my counter:", counter)
-#' }
-#'
-#' # Now we create an active binding in a child of the current
-#' # environment:
-#' env <- env()
-#' env_bind_fns(env, symbol = fn)
-#'
-#' # `fn` is executed each time `symbol` is evaluated or retrieved:
-#' env$symbol
-#' env$symbol
-#' eval_bare(quote(symbol), env)
-#' eval_bare(quote(symbol), env)
-env_bind_fns <- function(.env, ...) {
-  fns <- dots_splice(...)
-  stopifnot(is_named(fns) && every(fns, is_function))
-
-  nms <- names(fns)
-  env_ <- get_env(.env)
-
-  for (i in seq_along(fns)) {
-    makeActiveBinding(nms[[i]], fns[[i]], env_)
-  }
-
-  invisible(.env)
-}
-
-#' Temporarily change bindings of an environment
-#'
-#' @description
-#'
-#' * `scoped_bindings()` temporarily changes bindings in `.env` (which
-#'   is by default the caller environment). The bindings are reset to
-#'   their original values when the current frame (or an arbitrary one
-#'   if you specify `.frame`) goes out of scope.
-#'
-#' * `with_bindings()` evaluates `expr` with temporary bindings. When
-#'   `with_bindings()` returns, bindings are reset to their original
-#'   values. It is a simple wrapper around `scoped_bindings()`.
-#'
-#' @inheritParams env_bind
-#' @param ... Pairs of names and values. These dots support splicing
-#'   (with value semantics) and name unquoting.
-#' @param .frame The frame environment that determines the scope of
-#'   the temporary bindings. When that frame is popped from the call
-#'   stack, bindings are switched back to their original values.
-#' @return `scoped_bindings()` returns the values of old bindings
-#'   invisibly; `with_bindings()` returns the value of `expr`.
-#' @export
-#' @examples
-#' foo <- "foo"
-#' bar <- "bar"
-#'
-#' # `foo` will be temporarily rebinded while executing `expr`
-#' with_bindings(paste(foo, bar), foo = "rebinded")
-#' paste(foo, bar)
-scoped_bindings <- function(..., .env = .frame, .frame = caller_env()) {
-  env <- get_env(.env)
-  bindings <- dots_list(...)
-  stopifnot(is_named(bindings))
-
-  nms <- names(bindings)
-  is_old <- env_has(env, nms)
-  old <- env_get_list(env, nms[is_old])
-
-  unbind_lang <- call2(env_unbind, env, nms[!is_old])
-  rebind_lang <- call2(env_bind_impl, env, old)
-  scoped_exit(frame = .frame, {
-    !! unbind_lang
-    !! rebind_lang
-  })
-
-  env_bind_impl(env, bindings)
-  invisible(old)
-}
-#' @rdname scoped_bindings
-#' @param .expr An expression to evaluate with temporary bindings.
-#' @export
-with_bindings <- function(.expr, ..., .env = caller_env()) {
-  scoped_bindings(..., .env = .env)
-  .expr
-}
-
-#' Mask bindings by defining symbols deeper in a scope
-#'
-#' `env_bury()` is like [env_bind()] but it creates the bindings in a
-#' new child environment. This makes sure the new bindings have
-#' precedence over old ones, without altering existing environments.
-#' Unlike `env_bind()`, this function does not have side effects and
-#' returns a new environment (or object wrapping that environment).
-#'
-#' @inheritParams env_bind
-#' @return A copy of `.env` enclosing the new environment containing
-#'   bindings to `...` arguments.
-#' @seealso [env_bind()], [env_unbind()]
-#' @export
-#' @examples
-#' orig_env <- env(a = 10)
-#' fn <- set_env(function() a, orig_env)
-#'
-#' # fn() currently sees `a` as the value `10`:
-#' fn()
-#'
-#' # env_bury() will bury the current scope of fn() behind a new
-#' # environment:
-#' fn <- env_bury(fn, a = 1000)
-#' fn()
-#'
-#' # Even though the symbol `a` is still defined deeper in the scope:
-#' orig_env$a
-env_bury <- function(.env, ...) {
-  env_ <- get_env(.env)
-  env_ <- child_env(env_, ...)
-  set_env(.env, env_)
-}
-
-#' Remove bindings from an environment
-#'
-#' `env_unbind()` is the complement of [env_bind()]. Like `env_has()`,
-#' it ignores the parent environments of `env` by default. Set
-#' `inherit` to `TRUE` to track down bindings in parent environments.
-#'
-#' @inheritParams get_env
-#' @param nms A character vector containing the names of the bindings
-#'   to remove.
-#' @param inherit Whether to look for bindings in the parent
-#'   environments.
-#' @return The input object `env` with its associated environment
-#'   modified in place, invisibly.
-#' @export
-#' @examples
-#' data <- set_names(as_list(letters), letters)
-#' env_bind(environment(), !!! data)
-#' env_has(environment(), letters)
-#'
-#' # env_unbind() removes bindings:
-#' env_unbind(environment(), letters)
-#' env_has(environment(), letters)
-#'
-#' # With inherit = TRUE, it removes bindings in parent environments
-#' # as well:
-#' parent <- child_env(NULL, foo = "a")
-#' env <- child_env(parent, foo = "b")
-#' env_unbind(env, "foo", inherit = TRUE)
-#' env_has(env, "foo", inherit = TRUE)
-env_unbind <- function(env = caller_env(), nms, inherit = FALSE) {
-  env_ <- get_env(env)
-
-  if (inherit) {
-    while (any(env_has(env_, nms, inherit = TRUE))) {
-      rm(list = nms, envir = env, inherits = TRUE)
-    }
-  } else {
-    rm(list = nms, envir = env)
-  }
-
-  invisible(env)
-}
-
-#' Does an environment have or see bindings?
-#'
-#' `env_has()` is a vectorised predicate that queries whether an
-#' environment owns bindings personally (with `inherit` set to
-#' `FALSE`, the default), or sees them in its own environment or in
-#' any of its parents (with `inherit = TRUE`).
-#'
-#' @inheritParams env_unbind
-#' @return A logical vector as long as `nms`.
-#' @export
-#' @examples
-#' parent <- child_env(NULL, foo = "foo")
-#' env <- child_env(parent, bar = "bar")
-#'
-#' # env does not own `foo` but sees it in its parent environment:
-#' env_has(env, "foo")
-#' env_has(env, "foo", inherit = TRUE)
-env_has <- function(env = caller_env(), nms, inherit = FALSE) {
-  map_lgl(nms, exists, envir = get_env(env), inherits = inherit)
-}
-
-#' Get an object in an environment
-#'
-#' `env_get()` extracts an object from an enviroment `env`. By
-#' default, it does not look in the parent environments.
-#' `env_get_list()` extracts multiple objects from an environment into
-#' a named list.
-#'
-#' @inheritParams get_env
-#' @inheritParams env_has
-#' @param nm,nms Names of bindings. `nm` must be a single string.
-#' @return An object if it exists. Otherwise, throws an error.
-#' @export
-#' @examples
-#' parent <- child_env(NULL, foo = "foo")
-#' env <- child_env(parent, bar = "bar")
-#'
-#' # This throws an error because `foo` is not directly defined in env:
-#' # env_get(env, "foo")
-#'
-#' # However `foo` can be fetched in the parent environment:
-#' env_get(env, "foo", inherit = TRUE)
-env_get <- function(env = caller_env(), nm, inherit = FALSE) {
-  get(nm, envir = get_env(env), inherits = inherit)
-}
-#' @rdname env_get
-#' @export
-env_get_list <- function(env = caller_env(), nms, inherit = FALSE) {
-  nms <- set_names(nms)
-  map(nms, env_get, env = env, inherit = inherit)
-}
-
-#' Poke an object in an environment
-#'
-#' `env_poke()` will assign or reassign a binding in `env` if `create`
-#' is `TRUE`. If `create` is `FALSE` and a binding does not already
-#' exists, an error is issued.
-#'
-#' If `inherit` is `TRUE`, the parents environments are checked for
-#' an existing binding to reassign. If not found and `create` is
-#' `TRUE`, a new binding is created in `env`. The default value for
-#' `create` is a function of `inherit`: `FALSE` when inheriting,
-#' `TRUE` otherwise.
-#'
-#' This default makes sense because the inheriting case is mostly
-#' for overriding an existing binding. If not found, something
-#' probably went wrong and it is safer to issue an error. Note that
-#' this is different to the base R operator `<<-` which will create
-#' a binding in the global environment instead of the current
-#' environment when no existing binding is found in the parents.
-#'
-#'
-#' @section Life cycle:
-#'
-#' `env_poke()` is experimental. We are still experimenting with
-#' reducing the number of redundant functions by using quasiquotation.
-#' It is possible `env_poke()` will be deprecated in favour of
-#' `env_bind()` and name-unquoting with `:=`.
-#'
-#' @inheritParams env_get
-#' @param value The value for a new binding.
-#' @param create Whether to create a binding if it does not already
-#'   exist in the environment.
-#'
-#' @keywords internal
-#' @export
-env_poke <- function(env = caller_env(), nm, value,
-                    inherit = FALSE, create = NULL) {
-  stopifnot(is_string(nm))
-  env_ <- get_env(env)
-
-  # It is safer not to create a new binding when inherit is TRUE,
-  # since the main purpose is to override an existing binding
-  if (is_null(create)) {
-    create <- if (inherit) FALSE else TRUE
-  }
-
-  if (inherit) {
-    scope_set(env, nm, value, create)
-  } else if (create || env_has(env_, nm)) {
-    assign(nm, value, envir = env_)
-  } else {
-    abort(paste0("Can't find existing binding in `env` for \"", nm, "\""))
-  }
-
-  env
-}
-scope_set <- function(env, nm, value, create) {
-  env_ <- get_env(env)
-  cur <- env_
-
-  while (!env_has(cur, nm) && !is_empty_env(cur)) {
-    cur <- env_parent(cur)
-  }
-
-  if (is_empty_env(cur)) {
-    if (!create) {
-      abort(paste0("Can't find existing binding in `env` for \"", nm, "\""))
-    }
-    cur <- env_
-  }
-
-  assign(nm, value, envir = cur)
-  env
-}
-
-#' Names of symbols bound in an environment
-#'
-#' `env_names()` returns object names from an enviroment `env` as a
-#' character vector. All names are returned, even those starting with
-#' a dot.
-#'
-#' @section Names of symbols and objects:
-#'
-#' Technically, objects are bound to symbols rather than strings,
-#' since the R interpreter evaluates symbols (see [is_expression()] for a
-#' discussion of symbolic objects versus literal objects). However it
-#' is often more convenient to work with strings. In rlang
-#' terminology, the string corresponding to a symbol is called the
-#' _name_ of the symbol (or by extension the name of an object bound
-#' to a symbol).
-#'
-#' @section Encoding:
-#'
-#' There are deep encoding issues when you convert a string to symbol
-#' and vice versa. Symbols are _always_ in the native encoding (see
-#' [set_chr_encoding()]). If that encoding (let's say latin1) cannot
-#' support some characters, these characters are serialised to
-#' ASCII. That's why you sometimes see strings looking like
-#' `<U+1234>`, especially if you're running Windows (as R doesn't
-#' support UTF-8 as native encoding on that platform).
-#'
-#' To alleviate some of the encoding pain, `env_names()` always
-#' returns a UTF-8 character vector (which is fine even on Windows)
-#' with unicode points unserialised.
-#'
-#' @inheritParams get_env
-#' @return A character vector of object names.
-#' @export
-#' @examples
-#' env <- env(a = 1, b = 2)
-#' env_names(env)
-env_names <- function(env) {
-  nms <- names(get_env(env))
-  .Call(rlang_unescape_character, nms)
-}
 
 #' Clone an environment
 #'
@@ -970,7 +560,8 @@ env_names <- function(env) {
 #' identical(env, clone)
 #' identical(env$cyl, clone$cyl)
 env_clone <- function(env, parent = env_parent(env)) {
-  .Call(rlang_env_clone, get_env(env), parent)
+  env <- get_env_retired(env, "env_clone()")
+  .Call(rlang_env_clone, env, parent)
 }
 
 #' Does environment inherit from another environment?
@@ -981,8 +572,8 @@ env_clone <- function(env, parent = env_parent(env)) {
 #' @param ancestor Another environment from which `x` might inherit.
 #' @export
 env_inherits <- function(env, ancestor) {
-  env <- get_env(env)
-  stopifnot(is_env(ancestor) && is_env(env))
+  env <- get_env_retired(env, "env_inherits()")
+  stopifnot(is_environment(ancestor) && is_environment(env))
 
   while (!is_empty_env(env_parent(env))) {
     env <- env_parent(env)
@@ -994,253 +585,221 @@ env_inherits <- function(env, ancestor) {
   is_empty_env(env)
 }
 
-
-#' Scoped environments
+#' Lock an environment
 #'
 #' @description
 #'
-#' Scoped environments are named environments which form a
-#' parent-child hierarchy called the search path. They define what
-#' objects you can see (are in scope) from your workspace. They
-#' typically are package environments, i.e. special environments
-#' containing all exported functions from a package (and whose parent
-#' environment is the package namespace, which also contains
-#' unexported functions). Package environments are attached to the
-#' search path with [base::library()]. Note however that any
-#' environment can be attached to the search path, for example with
-#' the unrecommended [base::attach()] base function which transforms
-#' vectors to scoped environments.
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
 #'
-#' - You can list all scoped environments with `scoped_names()`. Unlike
-#'   [base::search()], it also mentions the empty environment that
-#'   terminates the search path (it is given the name `"NULL"`).
+#' Locked environments cannot be modified. An important example is
+#' namespace environments which are locked by R when loaded in a
+#' session. Once an environment is locked it normally cannot be
+#' unlocked.
 #'
-#' - `scoped_envs()` returns all environments on the search path,
-#'   including the empty environment.
+#' Note that only the environment as a container is locked, not the
+#' individual bindings. You can't remove or add a binding but you can
+#' still modify the values of existing bindings. See
+#' [env_binding_lock()] for locking individual bindings.
 #'
-#' - `pkg_env()` takes a package name and returns the scoped
-#'   environment of packages if they are attached to the search path,
-#'   and throws an error otherwise.
+#' @param env An environment.
+#' @return The old value of `env_is_locked()` invisibly.
 #'
-#' - `is_scoped()` allows you to check whether a named environment is
-#'   on the search path.
+#' @seealso [env_binding_lock()]
+#' @export
+#' @examples
+#' # New environments are unlocked by default:
+#' env <- env(a = 1)
+#' env_is_locked(env)
 #'
+#' # Use env_lock() to lock them:
+#' env_lock(env)
+#' env_is_locked(env)
 #'
-#' @section Search path:
+#' # Now that `env` is locked, it is no longer possible to remove or
+#' # add bindings. If run, the following would fail:
+#' # env_unbind(env, "a")
+#' # env_bind(env, b = 2)
 #'
-#' The search path is a chain of scoped environments where newly
-#' attached environments are the childs of earlier ones. However, the
-#' global environment, where everything you define at top-level ends
-#' up, is pinned as the head of that linked chain. Likewise, the base
-#' package environment is pinned as the tail of the chain. You can
-#' retrieve those environments with `global_env()` and `base_env()`
-#' respectively. The global environment is also the environment of the
-#' very first evaluation frame on the stack, see [global_frame()] and
-#' [ctxt_stack()].
+#' # Note that even though the environment as a container is locked,
+#' # the individual bindings are still unlocked and can be modified:
+#' env$a <- 10
+env_lock <- function(env) {
+  old <- env_is_locked(env)
+  lockEnvironment(env)
+  invisible(old)
+}
+#' @rdname env_lock
+#' @export
+env_is_locked <- function(env) {
+  environmentIsLocked(env)
+}
+
+#' Unlock an environment
 #'
+#' This function should only be used in development tools or
+#' interactively.
 #'
-#' @section Life cycle:
-#'
-#' These functions are experimental and may not belong to the rlang
-#' package. Expect API changes.
-#'
-#' @param nm The name of an environment attached to the search
-#'   path. Call [base::search()] to see what is currently on the path.
+#' @inheritParams env_lock
+#' @return Whether the environment has been unlocked.
 #'
 #' @keywords internal
 #' @export
-#' @examples
-#' # List the names of scoped environments:
-#' nms <- scoped_names()
-#' nms
+env_unlock <- function(env) {
+  invisible(.Call(rlang_env_unlock, env))
+}
+
+
+#' Pretty-print an environment
 #'
-#' # The global environment is always the first in the chain:
-#' scoped_env(nms[[1]])
+#' @description
 #'
-#' # And the scoped environment of the base package is always the last:
-#' scoped_env(nms[[length(nms)]])
+#' This prints:
 #'
-#' # These two environments have their own shortcuts:
-#' global_env()
-#' base_env()
+#' * The [label][env_label] and the parent label.
 #'
-#' # Packages appear in the search path with a special name. Use
-#' # pkg_env_name() to create that name:
-#' pkg_env_name("rlang")
-#' scoped_env(pkg_env_name("rlang"))
+#' * Whether the environment is [locked][env_lock].
 #'
-#' # Alternatively, get the scoped environment of a package with
-#' # pkg_env():
-#' pkg_env("utils")
-scoped_env <- function(nm) {
-  if (identical(nm, "NULL")) {
-    return(empty_env())
+#' * The bindings in the environment (up to 20 bindings). They are
+#'   printed succintly using `pillar::type_sum()` (if available,
+#'   otherwise uses an internal version of that generic). In addition
+#'   [fancy bindings][env_bind_lazy] (actives and promises) are
+#'   indicated as such.
+#'
+#' * Locked bindings get a `[L]` tag
+#'
+#' @param env An environment, or object that can be converted to an
+#'   environment by [get_env()].
+#'
+#' @export
+env_print <- function(env = caller_env()) {
+  env <- get_env(env)
+
+  if (is_empty_env(env)) {
+    parent <- "NULL"
+  } else {
+    parent <- sprintf("<environment: %s>", env_label(env_parent(env)))
   }
-  if (!is_scoped(nm)) {
-    stop(paste0(nm, " is not in scope"), call. = FALSE)
+
+  if (env_is_locked(env)) {
+    locked <- " [L]"
+  } else {
+    locked <- ""
   }
-  as.environment(nm)
-}
-#' @rdname scoped_env
-#' @param pkg The name of a package.
-#' @export
-pkg_env <- function(pkg) {
-  pkg_name <- pkg_env_name(pkg)
-  scoped_env(pkg_name)
-}
-#' @rdname scoped_env
-#' @export
-pkg_env_name <- function(pkg) {
-  paste0("package:", pkg)
-}
 
-#' @rdname scoped_env
-#' @export
-scoped_names <- function() {
-  c(search(), "NULL")
-}
-#' @rdname scoped_env
-#' @export
-scoped_envs <- function() {
-  envs <- c(.GlobalEnv, env_parents(.GlobalEnv))
-  set_names(envs, scoped_names())
-}
-#' @rdname scoped_env
-#' @export
-is_scoped <- function(nm) {
-  if (!is_scalar_character(nm)) {
-    stop("`nm` must be a string", call. = FALSE)
+  cat_line(
+    bold(sprintf("<environment: %s>%s", env_label(env), locked)),
+    sprintf("parent: %s", parent)
+  )
+
+  class <- attr(env, "class")
+  if (is_character(class)) {
+    class <- paste(class, collapse = ", ")
+    cat_line(sprintf("class: %s", class))
   }
-  nm %in% scoped_names()
-}
 
-#' @rdname scoped_env
-#' @export
-base_env <- baseenv
-#' @rdname scoped_env
-#' @export
-global_env <- globalenv
+  nms <- env_names(env)
+  n <- length(nms)
 
-#' Get the empty environment
-#'
-#' The empty environment is the only one that does not have a parent.
-#' It is always used as the tail of a scope chain such as the search
-#' path (see [scoped_names()]).
-#'
-#' @export
-#' @examples
-#' # Create environments with nothing in scope:
-#' child_env(empty_env())
-empty_env <- emptyenv
+  if (n) {
+    cat_line("bindings:")
 
-#' Get the namespace of a package
-#'
-#' Namespaces are the environment where all the functions of a package
-#' live. The parent environments of namespaces are the `imports`
-#' environments, which contain all the functions imported from other
-#' packages.
-#'
-#'
-#' @section Life cycle:
-#'
-#' These functions are experimental and may not belong to the rlang
-#' package. Expect API changes.
-#'
-#' @param pkg The name of a package. If `NULL`, the surrounding
-#'   namespace is returned, or an error is issued if not called within
-#'   a namespace. If a function, the enclosure of that function is
-#'   checked.
-#'
-#' @seealso [pkg_env()]
-#' @keywords internal
-#' @export
-ns_env <- function(pkg = NULL) {
-  if (is_null(pkg)) {
-    bottom <- topenv(caller_env())
-    if (!isNamespace(bottom)) abort("not in a namespace")
-    bottom
-  } else if (is_function(pkg)) {
-    env <- env_parent(pkg)
-    if (isNamespace(env)) {
-      env
+    if (n > 20) {
+      other <- nms[seq(21L, n)]
+      nms <- nms[1:20]
     } else {
-      NULL
+      other <- chr()
     }
-  } else {
-    asNamespace(pkg)
+
+    escaped_nms <- map_chr(syms(nms), deparse, backtick = TRUE)
+
+    types <- env_binding_type_sum(env, nms)
+    types <- paste0(" ", bullet(paste0(escaped_nms, ": <", types, ">")))
+
+    locked <- env_binding_are_locked(env, nms)
+    locked <- ifelse(locked, " [L]", "")
+    types <- paste0(types, locked)
+
+    cat_line(types)
+
+    n_other <- length(other)
+    if (n_other) {
+      cat_line(sprintf("   * ... with %s more bindings", n_other))
+    }
   }
-}
-#' @rdname ns_env
-#' @export
-ns_imports_env <- function(pkg = NULL) {
-  env_parent(ns_env(pkg))
-}
-#' @rdname ns_env
-#' @export
-ns_env_name <- function(pkg = NULL) {
-  if (is_null(pkg)) {
-    pkg <- with_env(caller_env(), ns_env())
-  } else if (is_function(pkg)) {
-    pkg <- get_env(pkg)
-  }
-  unname(getNamespaceName(pkg))
+
+  invisible(env)
 }
 
-#' Is an object a namespace environment?
-#'
-#' @param x An object to test.
-#' @export
-is_namespace <- function(x) {
-  isNamespace(x)
-}
-
-#' Is a package installed in the library?
-#'
-#' This checks that a package is installed with minimal side effects.
-#' If installed, the package will be loaded but not attached.
-#'
-#' @param pkg The name of a package.
-#' @return `TRUE` if the package is installed, `FALSE` otherwise.
-#' @export
-#' @examples
-#' is_installed("utils")
-#' is_installed("ggplot5")
-is_installed <- function(pkg) {
-  is_true(requireNamespace(pkg, quietly = TRUE))
-}
-
-
-env_type <- function(env) {
-  if (is_reference(env, global_env())) {
-    "global"
-  } else if (is_reference(env, empty_env())) {
-    "empty"
-  } else if (is_reference(env, base_env())) {
-    "base"
-  } else if (is_frame_env(env)) {
-    "frame"
-  } else {
-    "local"
-  }
-}
-friendly_env_type <- function(type) {
-  switch(type,
-    global = "the global environment",
-    empty = "the empty environment",
-    base = "the base environment",
-    frame = "a frame environment",
-    local = "a local environment",
-    abort("Internal error: unknown environment type")
+new_environments <- function(envs, names) {
+  stopifnot(is_list(envs))
+  structure(
+    envs,
+    names = map_chr(unname(envs), env_name),
+    class = "rlang_envs"
   )
 }
 
-env_format <- function(env) {
-  type <- env_type(env)
-
-  if (type %in% c("frame", "local")) {
-    addr <- sxp_address(get_env(env))
-    type <- paste(type, addr)
+#' @export
+print.rlang_envs <- function(x, ...) {
+  n <- length(x)
+  if (!n) {
+    print(list())
+    return(invisible(x))
+  }
+  if (n > 20L) {
+    footer <- sprintf("... and %s more environments", n - 20L)
+    x <- x[seq_len(20L)]
+  } else {
+    footer <- chr()
   }
 
-  type
+  digits <- n_digits(seq_along(x))
+  pads <- digits[[length(x)]] - digits
+  pads <- map_chr(pads, spaces)
+
+  labels <- map_chr(x, env_label)
+  nms_tags <- names_tags(names(x))
+
+  cat_line(
+    paste0(pads, "[[", seq_along(x), "]]", nms_tags, " <env: ", labels, ">"),
+    footer
+  )
+
+  invisible(x)
+}
+n_digits <- function(x) {
+  floor(log10(x) + 1)
+}
+names_tags <- function(nms) {
+  if (is_null(nms)) {
+    return("")
+  }
+
+  invalid <- nms_are_invalid(nms)
+  if (all(invalid)) {
+    return("")
+  }
+
+  ifelse(invalid, "  ", " $")
+}
+
+#' @export
+c.rlang_envs <- function(...) {
+  new_environments(NextMethod())
+}
+#' @export
+`[.rlang_envs` <- function(x, i) {
+  new_environments(NextMethod())
+}
+
+#' @export
+str.rlang_envs <- function(object, ...) {
+  i <- 0
+  for (env in object) {
+    i <- inc(i)
+    cat(sprintf("[[%s]]\n", i))
+    env_print(env)
+    cat("\n")
+  }
+  invisible(object)
 }

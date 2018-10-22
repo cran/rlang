@@ -35,25 +35,30 @@ syms <- function(x) {
 
 #' Is object a symbol?
 #' @param x An object to test.
-#' @param name An optional name that the symbol should match.
+#' @param name An optional name or vector of names that the symbol
+#'   should match.
 #' @export
 is_symbol <- function(x, name = NULL) {
   if (typeof(x) != "symbol") {
     return(FALSE)
   }
-  if (!is_null(name) && !identical(as_string(x), name)) {
-    return(FALSE)
+  if (is_null(name)) {
+    return(TRUE)
   }
-  TRUE
+  as_string(x) %in% name
 }
 
 
 namespace_sym <- quote(`::`)
 namespace2_sym <- quote(`:::`)
 dollar_sym <- quote(`$`)
+dot_data_sym <- quote(.data)
+dots_sym <- quote(...)
 at_sym <- quote(`@`)
 tilde_sym <- quote(`~`)
 colon_equals_sym <- quote(`:=`)
 brace_sym <- quote(`{`)
 dots_sym <- quote(...)
 function_sym <- quote(`function`)
+dot_sym <- quote(.)
+pipe_sym <- quote(`%>%`)

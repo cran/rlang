@@ -12,6 +12,8 @@ eval_bare(expr, env = parent.frame())
 \item{env}{The environment in which to evaluate the expression.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+
 \code{eval_bare()} is a lower-level version of function \code{\link[base:eval]{base::eval()}}.
 Technically, it is a simple wrapper around the C function
 \code{Rf_eval()}. You generally don't need to use \code{eval_bare()} instead
@@ -50,12 +52,6 @@ The flip side of the semantics of \code{eval_bare()} is that it can't
 evaluate \code{break} or \code{next} expressions even if called within a
 loop.
 }
-\section{Life cycle}{
-
-
-\code{eval_bare()} is stable.
-}
-
 \examples{
 # eval_bare() works just like base::eval() but you have to create
 # the evaluation environment yourself:
@@ -80,16 +76,16 @@ while (TRUE) {
 # To explore the consequences of stack inconsistent semantics, let's
 # create a function that evaluates `parent.frame()` deep in the call
 # stack, in an environment corresponding to a frame in the middle of
-# the stack. For consistency we R's lazy evaluation semantics, we'd
+# the stack. For consistency with R's lazy evaluation semantics, we'd
 # expect to get the caller of that frame as result:
 fn <- function(eval_fn) {
   list(
     returned_env = middle(eval_fn),
-    actual_env = get_env()
+    actual_env = current_env()
   )
 }
 middle <- function(eval_fn) {
-  deep(eval_fn, get_env())
+  deep(eval_fn, current_env())
 }
 deep <- function(eval_fn, eval_env) {
   expr <- quote(parent.frame())
@@ -101,12 +97,6 @@ fn(rlang::eval_bare)
 
 # But that's not the case with base::eval():
 fn(base::eval)
-
-# Another difference of eval_bare() compared to base::eval() is
-# that it does not insert parasite frames in the evaluation stack:
-get_stack <- quote(identity(ctxt_stack()))
-eval_bare(get_stack)
-eval(get_stack)
 }
 \seealso{
 \code{\link[=eval_tidy]{eval_tidy()}} for evaluation with data mask and quosure

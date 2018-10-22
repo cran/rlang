@@ -2,39 +2,47 @@
 #include "internal.h"
 
 
-static sexp* tilde_thunk_fmls = NULL;
-static sexp* tilde_thunk_body = NULL;
+static sexp* quo_mask_flag_sym = NULL;
+static sexp* data_mask_flag_sym = NULL;
 
-sexp* new_tilde_thunk(sexp* data_mask, sexp* data_mask_top) {
-  sexp* body = KEEP(r_duplicate(tilde_thunk_body, false));
-  sexp* fn = KEEP(r_new_function(tilde_thunk_fmls, body, r_base_env));
+enum rlang_mask_type {
+  RLANG_MASK_DATA,     // Full data mask
+  RLANG_MASK_QUOSURE,  // Quosure mask with only `~` binding
+  RLANG_MASK_NONE
+};
 
-  sexp* args = r_node_cdr(r_node_cddr(body));
-  r_node_poke_car(args, data_mask);
-  r_node_poke_cadr(args, data_mask_top);
+struct rlang_mask_info {
+  sexp* mask;
+  enum rlang_mask_type type;
+};
 
-  FREE(2);
-  return fn;
+static struct rlang_mask_info mask_info(sexp* mask) {
+  if (r_typeof(mask) != r_type_environment) {
+    return (struct rlang_mask_info) { r_null, RLANG_MASK_NONE };
+  }
+
+  sexp* flag;
+
+  flag = r_env_find_anywhere(mask, data_mask_flag_sym);
+  if (flag != r_unbound_sym) {
+    return (struct rlang_mask_info) { flag, RLANG_MASK_DATA };
+  }
+
+  flag = r_env_find_anywhere(mask, quo_mask_flag_sym);
+  if (flag != r_unbound_sym) {
+    return (struct rlang_mask_info) { flag, RLANG_MASK_QUOSURE };
+  }
+
+  return (struct rlang_mask_info) { r_null, RLANG_MASK_NONE };
 }
 
 
-static sexp* data_pronoun_names = NULL;
 static sexp* data_pronoun_class = NULL;
 
-// Exported for deprecated as_dictionary() generic
-sexp* rlang_new_data_pronoun(sexp* x, sexp* lookup_msg, sexp* read_only) {
-  sexp* dict = KEEP(r_new_vector(r_type_list, 3));
+static sexp* rlang_new_data_pronoun(sexp* mask) {
+  sexp* dict = KEEP(r_new_vector(r_type_list, 1));
 
-  r_list_poke(dict, 0, x);
-  r_list_poke(dict, 2, read_only);
-
-  if (lookup_msg == r_null) {
-    r_list_poke(dict, 1, r_scalar_chr("Object `%s` not found in `.data`"));
-  } else {
-    r_list_poke(dict, 1, lookup_msg);
-  }
-
-  r_poke_attribute(dict, r_names_sym, data_pronoun_names);
+  r_list_poke(dict, 0, mask);
   r_poke_attribute(dict, r_class_sym, data_pronoun_class);
 
   FREE(1);
@@ -55,7 +63,7 @@ static void check_unique_names(sexp* x) {
     r_abort("`data` must be uniquely named but does not have names");
   }
   if (r_vec_find_first_duplicate(names, empty_names_chr, NULL)) {
-    r_abort("`data` must be uniquely named but has duplicate elements");
+    r_abort("`data` must be uniquely named but has duplicate columns");
   }
 }
 sexp* rlang_as_data_pronoun(sexp* x) {
@@ -68,11 +76,11 @@ sexp* rlang_as_data_pronoun(sexp* x) {
   case r_type_complex:
   case r_type_character:
   case r_type_raw:
-    check_unique_names(x);
     x = KEEP_N(r_vec_coerce(x, r_type_list), n_kept);
-    break;
+    // fallthrough
   case r_type_list:
     check_unique_names(x);
+    x = KEEP_N(r_list_as_environment(x, r_empty_env), n_kept);
     break;
   case r_type_environment:
     break;
@@ -80,16 +88,13 @@ sexp* rlang_as_data_pronoun(sexp* x) {
     r_abort("`data` must be an uniquely named vector, list, data frame or environment");
   }
 
-  sexp* lookup_msg = KEEP_N(r_scalar_chr("Column `%s` not found in `.data`"), n_kept);
-  sexp* read_only = KEEP_N(r_scalar_lgl(1), n_kept);
-  sexp* pronoun = rlang_new_data_pronoun(x, lookup_msg, read_only);
+  sexp* pronoun = rlang_new_data_pronoun(x);
 
   FREE(n_kept);
   return pronoun;
 }
 
 
-static sexp* data_mask_flag_sym = NULL;
 static sexp* data_mask_env_sym = NULL;
 static sexp* data_mask_top_env_sym = NULL;
 
@@ -98,12 +103,46 @@ static void check_data_mask_input(sexp* env, const char* arg) {
     r_abort("Can't create data mask because `%s` must be an environment", arg);
   }
 }
-sexp* rlang_new_data_mask(sexp* bottom, sexp* top, sexp* parent) {
-  check_data_mask_input(parent, "parent");
+static void check_data_mask_top(sexp* bottom, sexp* top) {
+  sexp* cur = bottom;
+
+  while (cur != r_empty_env) {
+    if (cur == top) {
+      return ;
+    }
+    cur = r_env_parent(cur);
+  }
+
+  r_abort("Can't create data mask because `top` is not a parent of `bottom`");
+}
+
+static sexp* env_sym = NULL;
+static sexp* old_sym = NULL;
+static sexp* mask_sym = NULL;
+
+static sexp* tilde_fn = NULL;
+static sexp* restore_mask_fn = NULL;
+
+static void on_exit_restore_lexical_env(sexp* mask, sexp* old, sexp* frame) {
+  sexp* fn = KEEP(r_duplicate(restore_mask_fn, true));
+
+  sexp* env = KEEP(r_new_environment(r_base_env, 2));
+  r_env_poke(env, mask_sym, mask);
+  r_env_poke(env, old_sym, old);
+  r_fn_poke_env(fn, env);
+
+  sexp* call = KEEP(r_new_call(fn, r_null));
+  r_on_exit(call, frame);
+
+  FREE(3);
+}
+
+sexp* rlang_new_data_mask(sexp* bottom, sexp* top) {
   sexp* data_mask;
 
   if (bottom == r_null) {
-    data_mask = bottom = KEEP(r_new_environment(parent, 0));
+    bottom = KEEP(r_new_environment(r_empty_env, 0));
+    data_mask = bottom;
   } else {
     check_data_mask_input(bottom, "bottom");
     // Create a child because we don't know what might be in `bottom`
@@ -117,10 +156,13 @@ sexp* rlang_new_data_mask(sexp* bottom, sexp* top, sexp* parent) {
   } else {
     check_data_mask_input(top, "top");
   }
+  if (top != bottom) {
+    check_data_mask_top(bottom, top);
+  }
 
-  r_env_poke(data_mask, r_tilde_sym, new_tilde_thunk(data_mask, top));
+  r_env_poke(data_mask, r_tilde_sym, tilde_fn);
   r_env_poke(data_mask, data_mask_flag_sym, data_mask);
-  r_env_poke(data_mask, data_mask_env_sym, parent);
+  r_env_poke(data_mask, data_mask_env_sym, r_env_parent(top));
   r_env_poke(data_mask, data_mask_top_env_sym, top);
 
   FREE(1);
@@ -128,20 +170,96 @@ sexp* rlang_new_data_mask(sexp* bottom, sexp* top, sexp* parent) {
 }
 
 
+sexp* rlang_is_data_mask(sexp* env) {
+  return r_lgl(mask_info(env).type == RLANG_MASK_DATA);
+}
+
+static sexp* mask_find(sexp* env, sexp* sym) {
+  if (r_typeof(sym) != r_type_symbol) {
+    r_abort("Internal error: Data pronoun must be subset with a symbol");
+  }
+
+  sexp* top_env = r_env_find(env, data_mask_top_env_sym);
+  if (r_typeof(top_env) == r_type_environment) {
+    // Start lookup in the parent if the pronoun wraps a data mask
+    env = r_env_parent(env);
+  } else {
+    // Data pronouns created from lists or data frames are converted
+    // to a simple environment whose ancestry shouldn't be looked up.
+    top_env = env;
+  }
+  KEEP(top_env); // Help rchk
+
+  sexp* cur = env;
+  do {
+    sexp* obj = r_env_find(cur, sym);
+    if (obj != r_unbound_sym && !r_is_function(obj)) {
+      FREE(1);
+      return obj;
+    }
+
+    if (cur == top_env) {
+      break;
+    } else {
+      cur = r_env_parent(cur);
+    }
+  } while (cur != r_empty_env);
+
+  FREE(1);
+  return r_unbound_sym;
+}
+sexp* rlang_data_pronoun_get(sexp* pronoun, sexp* sym) {
+  if (r_typeof(pronoun) != r_type_environment) {
+    r_abort("Internal error: Data pronoun must wrap an environment");
+  }
+
+  sexp* obj = mask_find(pronoun, sym);
+
+  if (obj == r_unbound_sym) {
+    sexp* call = KEEP(r_parse("rlang:::abort_data_pronoun(x)"));
+    r_eval_with_x(call, r_base_env, sym);
+    r_abort("Internal error: .data subsetting should have failed earlier");
+  }
+
+  r_mark_shared(obj);
+  return obj;
+}
+
+static void warn_env_as_mask_once() {
+  const char* msg =
+    "Passing an environment as data mask is deprecated.\n"
+    "Please use `new_data_mask()` to transform your environment to a mask.\n"
+    "\n"
+    "  env <- env(foo = \"bar\")\n"
+    "\n"
+    "  # Bad:\n"
+    "  as_data_mask(env)\n"
+    "  eval_tidy(expr, env)\n"
+    "\n"
+    "  # Good:\n"
+    "  mask <- new_data_mask(env)\n"
+    "  eval_tidy(expr, mask)";
+  r_signal_soft_deprecated(msg, msg, "rlang", r_empty_env);
+}
+
 static sexp* data_pronoun_sym = NULL;
 
-sexp* rlang_as_data_mask(sexp* data, sexp* parent) {
-  if (data == r_null) {
-    return rlang_new_data_mask(r_null, r_null, parent);
+sexp* rlang_as_data_mask(sexp* data) {
+  if (mask_info(data).type == RLANG_MASK_DATA) {
+    return data;
   }
-  sexp* data_pronoun = rlang_as_data_pronoun(data);
-  sexp* bottom = NULL;
+  if (data == r_null) {
+    return rlang_new_data_mask(r_null, r_null);
+  }
 
   int n_protect = 0;
 
+  sexp* bottom = NULL;
+
   switch (r_typeof(data)) {
   case r_type_environment:
-    bottom = KEEP_N(r_env_clone(data, parent), n_protect);
+    warn_env_as_mask_once();
+    bottom = KEEP_N(r_env_clone(data, NULL), n_protect);
     break;
 
   case r_type_logical:
@@ -155,13 +273,15 @@ sexp* rlang_as_data_mask(sexp* data, sexp* parent) {
     // fallthrough:
 
   case r_type_list: {
+    check_unique_names(data);
+
     sexp* names = r_vec_names(data);
-    bottom = KEEP_N(r_new_environment(parent, 0), n_protect);
+    bottom = KEEP_N(r_new_environment(r_empty_env, 0), n_protect);
 
     if (names != r_null) {
-      r_ssize_t n = r_length(data);
+      r_ssize n = r_length(data);
 
-      for (r_ssize_t i = 0; i < n; ++i) {
+      for (r_ssize i = 0; i < n; ++i) {
         // Ignore empty or missing names
         sexp* nm = r_chr_get(names, i);
         if (r_str_is_name(nm)) {
@@ -178,11 +298,22 @@ sexp* rlang_as_data_mask(sexp* data, sexp* parent) {
     r_abort("`data` must be a vector, list, data frame, or environment");
   }
 
+  sexp* data_mask = rlang_new_data_mask(bottom, bottom);
+
+  sexp* data_pronoun = KEEP_N(rlang_as_data_pronoun(data_mask), n_protect);
   r_env_poke(bottom, data_pronoun_sym, data_pronoun);
-  sexp* data_mask = rlang_new_data_mask(bottom, bottom, parent);
 
   FREE(n_protect);
   return data_mask;
+}
+
+// For compatibility of the exported C callable
+// TODO: warn
+sexp* rlang_new_data_mask_compat(sexp* bottom, sexp* top, sexp* parent) {
+  return rlang_new_data_mask(bottom, top);
+}
+sexp* rlang_as_data_mask_compat(sexp* data, sexp* parent) {
+  return rlang_as_data_mask(data);
 }
 
 
@@ -195,7 +326,7 @@ static sexp* base_tilde_eval(sexp* tilde, sexp* quo_env) {
 
   // Inline the base primitive because overscopes override `~` to make
   // quosures self-evaluate
-  tilde = KEEP(r_new_call_node(tilde_prim, r_node_cdr(tilde)));
+  tilde = KEEP(r_new_call(tilde_prim, r_node_cdr(tilde)));
   tilde = KEEP(r_eval(tilde, quo_env));
 
   // Change it back because the result still has the primitive inlined
@@ -205,12 +336,24 @@ static sexp* base_tilde_eval(sexp* tilde, sexp* quo_env) {
   return tilde;
 }
 
+sexp* env_get_top_binding(sexp* mask) {
+  sexp* top = r_env_find(mask, data_mask_top_env_sym);
+
+  if (top == r_unbound_sym) {
+    r_abort("Internal error: Can't find .top pronoun in data mask");
+  }
+  if (r_typeof(top) != r_type_environment) {
+    r_abort("Internal error: Unexpected .top pronoun type");
+  }
+
+  return top;
+}
+
 
 static sexp* env_poke_parent_fn = NULL;
 static sexp* env_poke_fn = NULL;
 
-sexp* rlang_tilde_eval(sexp* tilde, sexp* overscope, sexp* overscope_top,
-                       sexp* cur_frame, sexp* caller_frame) {
+sexp* rlang_tilde_eval(sexp* tilde, sexp* current_frame, sexp* caller_frame) {
   // Remove srcrefs from system call
   r_poke_attribute(tilde, r_srcref_sym, r_null);
 
@@ -232,48 +375,41 @@ sexp* rlang_tilde_eval(sexp* tilde, sexp* overscope, sexp* overscope_top,
   }
 
   int n_protect = 0;
+  sexp* top;
+  struct rlang_mask_info info = mask_info(caller_frame);
 
-  sexp* prev_env;
-  sexp* flag = r_env_find(overscope, data_mask_flag_sym);
-  if (flag == r_unbound_sym) {
-    prev_env = r_env_parent(overscope);
-  } else {
-    prev_env = r_env_get(overscope, data_mask_env_sym);
-    KEEP_N(prev_env, n_protect); // Help rchk
-
-    // Update .env pronoun to current quosure env temporarily
-    r_env_poke(overscope, data_mask_env_sym, quo_env);
-
-    sexp* exit_args = r_build_pairlist3(overscope, r_scalar_chr(".env"), prev_env);
-    sexp* exit_lang = KEEP(r_build_call_node(env_poke_fn, exit_args));
-    r_on_exit(exit_lang, cur_frame);
-    FREE(1);
+  switch (info.type) {
+  case RLANG_MASK_DATA:
+    top = KEEP_N(env_get_top_binding(info.mask), n_protect);
+    // Update `.env` pronoun to current quosure env temporarily
+    r_env_poke(info.mask, data_mask_env_sym, quo_env);
+    break;
+  case RLANG_MASK_QUOSURE:
+    top = info.mask;
+    break;
+  case RLANG_MASK_NONE:
+    r_abort("Internal error: Can't find the data mask");
   }
 
+  // Unwind-protect the restoration of original parents
+  on_exit_restore_lexical_env(info.mask, r_env_parent(top), current_frame);
 
-  // Swap enclosures temporarily by rechaining the top of the dynamic
-  // scope to the enclosure of the new formula, if it has one
-  r_env_poke_parent(overscope_top, quo_env);
+  // Swap lexical contexts temporarily by rechaining the top of the
+  // mask to the quosure environment
+  r_env_poke_parent(top, quo_env);
 
-  sexp* exit_args = r_build_pairlist2(overscope_top, prev_env);
-  sexp* exit_lang = r_build_call_node(env_poke_parent_fn, exit_args);
-  KEEP_N(exit_lang, n_protect);
-  r_on_exit(exit_lang, cur_frame);
-
-  sexp* out = r_eval(expr, overscope);
   FREE(n_protect);
-  return out;
+  return r_eval(expr, info.mask);
 }
 
-#define DATA_MASK_OBJECTS_N 4
-static const char* data_mask_objects_names[DATA_MASK_OBJECTS_N] = {
-  ".__tidyeval_data_mask__.", "~", ".top_env", ".env"
+static const char* data_mask_objects_names[5] = {
+  ".__tidyeval_data_mask__.", "~", ".top_env", ".env", NULL
 };
 
 // Soft-deprecated in rlang 0.2.0
 sexp* rlang_data_mask_clean(sexp* mask) {
   sexp* bottom = r_env_parent(mask);
-  sexp* top = r_env_get(mask, data_mask_top_env_sym);
+  sexp* top = r_eval(data_mask_top_env_sym, mask);
 
   KEEP(top); // Help rchk
 
@@ -282,13 +418,15 @@ sexp* rlang_data_mask_clean(sexp* mask) {
   }
 
   // At this level we only want to remove our own stuff
-  r_env_unbind_all(mask, data_mask_objects_names, DATA_MASK_OBJECTS_N, false);
+  r_env_unbind_all(mask, data_mask_objects_names, false);
 
   // Remove everything in the other levels
   sexp* env = bottom;
   sexp* parent = r_env_parent(top);
   while (env != parent) {
-    r_env_unbind_names(env, r_env_names(env), false);
+    sexp* nms = KEEP(r_env_names(env));
+    r_env_unbind_names(env, nms, false);
+    FREE(1);
     env = r_env_parent(env);
   }
 
@@ -299,60 +437,50 @@ sexp* rlang_data_mask_clean(sexp* mask) {
 
 static sexp* new_quosure_mask(sexp* env) {
   sexp* mask = KEEP(r_new_environment(env, 3));
-  r_env_poke(mask, r_tilde_sym, new_tilde_thunk(mask, mask));
+  r_env_poke(mask, r_tilde_sym, tilde_fn);
+  r_env_poke(mask, quo_mask_flag_sym, mask);
   FREE(1);
   return mask;
 }
 
-
-bool is_data_mask(sexp* env) {
-  if (r_typeof(env) != r_type_environment) {
-    return false;
-  } else {
-    return r_env_find(env, data_mask_flag_sym) != r_unbound_sym;
-  }
-}
-
-
-static sexp* data_mask_clean_fn = NULL;
-static sexp* env_sym = NULL;
-
-sexp* rlang_eval_tidy(sexp* expr, sexp* data, sexp* frame) {
+sexp* rlang_eval_tidy(sexp* expr, sexp* data, sexp* env) {
   int n_protect = 0;
 
-  sexp* env;
   if (rlang_is_quosure(expr)) {
     env = r_quo_get_env(expr);
     expr = r_quo_get_expr(expr);
-  } else {
-    env = KEEP_N(r_eval(env_sym, frame), n_protect);
   }
-
-  // If `data` is already a data mask, update env pronouns and
-  // evaluate in that environment. The caller is responsible for
-  // cleaning the mask if needed.
-  if (is_data_mask(data)) {
-    r_env_poke(data, data_mask_env_sym, env);
-    sexp* top = r_env_get(data, data_mask_top_env_sym);
-    r_env_poke_parent(top, env);
-
-    sexp* out = r_eval(expr, data);
-    FREE(n_protect);
-    return out;
-  }
-
-
-  sexp* mask;
 
   // If there is no data, we only need to mask `~` with the definition
   // for quosure thunks. Otherwise we create a heavier data mask with
   // all the masking objects, data pronouns, etc.
   if (data == r_null) {
-    mask = KEEP(new_quosure_mask(env));
-  } else {
-    mask = KEEP(rlang_as_data_mask(data, env));
+    sexp* mask = KEEP_N(new_quosure_mask(env), n_protect);
+    sexp* out = r_eval(expr, mask);
+    FREE(n_protect);
+    return out;
   }
-  ++n_protect;
+
+  sexp* mask = KEEP_N(rlang_as_data_mask(data), n_protect);
+  sexp* top = KEEP_N(env_get_top_binding(mask), n_protect);
+
+  // Rechain the mask on the new lexical env but don't restore it on
+  // exit. This way leaked masks inherit from a somewhat sensible
+  // environment. We could do better with ALTENV and two-parent data
+  // masks:
+  //
+  // * We'd create a new two-parents evaluation env for each quosure.
+  //   The first parent would be the mask and the second the lexical
+  //   environment.
+  //
+  // * The data mask top would always inherit from the empty
+  //   environment.
+  //
+  // * Look-up in leaked environments would proceed from the data mask
+  //   to the appropriate lexical environment (from quosures or from
+  //   the `env` argument of eval_tidy()).
+  r_env_poke(mask, data_mask_env_sym, env);
+  r_env_poke_parent(top, env);
 
   sexp* out = r_eval(expr, mask);
   FREE(n_protect);
@@ -360,16 +488,22 @@ sexp* rlang_eval_tidy(sexp* expr, sexp* data, sexp* frame) {
 }
 
 
-const char* data_pronoun_c_names[3] = { "src", "lookup_msg", "read_only" };
-
 void rlang_init_eval_tidy() {
-  tilde_thunk_fmls = rlang_constants_get("tilde_thunk_fmls");
-  tilde_thunk_body = rlang_constants_get("tilde_thunk_body");
+  sexp* rlang_ns_env = KEEP(r_ns_env("rlang"));
 
-  data_pronoun_names = r_new_character(data_pronoun_c_names, 3);
-  r_mark_precious(data_pronoun_names);
+  tilde_fn = r_parse_eval(
+    "function(...) {                          \n"
+    "  .Call(rlang_tilde_eval,                \n"
+    "    sys.call(),     # Quosure env        \n"
+    "    environment(),  # Unwind-protect env \n"
+    "    parent.frame()  # Lexical env        \n"
+    "  )                                      \n"
+    "}                                        \n",
+    rlang_ns_env
+  );
+  r_mark_precious(tilde_fn);
 
-  data_pronoun_class = r_scalar_chr("rlang_data_pronoun");
+  data_pronoun_class = r_chr("rlang_data_pronoun");
   r_mark_precious(data_pronoun_class);
 
   empty_names_chr = r_new_vector(r_type_character, 2);
@@ -377,6 +511,7 @@ void rlang_init_eval_tidy() {
   r_chr_poke(empty_names_chr, 0, r_string(""));
   r_chr_poke(empty_names_chr, 1, r_missing_str);
 
+  quo_mask_flag_sym = r_sym(".__tidyeval_quosure_mask__.");
   data_mask_flag_sym = r_sym(".__tidyeval_data_mask__.");
   data_mask_env_sym = r_sym(".env");
   data_mask_top_env_sym = r_sym(".top_env");
@@ -386,7 +521,24 @@ void rlang_init_eval_tidy() {
   env_poke_parent_fn = rlang_ns_get("env_poke_parent");
   env_poke_fn = rlang_ns_get("env_poke");
 
-  data_mask_clean_fn = rlang_ns_get("overscope_clean");
-
   env_sym = r_sym("env");
+  old_sym = r_sym("old");
+  mask_sym = r_sym("mask");
+
+  restore_mask_fn = r_parse_eval(
+    "function() {                \n"
+    "  mask$.env <- `old`        \n"
+    "                            \n"
+    "  top <- `mask`$.top_env    \n"
+    "  if (is.null(top)) {       \n"
+    "    top <- `mask`           \n"
+    "  }                         \n"
+    "                            \n"
+    "  parent.env(top) <- `old`  \n"
+    "}                           \n",
+    r_base_env
+  );
+  r_mark_precious(restore_mask_fn);
+
+  FREE(1);
 }

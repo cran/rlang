@@ -8,19 +8,25 @@
 \usage{
 env_parent(env = caller_env(), n = 1)
 
-env_tail(env = caller_env(), sentinel = empty_env())
+env_tail(env = caller_env(), last = global_env(), sentinel = NULL)
 
-env_parents(env = caller_env())
+env_parents(env = caller_env(), last = global_env())
 }
 \arguments{
-\item{env}{An environment or an object bundling an environment,
-e.g. a formula, \link[=quotation]{quosure} or \link[=is_closure]{closure}.}
+\item{env}{An environment.}
 
 \item{n}{The number of generations to go up.}
 
-\item{sentinel}{The environment signalling the end of the linear
-search. \code{env_tail()} returns the environment which has \code{sentinel}
-as parent.}
+\item{last}{The environment at which to stop. Defaults to the
+global environment. The empty environment is always a stopping
+condition so it is safe to leave the default even when taking the
+tail or the parents of an environment on the search path.
+
+\code{env_tail()} returns the environment which has \code{last} as parent
+and \code{env_parents()} returns the list of environments up to \code{last}.}
+
+\item{sentinel}{This argument is soft-deprecated, please use \code{last}
+instead.}
 }
 \value{
 An environment for \code{env_parent()} and \code{env_tail()}, a list
@@ -33,11 +39,18 @@ with \code{n = 1}, the grandparent with \code{n = 2}, etc.
 \item \code{env_tail()} searches through the parents and returns the one
 which has \code{\link[=empty_env]{empty_env()}} as parent.
 \item \code{env_parents()} returns the list of all parents, including the
-empty environment.
+empty environment. This list is named using \code{\link[=env_name]{env_name()}}.
 }
 
 See the section on \emph{inheritance} in \code{\link[=env]{env()}}'s documentation.
 }
+\section{Life cycle}{
+
+
+The \code{sentinel} argument of \code{env_tail()} has been deprecated in
+rlang 0.2.0 and renamed to \code{last}.
+}
+
 \examples{
 # Get the parent environment with env_parent():
 env_parent(global_env())

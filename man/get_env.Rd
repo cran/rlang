@@ -6,22 +6,20 @@
 \alias{env_poke_parent}
 \title{Get or set the environment of an object}
 \usage{
-get_env(env = caller_env(), default = NULL)
+get_env(env, default = NULL)
 
 set_env(env, new_env = caller_env())
 
 env_poke_parent(env, new_env)
 }
 \arguments{
-\item{env}{An environment or an object bundling an environment,
-e.g. a formula, \link[=quotation]{quosure} or \link[=is_closure]{closure}.}
+\item{env}{An environment.}
 
 \item{default}{The default environment in case \code{env} does not wrap
 an environment. If \code{NULL} and no environment could be extracted,
 an error is issued.}
 
-\item{new_env}{An environment to replace \code{env} with. Can be an
-object handled by \code{get_env()}.}
+\item{new_env}{An environment to replace \code{env} with.}
 }
 \description{
 These functions dispatch internally with methods for functions,
@@ -40,18 +38,23 @@ side effect. This is because environments are
 that you don't own, e.g. a parent environment of a function from a
 package.
 }
-\examples{
-# Get the environment of frame objects. If no argument is supplied,
-# the current frame is used:
-fn <- function() {
-  list(
-    get_env(call_frame()),
-    get_env()
-  )
-}
-fn()
+\section{Life cycle}{
 
+\itemize{
+\item Using \code{get_env()} without supplying \code{env} is soft-deprecated as
+of rlang 0.3.0. Please use \code{\link[=current_env]{current_env()}} to retrieve the
+current environment.
+\item Passing environment wrappers like formulas or functions instead
+of bare environments is soft-deprecated as of rlang 0.3.0. This
+internal genericity was causing confusion (see issue #427). You
+should now extract the environment separately before calling
+these functions.
+}
+}
+
+\examples{
 # Environment of closure functions:
+fn <- function() "foo"
 get_env(fn)
 
 # Or of quosures or formulas:
@@ -80,7 +83,7 @@ fn <- set_env(function() NULL, env)
 
 # That function now has `env` as enclosure:
 identical(get_env(fn), env)
-identical(get_env(fn), get_env())
+identical(get_env(fn), current_env())
 
 # set_env() does not work by side effect. Setting a new environment
 # for fn has no effect on the original function:

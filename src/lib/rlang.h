@@ -8,13 +8,16 @@
 #define R_NO_REMAP
 #include <Rinternals.h>
 
+#include "../config.h"
+
 typedef struct SEXPREC sexp;
 typedef Rbyte r_byte_t;
 typedef Rcomplex r_complex_t;
 
-typedef R_len_t r_ssize_t;
-typedef R_xlen_t r_long_ssize_t;
-#define R_SSIZE_MAX R_LEN_T_MAX
+typedef R_xlen_t r_ssize;
+#define R_SSIZE_MAX R_XLEN_T_MAX
+
+r_ssize r_as_ssize(sexp* n);
 
 enum r_type {
   r_type_null        = 0,
@@ -50,6 +53,9 @@ enum r_type {
 
 
 #define r_null R_NilValue
+extern sexp* r_shared_true;
+extern sexp* r_shared_false;
+
 
 #define KEEP PROTECT
 #define FREE UNPROTECT
@@ -67,6 +73,7 @@ enum r_type {
 #include "debug.h"
 #include "cnd.h"
 #include "env.h"
+#include "env-binding.h"
 #include "eval.h"
 #include "export.h"
 #include "fn.h"
@@ -75,6 +82,7 @@ enum r_type {
 #include "node.h"
 #include "parse.h"
 #include "quo.h"
+#include "session.h"
 #include "squash.h"
 #include "stack.h"
 #include "state.h"

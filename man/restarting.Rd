@@ -22,10 +22,10 @@ the fields themselves are used as argument names.}
 }
 \description{
 This constructor automates the common task of creating an
-\code{\link[=inplace]{inplace()}} handler that invokes a restart.
+\code{\link[=calling]{calling()}} handler that invokes a restart.
 }
 \details{
-Jumping to a restart point from an inplace handler has two
+Jumping to a restart point from a calling handler has two
 effects. First, the control flow jumps to wherever the restart was
 established, and the restart function is called (with \code{...}, or
 \code{.fields} as arguments). Execution resumes from the
@@ -45,7 +45,7 @@ rst_baz <- function() "baz"
 
 # Signalling a condition parameterised with a data frame
 fn <- function() {
-  with_restarts(cnd_signal("foo", foo_field = mtcars),
+  with_restarts(signal("A foobar condition occurred", "foo", foo_field = mtcars),
     rst_bar = rst_bar,
     rst_baz = rst_baz
   )
@@ -65,5 +65,5 @@ with_handlers(fn(), foo = restart_bar)
 with_handlers(fn(), foo = restarting("rst_baz"))
 }
 \seealso{
-\code{\link[=inplace]{inplace()}} and \code{\link[=exiting]{exiting()}}.
+\code{\link[=calling]{calling()}} and \code{\link[=exiting]{exiting()}}.
 }

@@ -1,7 +1,7 @@
 #' Duplicate an R object
 #'
 #' In R semantics, objects are copied by value. This means that
-#' modifying the copy leaves the original object intact. Since,
+#' modifying the copy leaves the original object intact. Since
 #' copying data in memory is an expensive operation, copies in R are
 #' as lazy as possible. They only happen when the new object is
 #' actually modified. However, some operations (like [node_poke_car()]
@@ -31,8 +31,8 @@ duplicate <- function(x, shallow = FALSE) {
 poke_type <- function(x, type) {
   invisible(.Call(rlang_poke_type, x, type))
 }
-sxp_address <- function(x) {
-  .Call(rlang_sxp_address, x)
+sexp_address <- function(x) {
+  .Call(rlang_sexp_address, x)
 }
 
 mark_object <- function(x) {
@@ -50,6 +50,16 @@ env_frame <- function(x) {
 }
 env_hash_table <- function(x) {
   .Call(rlang_env_hash_table, x)
+}
+
+promise_expr <- function(name) {
+  .Call(rlang_promise_expr, name, caller_env())
+}
+promise_env <- function(name) {
+  .Call(rlang_promise_env, name, caller_env())
+}
+promise_value <- function(name) {
+  .Call(rlang_promise_value, name, caller_env())
 }
 
 # nocov end

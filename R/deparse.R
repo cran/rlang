@@ -159,10 +159,10 @@ new_lines <- function(width = peek_option("width"),
       status <- node_car(self$indent_status)
 
       if (self$next_indent_sticky) {
-        node_poke_cdr(status, inc(node_cdr(status)))
+        node_poke_cadr(status, inc(node_cadr(status)))
       } else {
         self$indent <- self$indent + 2L
-        self$indent_status <- new_node(new_node(FALSE, 0L), self$indent_status)
+        self$indent_status <- new_node(new_node(FALSE, new_node(0L, NULL)), self$indent_status)
         self$next_indent_sticky <- TRUE
       }
 
@@ -176,7 +176,7 @@ new_lines <- function(width = peek_option("width"),
       }
 
       reset <- node_car(status)
-      n_sticky <- node_cdr(status)
+      n_sticky <- node_cadr(status)
 
       # Decrease indent level only once for all the openers that were
       # on a single line
@@ -187,7 +187,7 @@ new_lines <- function(width = peek_option("width"),
       }
 
       if (n_sticky >= 1L) {
-        node_poke_cdr(status, dec(n_sticky))
+        node_poke_cadr(status, dec(n_sticky))
       } else {
         self$indent_status <- node_cdr(self$indent_status)
         self$next_indent_sticky <- FALSE
@@ -430,8 +430,86 @@ args_deparse <- function(x, lines = new_lines()) {
   lines$get_lines()
 }
 call_deparse <- function(x, lines = new_lines()) {
-  lines$deparse(node_car(x))
+  car <- node_car(x)
+
+  type <- call_delimited_type(car)
+  switch(type,
+    parens = {
+      car <- call("(", car)
+      lines$deparse(car)
+    },
+    backticks = {
+      lines$push_sticky("`")
+      lines$deparse(node_car(car))
+      lines$push_sticky("`")
+      args_deparse(node_cdr(car), lines)
+    },
+    lines$deparse(car)
+  )
+
   args_deparse(node_cdr(x), lines)
+}
+
+call_delimited_type <- function(call) {
+  if (!is_call(call)) {
+    return("none")
+  }
+
+  op <- which_operator(call)
+  if (op == "") {
+    return("none")
+  }
+
+  switch (op,
+    `function` =
+      "parens",
+    `while` = ,
+    `for` = ,
+    `repeat` = ,
+    `if` = ,
+    `?` = ,
+    `<-` = ,
+    `<<-` = ,
+    `=` = ,
+    `:=` = ,
+    `~` = ,
+    `|` = ,
+    `||` = ,
+    `&` = ,
+    `&&` = ,
+    `>` = ,
+    `>=` = ,
+    `<` = ,
+    `<=` = ,
+    `==` = ,
+    `!=` = ,
+    `+` = ,
+    `-` = ,
+    `*` = ,
+    `/` = ,
+    `%%` = ,
+    `special` = ,
+    `:` = ,
+    `^` = ,
+    `?unary` = ,
+    `~unary` = ,
+    `!` = ,
+    `!!!` = ,
+    `!!` = ,
+    `+unary` = ,
+    `-unary` =
+      "backticks",
+    `$` = ,
+    `@` = ,
+    `::` = ,
+    `:::` = ,
+    `[` = ,
+    `[[` = ,
+    `(` = ,
+    `{` =
+      "none",
+    abort("Internal error: Unexpected operator while deparsing")
+  )
 }
 
 op_deparse <- function(op, x, lines) {
@@ -503,7 +581,7 @@ atom_elements <- function(x) {
 
   elts[!na_pos] <- switch (typeof(x),
     integer = paste0(elts[!na_pos], "L"),
-    character = paste0("\"", elts[!na_pos], "\""),
+    character = map_chr(elts[!na_pos], deparse),
     elts[!na_pos]
   )
 
@@ -645,3 +723,59 @@ sexp_deparse <- function(x, lines = new_lines()) {
 
   lines$get_lines()
 }
+
+needs_backticks <- function(str) {
+  if (!is_string(str)) {
+    str <- as_string(str)
+  }
+
+  n <- nchar(str)
+  if (!n) {
+    return(FALSE)
+  }
+
+  if (str %in% reserved_words) {
+    return(TRUE)
+  }
+
+  start <- substr(str, 1, 1)
+  if (!grepl("[[:alpha:].]", start)) {
+    return(TRUE)
+  }
+
+  if (n == 1) {
+    return(FALSE)
+  }
+
+  remaining <- substr(str, 2, n)
+
+  # .0 double literals
+  if (start == "." && grepl("^[[:digit:]]", remaining)) {
+    return(TRUE)
+  }
+
+  !grepl("^[[:alnum:]_.]+$", remaining)
+}
+
+# From gram.y
+reserved_words <- c(
+  "NULL",
+  "NA",
+  "TRUE",
+  "FALSE",
+  "Inf",
+  "NaN",
+  "NA_integer_",
+  "NA_real_",
+  "NA_character_",
+  "NA_complex_",
+  "function",
+  "while",
+  "repeat",
+  "for",
+  "if",
+  "in",
+  "else",
+  "next",
+  "break"
+)

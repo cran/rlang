@@ -116,7 +116,7 @@ test_that("fn_fmls<- and fn_fmls_names<- handle primitive functions", {
 })
 
 test_that("assignment methods preserve attributes", {
-  orig <- set_attrs(function(foo) NULL, foo = "foo", bar = "bar")
+  orig <- structure(function(foo) NULL, foo = "foo", bar = "bar")
 
   fn <- orig
   fn_fmls(fn) <- list(arg = 1)
@@ -134,7 +134,7 @@ test_that("assignment methods preserve attributes", {
 })
 
 test_that("print method for `fn` discards attributes", {
-  fn <- set_attrs(function() NULL, foo = "foo")
+  fn <- structure(function() NULL, foo = "foo")
   fn <- new_fn(fn)
 
   temp <- file()
@@ -152,12 +152,13 @@ test_that("print method for `fn` discards attributes", {
 
 test_that("fn_body() requires a closure to extract body", {
   expect_error(fn_body(c), "`fn` is not a closure")
-  expect_null(fn_body(function() NULL))
+  expect_equal(fn_body(function() { NULL }), quote({ NULL }))
+  expect_equal(fn_body(function() NULL), quote({ NULL }))
 })
 
 test_that("fn_env() requires a function to extract env", {
   expect_error(fn_env(1L), "`fn` is not a function")
-  expect_identical(fn_env(function() NULL), get_env())
+  expect_identical(fn_env(function() NULL), current_env())
 })
 
 test_that("`fn_env<-`() sets environment", {
@@ -171,4 +172,34 @@ test_that("primitive predicates work", {
   expect_true(is_primitive_lazy(`$`))
   expect_false(is_primitive_eager(`$`))
   expect_false(is_primitive_lazy(`c`))
+})
+
+test_that("quosures converted to functions ignore their arguments", {
+  fn <- as_function(quo("foo"))
+  expect_no_error(expect_identical(fn(NULL), "foo"))
+})
+
+test_that("as_function() supports nested quosures", {
+  quo <- local({
+    lhs <- "quux"
+    rhs <- local({ rhs <- "hunoz"; quo(rhs) })
+    quo(paste(lhs, !!rhs))
+  })
+
+  fn <- as_function(quo)
+  expect_identical(fn(), "quux hunoz")
+})
+
+test_that("fn_body() always returns a `{` block", {
+  expect_equal(fn_body(function() "foo"), quote({ "foo" }))
+})
+
+test_that("as_function() adds a class to lambda functions", {
+  out <- as_function(~foo)
+  expect_is(out, "rlang_lambda_function")
+  expect_output(print(out), "<lambda>")
+})
+
+test_that("fn_env() returns base namespace for primitives", {
+  expect_reference(fn_env(base::list), ns_env("base"))
 })

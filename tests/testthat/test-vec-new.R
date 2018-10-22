@@ -68,7 +68,7 @@ test_that("atomic inputs are implicitly coerced", {
   expect_identical(lgl(10L, FALSE, list(TRUE, 0L, 0)), c(TRUE, FALSE, TRUE, FALSE, FALSE))
   expect_identical(dbl(10L, 10, TRUE, list(10L, 0, TRUE)), c(10, 10, 1, 10, 0, 1))
 
-  expect_error(lgl("foo"), "Can't convert a string to a logical vector")
+  expect_error(lgl("foo"), "Can't convert a character vector to a logical vector")
   expect_error(chr(10), "Can't convert a double vector to a character vector")
 })
 
@@ -102,46 +102,13 @@ test_that("vector ctors take names arguments", {
   expect_identical(new_list(2, letters[1:2]), list(a = NULL, b = NULL))
 })
 
-test_that("vector _along() ctors pick up names", {
-  x <- list(a = NULL, b = NULL)
-  expect_identical(new_logical_along(x), c(a = NA, b = NA))
-  expect_identical(new_integer_along(x), c(a = na_int, b = na_int))
-  expect_identical(new_double_along(x), c(a = na_dbl, b = na_dbl))
-  expect_identical(new_complex_along(x), c(a = na_cpl, b = na_cpl))
-  expect_identical(new_character_along(x), c(a = na_chr, b = na_chr))
-  expect_identical(new_raw_along(x), set_names(raw(2), c("a", "b")))
-  expect_identical(new_list_along(x), list(a = NULL, b = NULL))
+test_that("rep_named() repeats along names", {
+  expect_error(rep_named(1, list(1)), "must be `NULL` or a character vector")
+  expect_identical(rep_named(NULL, list(1)), named_list())
+  expect_identical(rep_named(chr(), list(1)), named_list())
+  expect_identical(rep_named(c("foo", "bar"), list(1)), list(foo = 1, bar = 1))
 })
 
-test_that("vector _along() ctors pick up names", {
-  x <- list(a = NULL, b = NULL)
-  expect_identical(new_logical_along(x, toupper), c(A = NA, B = NA))
-  expect_identical(new_integer_along(x, toupper), c(A = na_int, B = na_int))
-  expect_identical(new_double_along(x, toupper), c(A = na_dbl, B = na_dbl))
-  expect_identical(new_complex_along(x, toupper), c(A = na_cpl, B = na_cpl))
-  expect_identical(new_character_along(x, toupper), c(A = na_chr, B = na_chr))
-  expect_identical(new_raw_along(x, toupper), set_names(raw(2), c("A", "B")))
-  expect_identical(new_list_along(x, toupper), list(A = NULL, B = NULL))
-})
-
-test_that("retired _len() ctors still work", {
-  expect_identical(lgl_len(2), new_logical(2))
-  expect_identical(int_len(2), new_integer(2))
-  expect_identical(dbl_len(2), new_double(2))
-  expect_identical(chr_len(2), new_character(2))
-  expect_identical(cpl_len(2), new_complex(2))
-  expect_identical(raw_len(2), new_raw(2))
-  expect_identical(bytes_len(2), new_raw(2))
-  expect_identical(list_len(2), new_list(2))
-})
-
-test_that("retired _along() ctors still work", {
-  expect_identical(lgl_along(1:2), new_logical_along(1:2))
-  expect_identical(int_along(1:2), new_integer_along(1:2))
-  expect_identical(dbl_along(1:2), new_double_along(1:2))
-  expect_identical(chr_along(1:2), new_character_along(1:2))
-  expect_identical(cpl_along(1:2), new_complex_along(1:2))
-  expect_identical(raw_along(1:2), new_raw_along(1:2))
-  expect_identical(bytes_along(1:2), new_raw_along(1:2))
-  expect_identical(list_along(1:2), new_list_along(1:2))
+test_that("rep_along() reps along vector", {
+  expect_identical(rep_along(1:2, list(zap())), list(zap(), zap()))
 })

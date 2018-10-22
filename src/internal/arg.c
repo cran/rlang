@@ -9,7 +9,7 @@ sexp* capture(sexp* sym, sexp* frame, SEXP* arg_env) {
   static sexp* capture_call = NULL;
   if (!capture_call) {
     sexp* args = KEEP(r_new_node(r_null, r_null));
-    capture_call = r_new_call_node(rlang_ns_get("captureArgInfo"), args);
+    capture_call = r_new_call(rlang_ns_get("captureArgInfo"), args);
     r_mark_precious(capture_call);
     r_mark_shared(capture_call);
     FREE(1);
@@ -48,7 +48,7 @@ sexp* rlang_ensym(sexp* sym, sexp* frame) {
   case r_type_character:
     if (r_length(expr) == 1) {
       KEEP(expr);
-      expr = r_sym(r_c_string(expr));
+      expr = r_sym(r_chr_get_c_string(expr, 0));
       FREE(1);
       break;
     }

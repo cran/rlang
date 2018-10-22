@@ -52,7 +52,7 @@ flatten_if(x, predicate = is_spliced)
 squash_if(x, predicate = is_spliced)
 }
 \arguments{
-\item{x}{A list of flatten or squash. The contents of the list can
+\item{x}{A list to flatten or squash. The contents of the list can
 be anything for unsuffixed functions \code{flatten()} and \code{squash()}
 (as a list is returned), but the contents must match the type for
 the other functions.}
@@ -67,11 +67,22 @@ double vector, and \code{flatten_chr()} a character vector. Similarly
 for \code{squash()} and the typed variants (\code{squash_lgl()} etc).
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+
 \code{flatten()} removes one level hierarchy from a list, while
 \code{squash()} removes all levels. These functions are similar to
 \code{\link[=unlist]{unlist()}} but they are type-stable so you always know what the
 type of the output is.
 }
+\section{Life cycle}{
+
+
+These functions are in the questioning stage. They have slightly
+different semantics than the flattening functions in purrr and we
+are currently rethinking our approach to flattening with the new
+typing facilities of the vctrs package.
+}
+
 \examples{
 x <- replicate(2, sample(4), simplify = FALSE)
 x
@@ -88,7 +99,7 @@ flatten(flatten(deep))
 squash(deep)
 squash_dbl(deep)
 
-# The typed flattens remove one level and coerce to an atomic
+# The typed flatten functions remove one level and coerce to an atomic
 # vector at the same time:
 flatten_dbl(list(1, list(2)))
 
@@ -110,3 +121,4 @@ str(deep_foo)
 str(squash(deep_foo))
 str(squash_if(deep_foo, is_foo))
 }
+\keyword{internal}

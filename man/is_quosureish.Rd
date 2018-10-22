@@ -16,9 +16,13 @@ as_quosureish(x, env = caller_env())
 that is, has a valid environment attribute. If \code{NULL}, the scope
 is not inspected.}
 
-\item{env}{The original context of the context expression.}
+\item{env}{The environment in which the expression should be
+evaluated. Only used for symbols and calls. This should typically
+be the environment in which the expression was created.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("defunct")}
+
 These functions are deprecated as of rlang 0.2.0 because they make
 the assumption that quosures are a subtype of formula, which we are
 now considering to be an implementation detail.

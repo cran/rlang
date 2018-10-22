@@ -6,7 +6,9 @@
 
 #include "lib/attrs.c"
 #include "lib/cnd.c"
+#include "lib/debug.c"
 #include "lib/env.c"
+#include "lib/env-binding.c"
 #include "lib/eval.c"
 #include "lib/export.c"
 #include "lib/fn.c"
@@ -17,6 +19,7 @@
 #include "lib/quo.c"
 #include "lib/replace-na.c"
 #include "lib/rlang.c"
+#include "lib/session.c"
 #include "lib/sexp.c"
 #include "lib/squash.c"
 #include "lib/stack.c"

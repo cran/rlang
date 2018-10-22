@@ -6,16 +6,21 @@
 \alias{new_data_mask}
 \title{Create a data mask}
 \usage{
-as_data_mask(data, parent = base_env())
+as_data_mask(data, parent = NULL)
 
 as_data_pronoun(data)
 
-new_data_mask(bottom, top = bottom, parent = base_env())
+new_data_mask(bottom, top = bottom, parent = NULL)
 }
 \arguments{
 \item{data}{A data frame or named vector of masking data.}
 
-\item{parent}{The parent environment of the data mask.}
+\item{parent}{Soft-deprecated. This argument no longer has any effect.
+The parent of the data mask is determined from either:
+\itemize{
+\item The \code{env} argument of \code{eval_tidy()}
+\item Quosure environments when applicable
+}}
 
 \item{bottom}{The environment containing masking objects if the
 data mask is one environment deep. The bottom environment if the
@@ -29,6 +34,8 @@ is only one environment deep, \code{top} should be the same as
 A data mask that you can supply to \code{\link[=eval_tidy]{eval_tidy()}}.
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+
 A data mask is an environment (or possibly multiple environments
 forming an ancestry) containing user-supplied objects. Objects in
 the mask have precedence over objects in the environment (i.e. they
@@ -38,71 +45,114 @@ user data.
 
 These functions let you construct a tidy eval data mask manually.
 They are meant for developers of tidy eval interfaces rather than
-for end users. Most of the time you can just call \code{\link[=eval_tidy]{eval_tidy()}}
-with user data and the data mask will be constructed automatically.
+for end users.
+}
+\section{Why build a data mask?}{
+
+
+Most of the time you can just call \code{\link[=eval_tidy]{eval_tidy()}} with a list or a
+data frame and the data mask will be constructed automatically.
 There are three main use cases for manual creation of data masks:
 \itemize{
 \item When \code{\link[=eval_tidy]{eval_tidy()}} is called with the same data in a tight loop.
-Tidy eval data masks are a bit expensive to build so it is best
-to construct it once and reuse it the other times for optimal
-performance.
-\item When several expressions should be evaluated in the same
+Because there is some overhead to creating tidy eval data masks,
+constructing the mask once and reusing it for subsequent
+evaluations may improve performance.
+\item When several expressions should be evaluated in the exact same
 environment because a quoted expression might create new objects
 that can be referred in other quoted expressions evaluated at a
-later time.
+later time. One example of this is \code{tibble::lst()} where new
+columns can refer to previous ones.
 \item When your data mask requires special features. For instance the
 data frame columns in dplyr data masks are implemented with
 \link[base:delayedAssign]{active bindings}.
 }
 }
+
 \section{Building your own data mask}{
 
 
-Creating a data mask for \code{\link[base:eval]{base::eval()}} is a simple matter of
-creating an environment containing masking objects that has the
-user context as parent. \code{eval()} automates this task when you
-supply data as second argument. However a tidy eval data mask also
-needs to enable support of \link[=quotation]{quosures} and \link[=tidyeval-data]{data
-pronouns}. These functions allow manual construction
-of tidy eval data masks:
+Unlike \code{\link[base:eval]{base::eval()}} which takes any kind of environments as data
+mask, \code{\link[=eval_tidy]{eval_tidy()}} has specific requirements in order to support
+\link[=quotation]{quosures}. For this reason you can't supply bare
+environments.
+
+There are two ways of constructing an rlang data mask manually:
 \itemize{
-\item \code{as_data_mask()} transforms a data frame, named vector or
-environment to a data mask. If an environment, its ancestry is
-ignored. It automatically installs a data pronoun.
+\item \code{as_data_mask()} transforms a list or data frame to a data mask.
+It automatically installs the data pronoun \code{\link{.data}}.
 \item \code{new_data_mask()} is a bare bones data mask constructor for
 environments. You can supply a bottom and a top environment in
-case your data mask comprises multiple environments.
+case your data mask comprises multiple environments (see section
+below).
 
 Unlike \code{as_data_mask()} it does not install the \code{.data} pronoun
 so you need to provide one yourself. You can provide a pronoun
 constructed with \code{as_data_pronoun()} or your own pronoun class.
-}
-\itemize{
-\item \code{as_data_pronoun()} constructs a tidy eval data pronoun that
-gives more useful error messages than regular data frames or
-lists, i.e. when an object does not exist or if an user tries to
-overwrite an object.
+
+\code{as_data_pronoun()} will create a pronoun from a list, an
+environment, or an rlang data mask. In the latter case, the whole
+ancestry is looked up from the bottom to the top of the mask.
+Functions stored in the mask are bypassed by the pronoun.
 }
 
-To use a a data mask, just supply it to \code{\link[=eval_tidy]{eval_tidy()}} as \code{data}
-argument. You can repeat this as many times as needed. Note that
-any objects created there (perhaps because of a call to \code{<-}) will
-persist in subsequent evaluations:
+Once you have built a data mask, simply pass it to \code{\link[=eval_tidy]{eval_tidy()}} as
+the \code{data} argument. You can repeat this as many times as
+needed. Note that any objects created there (perhaps because of a
+call to \code{<-}) will persist in subsequent evaluations.
+}
+
+\section{Top and bottom of data mask}{
+
+
+In some cases you'll need several levels in your data mask. One
+good reason is when you include functions in the mask. It's a good
+idea to keep data objects one level lower than function objects, so
+that the former cannot override the definitions of the latter (see
+examples).
+
+In that case, set up all your environments and keep track of the
+bottom child and the top parent. You'll need to pass both to
+\code{new_data_mask()}.
+
+Note that the parent of the top environment is completely
+undetermined, you shouldn't expect it to remain the same at all
+times. This parent is replaced during evaluation by \code{\link[=eval_tidy]{eval_tidy()}}
+to one of the following environments:
+\itemize{
+\item The default environment passed as the \code{env} argument of \code{eval_tidy()}.
+\item The environment of the current quosure being evaluated, if applicable.
+}
+
+Consequently, all masking data should be contained between the
+bottom and top environment of the data mask.
 }
 
 \section{Life cycle}{
 
 
-All these functions are now stable.
+\strong{rlang 0.3.0}
+
+Passing environments to \code{as_data_mask()} is soft-deprecated. Please
+build a data mask with \code{new_data_mask()}.
+
+The \code{parent} argument no longer has any effect. The parent of the
+data mask is determined from either:
+\itemize{
+\item The \code{env} argument of \code{eval_tidy()}
+\item Quosure environments when applicable
+}
+
+\strong{rlang 0.2.0}
 
 In early versions of rlang data masks were called overscopes. We
 think data mask is a more natural name in R. It makes reference to
 masking in the search path which occurs through the same mechanism
 (in technical terms, lexical scoping with hierarchically nested
-environments). We say that that objects from user data mask objects
+environments). We say that objects from user data mask objects
 in the current environment.
 
-Following this change in terminology, \code{as_data_mask()} and
+Following this change in terminology, \code{as_overscope()} and
 \code{new_overscope()} were soft-deprecated in rlang 0.2.0 in favour of
 \code{as_data_mask()} and \code{new_data_mask()}.
 }
@@ -127,4 +177,48 @@ fn()
 # subsequent calls:
 eval_tidy(quote(new <- cyl + am), mask)
 eval_tidy(quote(new * 2), mask)
+
+
+# In some cases your data mask is a whole chain of environments
+# rather than a single environment. You'll have to use
+# `new_data_mask()` and let it know about the bottom of the mask
+# (the last child of the environment chain) and the topmost parent.
+
+# A common situation where you'll want a multiple-environment mask
+# is when you include functions in your mask. In that case you'll
+# put functions in the top environment and data in the bottom. This
+# will prevent the data from overwriting the functions.
+top <- new_environment(list(`+` = base::paste, c = base::paste))
+
+# Let's add a middle environment just for sport:
+middle <- env(top)
+
+# And finally the bottom environment containing data:
+bottom <- env(middle, a = "a", b = "b", c = "c")
+
+# We can now create a mask by supplying the top and bottom
+# environments:
+mask <- new_data_mask(bottom, top = top)
+
+# This data mask can be passed to eval_tidy() instead of a list or
+# data frame:
+eval_tidy(quote(a + b + c), data = mask)
+
+# Note how the function `c()` and the object `c` are looked up
+# properly because of the multi-level structure:
+eval_tidy(quote(c(a, b, c)), data = mask)
+
+# new_data_mask() does not create data pronouns, but
+# data pronouns can be added manually:
+mask$.fns <- as_data_pronoun(top)
+
+# The `.data` pronoun should generally be created from the
+# mask. This will ensure data is looked up throughout the whole
+# ancestry. Only non-function objects are looked up from this
+# pronoun:
+mask$.data <- as_data_pronoun(mask)
+mask$.data$c
+
+# Now we can reference the values with the pronouns:
+eval_tidy(quote(c(.data$a, .data$b, .data$c)), data = mask)
 }

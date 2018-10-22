@@ -2,10 +2,12 @@
 #'
 #' @description
 #'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+#'
 #' `eval_tidy()` is a variant of [base::eval()] that powers the tidy
 #' evaluation framework. Like `eval()` it accepts user data as
 #' argument. If supplied, it evaluates its input `expr` in a [data
-#' mask][as_data_mask]. In additon `eval_tidy()` supports:
+#' mask][as_data_mask]. In addition `eval_tidy()` supports:
 #'
 #' - [Quosures][quotation]. The expression wrapped in the quosure
 #'   evaluates in its original context (masked by `data` if supplied).
@@ -19,14 +21,17 @@
 #'
 #' @section Life cycle:
 #'
-#' `eval_tidy()` is stable.
+#' **rlang 0.3.0**
+#'
+#' Passing an environment to `data` is deprecated. Please construct an
+#' rlang data mask with [new_data_mask()].
 #'
 #' @param expr An expression to evaluate.
 #' @param data A data frame, or named list or vector. Alternatively, a
 #'   data mask created with [as_data_mask()] or [new_data_mask()].
 #' @param env The environment in which to evaluate `expr`. This
-#'   environment is always ignored when evaluating quosures. Quosures
-#'   are evaluated in their own environment.
+#'   environment is not applicable for quosures because they have
+#'   their own environments.
 #' @seealso [quasiquotation] for the second leg of the tidy evaluation
 #'   framework.
 #' @export
@@ -56,7 +61,7 @@
 #' with_data(data, apple)
 #' with_data(data, list(apple, kiwi))
 #'
-#' # Secondly eval_tidy() installs handy pronouns that allows users to
+#' # Secondly eval_tidy() installs handy pronouns that allow users to
 #' # be explicit about where to find symbols:
 #' with_data(data, .data$apple)
 #' with_data(data, .env$apple)
@@ -79,8 +84,20 @@
 #' }
 #' @name eval_tidy
 eval_tidy <- function(expr, data = NULL, env = caller_env()) {
-  .Call(rlang_eval_tidy, expr, data, environment())
+  .Call(rlang_eval_tidy, expr, data, env)
 }
+
+# Helps work around roxygen loading issues
+#' @export
+length.rlang_fake_data_pronoun <- function(...) NULL
+#' @export
+names.rlang_fake_data_pronoun <- function(...) NULL
+#' @export
+`$.rlang_fake_data_pronoun` <- function(...) NULL
+#' @export
+`[[.rlang_fake_data_pronoun` <- function(...) NULL
+#' @export
+print.rlang_fake_data_pronoun <- function(...) cat_line("<pronoun>")
 
 #' Data pronoun for tidy evaluation
 #'
@@ -89,6 +106,19 @@ eval_tidy <- function(expr, data = NULL, env = caller_env()) {
 #' This pronoun allows you to be explicit when you refer to an object
 #' inside the data. Referring to the `.data` pronoun rather than to
 #' the original data frame has several advantages:
+#'
+#' * It makes it easy to refer to column names stored as strings. If
+#'   `var` contains the column `"height"`, the pronoun will subset that
+#'   column:
+#'
+#'     ```
+#'     var <- "height"
+#'     dplyr::summarise(df, mean(.data[[var]]))
+#'     ```
+#'
+#'   The index variable `var` is [unquoted][quasiquotation], which
+#'   ensures a column named `var` in the data frame cannot mask it.
+#'   This makes the pronoun safe to use in functions and packages.
 #'
 #' * Sometimes a computation is not about the whole data but about a
 #'   subset. For example if you supply a grouped data frame to a dplyr
@@ -103,14 +133,16 @@ eval_tidy <- function(expr, data = NULL, env = caller_env()) {
 #' objects from the data mask.
 #'
 #' @name tidyeval-data
+#' @format NULL
 #' @export
-.data <- NULL
-delayedAssign(".data", as_data_pronoun(list()))
+.data <- structure(list(), class = "rlang_fake_data_pronoun")
 
 
 #' Create a data mask
 #'
 #' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
 #'
 #' A data mask is an environment (or possibly multiple environments
 #' forming an ancestry) containing user-supplied objects. Objects in
@@ -121,19 +153,25 @@ delayedAssign(".data", as_data_pronoun(list()))
 #'
 #' These functions let you construct a tidy eval data mask manually.
 #' They are meant for developers of tidy eval interfaces rather than
-#' for end users. Most of the time you can just call [eval_tidy()]
-#' with user data and the data mask will be constructed automatically.
+#' for end users.
+#'
+#'
+#' @section Why build a data mask?:
+#'
+#' Most of the time you can just call [eval_tidy()] with a list or a
+#' data frame and the data mask will be constructed automatically.
 #' There are three main use cases for manual creation of data masks:
 #'
 #' * When [eval_tidy()] is called with the same data in a tight loop.
-#'   Tidy eval data masks are a bit expensive to build so it is best
-#'   to construct it once and reuse it the other times for optimal
-#'   performance.
+#'   Because there is some overhead to creating tidy eval data masks,
+#'   constructing the mask once and reusing it for subsequent
+#'   evaluations may improve performance.
 #'
-#' * When several expressions should be evaluated in the same
+#' * When several expressions should be evaluated in the exact same
 #'   environment because a quoted expression might create new objects
 #'   that can be referred in other quoted expressions evaluated at a
-#'   later time.
+#'   later time. One example of this is `tibble::lst()` where new
+#'   columns can refer to previous ones.
 #'
 #' * When your data mask requires special features. For instance the
 #'   data frame columns in dplyr data masks are implemented with
@@ -142,54 +180,90 @@ delayedAssign(".data", as_data_pronoun(list()))
 #'
 #' @section Building your own data mask:
 #'
-#' Creating a data mask for [base::eval()] is a simple matter of
-#' creating an environment containing masking objects that has the
-#' user context as parent. `eval()` automates this task when you
-#' supply data as second argument. However a tidy eval data mask also
-#' needs to enable support of [quosures][quotation] and [data
-#' pronouns][tidyeval-data]. These functions allow manual construction
-#' of tidy eval data masks:
+#' Unlike [base::eval()] which takes any kind of environments as data
+#' mask, [eval_tidy()] has specific requirements in order to support
+#' [quosures][quotation]. For this reason you can't supply bare
+#' environments.
 #'
-#' * `as_data_mask()` transforms a data frame, named vector or
-#'   environment to a data mask. If an environment, its ancestry is
-#'   ignored. It automatically installs a data pronoun.
+#' There are two ways of constructing an rlang data mask manually:
+#'
+#' * `as_data_mask()` transforms a list or data frame to a data mask.
+#'   It automatically installs the data pronoun [`.data`][.data].
 #'
 #' * `new_data_mask()` is a bare bones data mask constructor for
 #'   environments. You can supply a bottom and a top environment in
-#'   case your data mask comprises multiple environments.
+#'   case your data mask comprises multiple environments (see section
+#'   below).
 #'
 #'   Unlike `as_data_mask()` it does not install the `.data` pronoun
 #'   so you need to provide one yourself. You can provide a pronoun
 #'   constructed with `as_data_pronoun()` or your own pronoun class.
 #'
-#' - `as_data_pronoun()` constructs a tidy eval data pronoun that
-#'   gives more useful error messages than regular data frames or
-#'   lists, i.e. when an object does not exist or if an user tries to
-#'   overwrite an object.
+#'   `as_data_pronoun()` will create a pronoun from a list, an
+#'   environment, or an rlang data mask. In the latter case, the whole
+#'   ancestry is looked up from the bottom to the top of the mask.
+#'   Functions stored in the mask are bypassed by the pronoun.
 #'
-#' To use a a data mask, just supply it to [eval_tidy()] as `data`
-#' argument. You can repeat this as many times as needed. Note that
-#' any objects created there (perhaps because of a call to `<-`) will
-#' persist in subsequent evaluations:
+#' Once you have built a data mask, simply pass it to [eval_tidy()] as
+#' the `data` argument. You can repeat this as many times as
+#' needed. Note that any objects created there (perhaps because of a
+#' call to `<-`) will persist in subsequent evaluations.
 #'
+#'
+#' @section Top and bottom of data mask:
+#'
+#' In some cases you'll need several levels in your data mask. One
+#' good reason is when you include functions in the mask. It's a good
+#' idea to keep data objects one level lower than function objects, so
+#' that the former cannot override the definitions of the latter (see
+#' examples).
+#'
+#' In that case, set up all your environments and keep track of the
+#' bottom child and the top parent. You'll need to pass both to
+#' `new_data_mask()`.
+#'
+#' Note that the parent of the top environment is completely
+#' undetermined, you shouldn't expect it to remain the same at all
+#' times. This parent is replaced during evaluation by [eval_tidy()]
+#' to one of the following environments:
+#'
+#' * The default environment passed as the `env` argument of `eval_tidy()`.
+#' * The environment of the current quosure being evaluated, if applicable.
+#'
+#' Consequently, all masking data should be contained between the
+#' bottom and top environment of the data mask.
 #'
 #' @section Life cycle:
 #'
-#' All these functions are now stable.
+#' **rlang 0.3.0**
+#'
+#' Passing environments to `as_data_mask()` is soft-deprecated. Please
+#' build a data mask with `new_data_mask()`.
+#'
+#' The `parent` argument no longer has any effect. The parent of the
+#' data mask is determined from either:
+#'
+#'   * The `env` argument of `eval_tidy()`
+#'   * Quosure environments when applicable
+#'
+#' **rlang 0.2.0**
 #'
 #' In early versions of rlang data masks were called overscopes. We
 #' think data mask is a more natural name in R. It makes reference to
 #' masking in the search path which occurs through the same mechanism
 #' (in technical terms, lexical scoping with hierarchically nested
-#' environments). We say that that objects from user data mask objects
+#' environments). We say that objects from user data mask objects
 #' in the current environment.
 #'
-#' Following this change in terminology, `as_data_mask()` and
+#' Following this change in terminology, `as_overscope()` and
 #' `new_overscope()` were soft-deprecated in rlang 0.2.0 in favour of
 #' `as_data_mask()` and `new_data_mask()`.
 #'
 #' @param data A data frame or named vector of masking data.
-#' @param parent The parent environment of the data mask.
+#' @param parent Soft-deprecated. This argument no longer has any effect.
+#'   The parent of the data mask is determined from either:
+#'   * The `env` argument of `eval_tidy()`
+#'   * Quosure environments when applicable
 #' @return A data mask that you can supply to [eval_tidy()].
 #'
 #' @export
@@ -213,8 +287,61 @@ delayedAssign(".data", as_data_pronoun(list()))
 #' # subsequent calls:
 #' eval_tidy(quote(new <- cyl + am), mask)
 #' eval_tidy(quote(new * 2), mask)
-as_data_mask <- function(data, parent = base_env()) {
-  .Call(rlang_as_data_mask, data, parent)
+#'
+#'
+#' # In some cases your data mask is a whole chain of environments
+#' # rather than a single environment. You'll have to use
+#' # `new_data_mask()` and let it know about the bottom of the mask
+#' # (the last child of the environment chain) and the topmost parent.
+#'
+#' # A common situation where you'll want a multiple-environment mask
+#' # is when you include functions in your mask. In that case you'll
+#' # put functions in the top environment and data in the bottom. This
+#' # will prevent the data from overwriting the functions.
+#' top <- new_environment(list(`+` = base::paste, c = base::paste))
+#'
+#' # Let's add a middle environment just for sport:
+#' middle <- env(top)
+#'
+#' # And finally the bottom environment containing data:
+#' bottom <- env(middle, a = "a", b = "b", c = "c")
+#'
+#' # We can now create a mask by supplying the top and bottom
+#' # environments:
+#' mask <- new_data_mask(bottom, top = top)
+#'
+#' # This data mask can be passed to eval_tidy() instead of a list or
+#' # data frame:
+#' eval_tidy(quote(a + b + c), data = mask)
+#'
+#' # Note how the function `c()` and the object `c` are looked up
+#' # properly because of the multi-level structure:
+#' eval_tidy(quote(c(a, b, c)), data = mask)
+#'
+#' # new_data_mask() does not create data pronouns, but
+#' # data pronouns can be added manually:
+#' mask$.fns <- as_data_pronoun(top)
+#'
+#' # The `.data` pronoun should generally be created from the
+#' # mask. This will ensure data is looked up throughout the whole
+#' # ancestry. Only non-function objects are looked up from this
+#' # pronoun:
+#' mask$.data <- as_data_pronoun(mask)
+#' mask$.data$c
+#'
+#' # Now we can reference the values with the pronouns:
+#' eval_tidy(quote(c(.data$a, .data$b, .data$c)), data = mask)
+as_data_mask <- function(data, parent = NULL) {
+  if (!is_null(parent)) {
+    warn_deprecated(paste_line(
+      "The `parent` argument of `as_data_mask()` is deprecated.",
+      "The parent of the data mask is determined from either:",
+      "",
+      "  * The `env` argument of `eval_tidy()`",
+      "  * Quosure environments when applicable"
+    ))
+  }
+  .Call(rlang_as_data_mask, data)
 }
 #' @rdname as_data_mask
 #' @export
@@ -230,98 +357,106 @@ as_data_pronoun <- function(data) {
 #'   is only one environment deep, `top` should be the same as
 #'   `bottom`.
 #' @export
-new_data_mask <- function(bottom, top = bottom, parent = base_env()) {
-  .Call(rlang_new_data_mask, bottom, top, parent)
+new_data_mask <- function(bottom, top = bottom, parent = NULL) {
+  if (!is_null(parent)) {
+    warn_deprecated(paste_line(
+      "The `parent` argument of `new_data_mask()` is deprecated.",
+      "The parent of the data mask is determined from either:",
+      "",
+      "  * The `env` argument of `eval_tidy()`",
+      "  * Quosure environments when applicable"
+    ))
+  }
+  .Call(rlang_new_data_mask, bottom, top)
 }
 
-
 #' @export
-`$.rlang_data_pronoun` <- function(x, name) {
-  src <- .subset2(x, "src")
-  if (!has_binding(src, name)) {
-    abort(sprintf(.subset2(x, "lookup_msg"), name), "rlang_data_pronoun_not_found")
-  }
-  src[[name]]
+`$.rlang_data_pronoun` <- function(x, nm) {
+  data_pronoun_get(x, nm)
 }
 #' @export
 `[[.rlang_data_pronoun` <- function(x, i, ...) {
   if (!is_string(i)) {
     abort("Must subset the data pronoun with a string")
   }
-  src <- .subset2(x, "src")
-  if (!has_binding(src, i)) {
-    abort(sprintf(.subset2(x, "lookup_msg"), i), "rlang_data_pronoun_not_found")
-  }
-  src[[i, ...]]
+  data_pronoun_get(x, i)
+}
+data_pronoun_get <- function(x, nm) {
+  mask <- .subset2(x, 1)
+  .Call(rlang_data_pronoun_get, mask, sym(nm))
+}
+abort_data_pronoun <- function(nm) {
+  msg <- sprintf("Column `%s` not found in `.data`", as_string(nm))
+  abort(msg, "rlang_data_pronoun_not_found")
 }
 
 #' @export
 `$<-.rlang_data_pronoun` <- function(x, i, value) {
-  dict <- unclass_data_pronoun(x)
-
-  if (dict$read_only) {
-    abort("Can't modify the data pronoun")
-  }
-
-  dict$src[[i]] <- value
-  set_attrs(dict, class = class(x))
+  abort("Can't modify the data pronoun")
 }
 #' @export
 `[[<-.rlang_data_pronoun` <- function(x, i, value) {
-  dict <- unclass_data_pronoun(x)
-
-  if (dict$read_only) {
-    abort("Can't modify the data pronoun")
-  }
-  if (!is_string(i)) {
-    abort("Must subset the data pronoun with a string")
-  }
-
-  dict$src[[i]] <- value
-  set_attrs(dict, class = class(x))
+  abort("Can't modify the data pronoun")
 }
 
 #' @export
+`[.rlang_data_pronoun` <- function(x, i, ...) {
+  abort("`[` is not supported by .data pronoun, use `[[` or $ instead")
+}
+#' @export
 names.rlang_data_pronoun <- function(x) {
-  names(unclass(x)$src)
+  warn_deprecated("Taking the `names()` of the `.data` pronoun is deprecated")
+  env <- .subset2(x, 1)
+  if (is_data_mask(env)) {
+    env <- env_parent(env)
+  }
+  env_names(env)
 }
 #' @export
 length.rlang_data_pronoun <- function(x) {
-  length(unclass(x)$src)
-}
-
-has_binding <- function(x, name) {
-  if (is_environment(x)) {
-    env_has(x, name)
-  } else {
-    has_name(x, name)
+  warn_deprecated("Taking the `length()` of the `.data` pronoun is deprecated")
+  env <- .subset2(x, 1)
+  if (is_data_mask(env)) {
+    env <- env_parent(env)
   }
+  env_length(env)
 }
 
 #' @export
 print.rlang_data_pronoun <- function(x, ...) {
-  src <- unclass_data_pronoun(x)$src
-  objs <- glue_countable(length(src), "object")
-  cat(paste0("<pronoun>\n", objs, "\n"))
+  cat_line("<pronoun>")
   invisible(x)
 }
 #' @importFrom utils str
 #' @export
 str.rlang_data_pronoun <- function(object, ...) {
-  str(unclass_data_pronoun(object)$src, ...)
+  cat_line("<pronoun>")
 }
 
-glue_countable <- function(n, str) {
-  if (n == 1) {
-    paste0(n, " ", str)
-  } else {
-    paste0(n, " ", str, "s")
+# Used for deparsing
+is_data_pronoun <- function(x) {
+  is_call(x, c("[[", "$"), n = 2L) && identical(node_cadr(x), dot_data_sym)
+}
+data_pronoun_name <- function(x) {
+  if (is_call(x, "$")) {
+    arg <- node_cadr(node_cdr(x))
+    if (is_symbol(arg)) {
+      return(as_string(arg))
+    } else {
+      return(NULL)
+    }
+  }
+
+  if (is_call(x, "[[")) {
+    arg <- node_cadr(node_cdr(x))
+    if (is_string(arg)) {
+      return(arg)
+    } else {
+      return(NULL)
+    }
   }
 }
-# Unclassing before print() or str() is necessary because default
-# methods index objects with integers
-unclass_data_pronoun <- function(x) {
-  i <- match("rlang_data_pronoun", class(x))
-  class(x) <- class(x)[-i]
-  x
+
+is_data_mask <- function(x) {
+  is_environment(x) && env_has(x, ".__rlang_data_mask__.")
 }

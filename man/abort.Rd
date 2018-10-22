@@ -4,48 +4,156 @@
 \alias{abort}
 \alias{warn}
 \alias{inform}
+\alias{signal}
+\alias{interrupt}
 \title{Signal an error, warning, or message}
 \usage{
-abort(msg, type = NULL, call = FALSE)
+abort(message, .subclass = NULL, ..., trace = NULL, call = NULL,
+  parent = NULL, msg, type)
 
-warn(msg, type = NULL, call = FALSE)
+warn(message, .subclass = NULL, ..., call = NULL, msg, type)
 
-inform(msg, type = NULL, call = FALSE)
+inform(message, .subclass = NULL, ..., call = NULL, msg, type)
+
+signal(message, .subclass, ...)
+
+interrupt()
 }
 \arguments{
-\item{msg}{A message to display.}
+\item{message}{The message to display.}
 
-\item{type}{Subclass of the condition to signal.}
+\item{.subclass}{Subclass of the condition. This allows your users
+to selectively handle the conditions signalled by your functions.}
 
-\item{call}{Whether to display the call. If a number \code{n}, the call
-is taken from the nth frame on the \link[=call_stack]{call stack}.}
+\item{...}{Additional data to be stored in the condition object.}
+
+\item{trace}{A \code{trace} object created by \code{\link[=trace_back]{trace_back()}}.}
+
+\item{call}{Deprecated as of rlang 0.3.0. Storing the full
+backtrace is now preferred to storing a simple call.}
+
+\item{parent}{A parent condition object created by \code{\link[=abort]{abort()}}.}
+
+\item{msg, type}{These arguments were renamed to \code{message} and
+\code{.type} and are deprecated as of rlang 0.3.0.}
 }
 \description{
 These functions are equivalent to base functions \code{\link[base:stop]{base::stop()}},
-\code{\link[base:warning]{base::warning()}} and \code{\link[base:message]{base::message()}}, but the \code{type} argument
-makes it easy to create subclassed conditions. They also don't
-include call information by default. This saves you from typing
-\code{call. = FALSE} to make error messages cleaner within package
-functions.
+\code{\link[base:warning]{base::warning()}} and \code{\link[base:message]{base::message()}}, but make it easy to supply
+condition metadata:
+\itemize{
+\item Supply \code{.subclass} to create a classed condition. Typed
+conditions can be captured or handled selectively, allowing for
+finer-grained error handling.
+\item Supply metadata with named \code{...} arguments. This data will be
+stored in the condition object and can be examined by handlers.
 }
-\details{
-Like \code{stop()} and \code{\link[=cnd_abort]{cnd_abort()}}, \code{abort()} signals a critical
-condition and interrupts execution by jumping to top level (see
-\code{\link[=rst_abort]{rst_abort()}}). Only a handler of the relevant type can prevent
-this jump by making another jump to a different target on the stack
-(see \code{\link[=with_handlers]{with_handlers()}}).
 
-\code{warn()} and \code{inform()} both have the side effect of displaying a
-message. These messages will not be displayed if a handler
-transfers control. Transfer can be achieved by establishing an
-exiting handler that transfers control to \code{\link[=with_handlers]{with_handlers()}}). In
-this case, the current function stops and execution resumes at the
-point where handlers were established.
+\code{interrupt()} allows R code to simulate a user interrupt of the
+kind that is signalled with \code{Ctrl-C}. It is currently not possible
+to create custom interrupt condition objects.
+}
+\section{Backtrace}{
 
-Since it is often desirable to continue normally after a message or
-warning, both \code{warn()} and \code{inform()} (and their base R equivalent)
-establish a muffle restart where handlers can jump to prevent the
-message from being displayed. Execution resumes normally after
-that. See \code{\link[=rst_muffle]{rst_muffle()}} to jump to a muffling restart, and the
-\code{muffle} argument of \code{\link[=inplace]{inplace()}} for creating a muffling handler.
+
+Unlike \code{stop()} and \code{warning()}, these functions don't include call
+information by default. This saves you from typing \code{call. = FALSE}
+and produces cleaner error messages.
+
+A backtrace is always saved into error objects. You can print a
+simplified backtrace of the last error by calling \code{\link[=last_error]{last_error()}}
+and a full backtrace with \code{summary(last_error())}.
+
+You can also display a backtrace with the error message by setting
+the experimental option \code{rlang__backtrace_on_error}. It supports the
+following values:
+\itemize{
+\item \code{"reminder"}: Invite users to call \code{rlang::last_error()} to see a
+backtrace.
+\item \code{"branch"}: Display a simplified backtrace.
+\item \code{"collapse"}: Display a collapsed backtrace tree.
+\item \code{"full"}: Display a full backtrace tree.
+}
+}
+
+\section{Mufflable conditions}{
+
+
+Signalling a condition with \code{inform()} or \code{warn()} causes a message
+to be displayed in the console. These messages can be muffled with
+\code{\link[base:suppressMessages]{base::suppressMessages()}} or \code{\link[base:suppressWarnings]{base::suppressWarnings()}}.
+
+On recent R versions (>= R 3.5.0), interrupts are typically
+signalled with a \code{"resume"} restart. This is however not
+guaranteed.
+}
+
+\section{Lifecycle}{
+
+
+These functions were changed in rlang 0.3.0 to take condition
+metadata with \code{...}. Consequently:
+\itemize{
+\item All arguments were renamed to be prefixed with a dot, except for
+\code{type} which was renamed to \code{.subclass}.
+\item \code{.call} (previously \code{call}) can no longer be passed positionally.
+}
+}
+
+\examples{
+# These examples are guarded to avoid throwing errors
+if (FALSE) {
+
+# Signal an error with a message just like stop():
+abort("Something bad happened")
+
+# Give a class to the error:
+abort("Something bad happened", "somepkg_bad_error")
+
+# This will allow your users to handle the error selectively
+tryCatch(
+  somepkg_function(),
+  somepkg_bad_error = function(err) {
+    warn(err$message) # Demote the error to a warning
+    NA                # Return an alternative value
+  }
+)
+
+# You can also specify metadata that will be stored in the condition:
+abort("Something bad happened", "somepkg_bad_error", data = 1:10)
+
+# This data can then be consulted by user handlers:
+tryCatch(
+  somepkg_function(),
+  somepkg_bad_error = function(err) {
+    # Compute an alternative return value with the data:
+    recover_error(err$data)
+  }
+)
+
+# If you call low-level APIs it is good practice to catch technical
+# errors and rethrow them with a more meaningful message. Pass on
+# the caught error as `parent` to get a nice decomposition of
+# errors and backtraces:
+file <- "http://foo.bar/baz"
+tryCatch(
+  download(file),
+  error = function(err) {
+    msg <- sprintf("Can't download `\%s`", file)
+    abort(msg, parent = err)
+})
+
+# Unhandled errors are saved automatically by `abort()` and can be
+# retrieved with `last_error()`. The error prints with a simplified
+# backtrace:
+abort("Saved error?")
+last_error()
+
+# Use `summary()` to print the full backtrace and the condition fields:
+summary(last_error())
+
+}
+}
+\seealso{
+\code{\link[=with_abort]{with_abort()}} to convert all errors to rlang errors.
 }

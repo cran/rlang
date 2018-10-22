@@ -2,9 +2,12 @@
 % Please edit documentation in R/lifecycle-retired.R
 \name{parse_quosure}
 \alias{parse_quosure}
+\alias{parse_quosures}
 \title{Parse text into a quosure}
 \usage{
 parse_quosure(x, env = caller_env())
+
+parse_quosures(x, env = caller_env())
 }
 \arguments{
 \item{x}{Text containing expressions to parse_expr for
@@ -13,12 +16,13 @@ for instance to a file. If the supplied connection is not open,
 it will be automatically closed and destroyed.}
 
 \item{env}{The environment for the quosures. Depending on the use
-case, a good default might be the \link[=global_env]{global
-environment} but you might also want to evaluate the
+case, a good default might be the \link[=global_env]{global environment} but you might also want to evaluate the
 R code in an isolated context (perhaps a child of the global
 environment or of the \link[=base_env]{base environment}).}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("soft-deprecated")}
+
 These functions were soft-deprecated and renamed to \code{\link[=parse_quo]{parse_quo()}}
 and \code{\link[=parse_quos]{parse_quos()}} in rlang 0.2.0. This is for consistency with the
 convention that suffixes indicating return types are not

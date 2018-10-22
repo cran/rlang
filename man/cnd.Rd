@@ -7,23 +7,27 @@
 \alias{message_cnd}
 \title{Create a condition object}
 \usage{
-cnd(.type = NULL, ..., .msg = NULL)
+cnd(.subclass, ..., message = "")
 
-error_cnd(.type = NULL, ..., .msg = NULL)
+error_cnd(.subclass = NULL, ..., message = "", trace = NULL,
+  parent = NULL)
 
-warning_cnd(.type = NULL, ..., .msg = NULL)
+warning_cnd(.subclass = NULL, ..., message = "")
 
-message_cnd(.type = NULL, ..., .msg = NULL)
+message_cnd(.subclass = NULL, ..., message = "")
 }
 \arguments{
-\item{.type}{The condition subclass.}
+\item{.subclass}{The condition subclass.}
 
 \item{...}{Named data fields stored inside the condition
-object. These dots are evaluated with \link[=tidy-dots]{explicit
-splicing}.}
+object. These dots are evaluated with \link[=tidy-dots]{explicit splicing}.}
 
-\item{.msg}{A default message to inform the user about the
+\item{message}{A default message to inform the user about the
 condition when it is signalled.}
+
+\item{trace}{A \code{trace} object created by \code{\link[=trace_back]{trace_back()}}.}
+
+\item{parent}{A parent condition object created by \code{\link[=abort]{abort()}}.}
 }
 \description{
 These constructors make it easy to create subclassed conditions.
@@ -35,29 +39,31 @@ also be used for passing messages to pre-established handlers.
 created with \code{error_cnd()}, \code{warning_cnd()} and \code{message_cnd()}
 inherit from \code{error}, \code{warning} or \code{message}.
 }
+\section{Lifecycle}{
+
+
+The \code{.type} and \code{.msg} arguments have been renamed to \code{.subclass}
+and \code{message}. They are defunct as of rlang 0.3.0.
+}
+
 \examples{
 # Create a condition inheriting from the s3 type "foo":
 cnd <- cnd("foo")
 
-# Signal the condition to potential handlers. This has no effect if no
-# handler is registered to deal with conditions of type "foo":
+# Signal the condition to potential handlers. Since this is a bare
+# condition the signal has no effect if no handlers are set up:
 cnd_signal(cnd)
 
-# If a relevant handler is on the current evaluation stack, it will be
-# called by cnd_signal():
+# When a relevant handler is set up, the signal causes the handler
+# to be called:
 with_handlers(cnd_signal(cnd), foo = exiting(function(c) "caught!"))
 
 # Handlers can be thrown or executed inplace. See with_handlers()
 # documentation for more on this.
 
-
-# Note that merely signalling a condition inheriting of "error" is
-# not sufficient to stop a program:
-cnd_signal(error_cnd("my_error"))
-
-# you need to use stop() to signal a critical condition that should
-# terminate the program if not handled:
-# stop(error_cnd("my_error"))
+# Signalling an error condition aborts the current computation:
+err <- error_cnd("foo", message = "I am an error")
+try(cnd_signal(err))
 }
 \seealso{
 \code{\link[=cnd_signal]{cnd_signal()}}, \code{\link[=with_handlers]{with_handlers()}}.

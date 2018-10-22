@@ -6,10 +6,15 @@
 #' environment) with:
 #'
 #' * [get_expr()] and [get_env()]. These getters also support other
-#'   kinds of objects such as formulas
+#'   kinds of objects such as formulas.
 #'
 #' * `quo_get_expr()` and `quo_get_env()`. These getters only work
 #'   with quosures and throw an error with other types of input.
+#'
+#' Note that a quosure usually does not carry environments for
+#' [literal objects][is_syntactic_literal] like strings or
+#' numbers. [quo()] and [enquo()] only capture an environment for
+#' [symbolic expressions][is_symbolic].
 #'
 #' Test if an object is a quosure with `is_quosure()`. If you know an
 #' object is a quosure, use the `quo_` prefixed predicates to check
@@ -133,7 +138,44 @@ quo_set_env <- function(quo, env) {
 }
 
 
-#' @rdname quosure
+#' Create a list of quosures
+#'
+#' @description
+#'
+#' This small S3 class provides methods for `[` and `c()` and ensures
+#' the following invariants:
+#'
+#' * The list only contains quosures.
+#' * It is always named, possibly with a vector of empty strings.
+#'
+#' `new_quosures()` takes a list of quosures and adds the `quosures`
+#' class and a vector of empty names if needed. `as_quosures()` calls
+#' [as_quosure()] on all elements before creating the `quosures`
+#' object.
+#'
+#' @param x A list of quosures or objects to coerce to quosures.
+#' @param env The default environment for the new quosures.
+#' @param named Whether to name the list with [quos_auto_name()].
+#' @export
+new_quosures <- function(x) {
+  if (!is_list(x) || !every(x, is_quosure)) {
+    abort("Expected a list of quosures")
+  }
+  structure(x,
+    class = "quosures",
+    names = names2(x)
+  )
+}
+#' @rdname new_quosures
+#' @export
+as_quosures <- function(x, env, named = FALSE) {
+  x <- map(x, as_quosure, env = env)
+  if (named) {
+    x <- quos_auto_name(x)
+  }
+  new_quosures(x)
+}
+#' @rdname new_quosures
 #' @export
 is_quosures <- function(x) {
   inherits(x, "quosures")
@@ -141,17 +183,56 @@ is_quosures <- function(x) {
 
 #' @export
 `[.quosures` <- function(x, i) {
-  set_attrs(NextMethod(), class = "quosures")
-}
-#' @export
-c.quosures <- function(..., recursive = FALSE) {
   structure(NextMethod(), class = "quosures")
 }
 #' @export
+c.quosures <- function(..., recursive = FALSE) {
+  out <- NextMethod()
+  if (every(out, is_quosure)) {
+    new_quosures(out)
+  } else {
+    signal_soft_deprecated(paste_line(
+      "Quosure lists can't be concatenated with objects other than quosures as of rlang 0.3.0.",
+      "Please call `as.list()` on the quosure list first."
+    ))
+    out
+  }
+}
+#' @export
 print.quosures <- function(x, ...) {
+  cat_line("<listof<quosures>>\n")
   print(unclass(x), ...)
 }
+#' @export
+as.list.quosures <- function(x, ...) {
+  unclass(x)
+}
 
+#' @export
+`[<-.quosures` <- function(x, i, value) {
+  if (idx <- detect_index(value, negate(is_quosure))) {
+    signal_quosure_assign(value[[idx]])
+  }
+  NextMethod()
+}
+#' @export
+`[[<-.quosures` <- function(x, i, value) {
+  if (!is_quosure(value) && !is_null(value)) {
+    signal_quosure_assign(value)
+  }
+  NextMethod()
+}
+#' @export
+`$<-.quosures` <- function(x, name, value) {
+  x[[name]] <- value
+  x
+}
+signal_quosure_assign <- function(x, env = caller_env(2)) {
+  signal_soft_deprecated(env = env, paste_line(
+    "Assigning non-quosure objects to quosure lists is soft-deprecated.",
+    "Please coerce to a bare list beforehand with `as.list()`"
+  ))
+}
 
 #' Coerce object to quosure
 #'
@@ -164,8 +245,8 @@ print.quosures <- function(x, ...) {
 #'
 #' @section Life cycle:
 #'
-#' - Like the rest of the rlang package, `new_quosure()` and
-#'   `as_quosure()` are maturing.
+#' - `as_quosure()` now requires an explicit default environment for
+#'   creating quosures from symbols and calls.
 #'
 #' - `as_quosureish()` is deprecated as of rlang 0.2.0. This function
 #'   assumes that quosures are formulas which is currently true but
@@ -173,37 +254,54 @@ print.quosures <- function(x, ...) {
 #'
 #' @param x An object to convert. Either an [expression][is_expression] or a
 #'   formula.
-#' @param env The original context of the context expression.
+#' @param env The environment in which the expression should be
+#'   evaluated. Only used for symbols and calls. This should typically
+#'   be the environment in which the expression was created.
 #' @seealso [quo()], [is_quosure()]
 #' @export
 #' @examples
 #' # as_quosure() converts expressions or any R object to a validly
 #' # scoped quosure:
-#' as_quosure(quote(expr), base_env())
-#' as_quosure(10L, base_env())
+#' env <- env(var = "thing")
+#' as_quosure(quote(var), env)
 #'
 #'
-#' # Sometimes you get unscoped formulas because of quotation:
-#' f <- ~~expr
-#' inner_f <- f_rhs(f)
-#' str(inner_f)
+#' # The environment is ignored for formulas:
+#' as_quosure(~foo, env)
+#' as_quosure(~foo)
 #'
-#' # In that case testing for a scoped formula returns FALSE:
-#' is_formula(inner_f, scoped = TRUE)
-#'
-#' # With as_quosure() you ensure that this kind of unscoped formulas
-#' # will be granted a default environment:
-#' as_quosure(inner_f, base_env())
-as_quosure <- function(x, env = caller_env()) {
+#' # However you must supply it for symbols and calls:
+#' try(as_quosure(quote(var)))
+as_quosure <- function(x, env = NULL) {
   if (is_quosure(x)) {
-    x
-  } else if (is_bare_formula(x)) {
-    new_quosure(f_rhs(x), f_env(x) %||% env)
-  } else if (is_symbolic(x)) {
-    new_quosure(x, env)
-  } else {
-    new_quosure(x, empty_env())
+    return(x)
   }
+
+  if (is_bare_formula(x)) {
+    env <- f_env(x)
+    if (is_null(env)) {
+      abort(paste_line(
+        "The formula does not have an environment.",
+        "This is a quoted formula that was never evaluated."
+      ))
+    }
+
+    return(new_quosure(f_rhs(x), env))
+  }
+
+  if (is_symbolic(x)) {
+    if (is_null(env)) {
+      signal_soft_deprecated(paste_line(
+        "`as_quosure()` requires an explicit environment as of rlang 0.3.0.",
+        "Please supply `env`."
+      ))
+      env <- caller_env()
+    }
+
+    return(new_quosure(x, env))
+  }
+
+  new_quosure(x, empty_env())
 }
 #' @rdname as_quosure
 #' @param expr The expression wrapped by the quosure.
@@ -270,13 +368,22 @@ quo_squash <- function(quo, warn = FALSE) {
 #'
 #' @description
 #'
-#' * `quo_text()` and `quo_label()` are equivalent to [expr_text()],
-#'   [expr_label()], etc, but they first squash all quosures with
-#'   [quo_squash()] so they print more nicely.
+#' These functions take an arbitrary R object, typically an
+#' [expression][is_expression], and represent it as a string.
 #'
-#' * `quo_name()` squashes a quosure and transforms it into a simple
-#'   string. It is suitable to give an unnamed quosure a default name,
-#'   for instance a column name in a data frame.
+#' * `quo_name()` returns an abbreviated representation of the object
+#'   as a single line string. It is suitable for default names.
+#'
+#' * `quo_text()` returns a multiline string. For instance block
+#'   expressions like `{ foo; bar }` are represented on 4 lines (one
+#'   for each symbol, and the curly braces on their own lines).
+#'
+#' These deparsers are only suitable for creating default names or
+#' printing output at the console. The behaviour of your functions
+#' should not depend on deparsed objects. If you are looking for a way
+#' of transforming symbols to strings, use [as_string()] instead of
+#' `quo_name()`. Unlike deparsing, the transformation between symbols
+#' and strings is non-lossy and well defined.
 #'
 #' @inheritParams quo_squash
 #' @inheritParams expr_label
@@ -352,16 +459,16 @@ quo_squash_impl <- function(x, parent = NULL, warn = FALSE) {
 
 #' @export
 print.quosure <- function(x, ...) {
-  meow(.trailing = FALSE,
-    "<quosure>",
-    "  expr: "
+  cat_line(.trailing = FALSE,
+    bold("<quosure>"),
+    "expr: "
   )
   quo_print(x)
-  meow(.trailing = FALSE,
-    "  env:  "
+  cat_line(.trailing = FALSE,
+    "env:  "
   )
 
-  env <- get_env(x)
+  env <- quo_get_env(x)
   quo_env_print(env)
 
   invisible(x)
@@ -369,6 +476,15 @@ print.quosure <- function(x, ...) {
 #' @export
 str.quosure <- function(object, ...) {
   str(unclass(object), ...)
+}
+
+#' @export
+as.character.quosure <- function(x, ...) {
+  signal_soft_deprecated(paste_line(
+    "Using `as.character()` on a quosure is soft-deprecated as of rlang 0.3.0.",
+    "Please use `quo_text()` intead."
+  ))
+  NextMethod()
 }
 
 # Create a circular list of colours. This infloops if printed in the REPL!
@@ -478,12 +594,70 @@ quo_print <- function(quo) {
   cat(paste0(lines, "\n"))
 }
 quo_env_print <- function(env) {
-  if (is_reference(env, global_env())) {
-    nm <- "global"
-  } else if (is_reference(env, empty_env())) {
-    nm <- "empty"
-  } else {
-    nm <- blue(sxp_address(env))
+  nm <- env_label(env)
+
+  if (!is_reference(env, global_env()) && !is_reference(env, empty_env())) {
+    nm <- blue(nm)
   }
-  meow(nm)
+
+  cat_line(nm)
+}
+
+#' @export
+Ops.quosure <- function(e1, e2) {
+  if (is_quosure(e1) && is_quosure(e2)) {
+    bad <- c("myquosure1", "myquosure2")
+    good <- c("!!myquosure1", "!!myquosure2")
+  } else if (is_quosure(e1)) {
+    bad <- c("myquosure", "rhs")
+    good <- c("!!myquosure", "rhs")
+  } else {
+    bad <- c("lhs", "myquosure")
+    good <- c("lhs", "!!myquosure")
+  }
+  abort(paste_line(
+    "Base operators are not defined for quosures.",
+    "Do you need to unquote the quosure?",
+    "",
+    "  # Bad:",
+    sprintf("  %s %s %s", bad[[1]], .Generic, bad[[2]]),
+    "",
+    "  # Good:",
+    sprintf("  %s %s %s", good[[1]], .Generic, good[[2]]),
+  ))
+}
+
+abort_quosure_op <- function(group, op) {
+  abort(paste_line(
+    sprintf("%s operations are not defined for quosures.", group),
+    "Do you need to unquote the quosure?",
+    "",
+    "  # Bad:",
+    sprintf("  %s(myquosure)", op),
+    "",
+    "  # Good:",
+    sprintf("  %s(!!myquosure)", op),
+  ))
+}
+#' @export
+Math.quosure <- function(x, ...) {
+  abort_quosure_op("Math", .Generic)
+}
+#' @export
+Summary.quosure <- function(x, ...) {
+  abort_quosure_op("Summary", .Generic)
+}
+#' @export
+mean.quosure <- function(x, na.rm = TRUE, ...) {
+  abort_quosure_op("Summary", "mean")
+}
+#' @importFrom stats median
+#' @export
+median.quosure <- function(x, na.rm = TRUE, ...) {
+  abort_quosure_op("Summary", "median")
+}
+#' @importFrom stats quantile
+#' @export
+quantile.quosure <- function(x, na.rm = TRUE, ...) {
+  abort_quosure_op("Summary", "quantile")
 }

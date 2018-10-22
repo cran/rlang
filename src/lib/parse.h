@@ -1,6 +1,8 @@
 #ifndef RLANG_PARSE_H
 #define RLANG_PARSE_H
 
+sexp* r_parse(const char* str);
+sexp* r_parse_eval(const char* str, sexp* env);
 
 // This only includes operators that actually appear in the AST.
 // Examples of silent operators are `else` and `in`.
@@ -73,7 +75,7 @@ struct r_op_precedence {
   bool delimited;
 };
 
-const struct r_op_precedence r_ops_precedence[R_OP_MAX];
+extern const struct r_op_precedence r_ops_precedence[R_OP_MAX];
 
 /**
  * r_op_has_precedence() - Does an operation have precedence over another?

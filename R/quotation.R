@@ -2,6 +2,8 @@
 #'
 #' @description
 #'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+#'
 #' Quotation is a mechanism by which an expression supplied as
 #' argument is captured by a function. Instead of seeing the value of
 #' the argument, the function sees the recipe (the R code) to make
@@ -51,12 +53,12 @@
 #'   is supplied they throw an error.
 #'
 #' In terms of base functions, `enexpr(arg)` corresponds to
-#' `base::substitute(arg)` (though that function has complex
-#' semantics) and `expr()` is like [quote()] (and [bquote()] if we
-#' consider unquotation syntax). The plural variant `exprs()` is
-#' equivalent to [base::alist()]. Finally there is no function in base
-#' R that is equivalent to `enexprs()` but you can reproduce its
-#' behaviour with `eval(substitute(alist(...)))`.
+#' `base::substitute(arg)` (though that function also features complex
+#' substitution semantics) and `expr()` is like [quote()] (and
+#' [bquote()] if we consider unquotation syntax). The plural variant
+#' `exprs()` is equivalent to [base::alist()]. Finally there is no
+#' function in base R that is equivalent to `enexprs()` but you can
+#' reproduce its behaviour with `eval(substitute(alist(...)))`.
 #'
 #'
 #' @section Capture expressions in quosures:
@@ -70,7 +72,7 @@
 #'
 #' Quosures are objects that can be evaluated with [eval_tidy()] just
 #' like symbols or function calls. Since they always evaluate in their
-#' original environment, quosures can be seen as a vehicle that allow
+#' original environment, quosures can be seen as vehicles that allow
 #' expressions to travel from function to function but that beam back
 #' instantly to their original environment upon evaluation.
 #'
@@ -104,11 +106,6 @@
 #' [the chapter in Advanced R](https://adv-r.hadley.nz/quasiquotation.html).
 #'
 #'
-#' @section Life cycle:
-#'
-#' All the quotation functions mentioned here are stable.
-#'
-#'
 #' @inheritParams tidy-dots
 #' @param expr An expression.
 #' @param arg A symbol representing an argument. The expression
@@ -119,10 +116,14 @@
 #'   `exprs()` and `quos()`, the expressions to capture unevaluated
 #'   (including expressions contained in `...`).
 #' @param .named Whether to ensure all dots are named. Unnamed
-#'   elements are processed with [expr_text()] to figure out a default
-#'   name. If an integer, it is passed to the `width` argument of
-#'   `expr_text()`, if `TRUE`, the default width is used. See
-#'   [exprs_auto_name()].
+#'   elements are processed with [quo_name()] to build a default
+#'   name. See also [quos_auto_name()].
+#' @param .ignore_empty Whether to ignore empty arguments. Can be one
+#'   of `"trailing"`, `"none"`, `"all"`. If `"trailing"`, only the
+#'   last argument is ignored if it is empty. Note that `"trailing"`
+#'   applies only to arguments passed in `...`, not to named
+#'   arguments. On the other hand, `"all"` also applies to named
+#'   arguments.
 #' @param .unquote_names Whether to treat `:=` as `=`. Unlike `=`, the
 #'   `:=` syntax supports `!!` unquoting on the LHS.
 #' @name quotation
@@ -157,7 +158,7 @@
 #' expr(say(what))
 #' expr(say(!!what))
 #'
-#' # This also applies to the expressions supplied the user. This is
+#' # This also applies to expressions supplied by the user. This is
 #' # like an escape hatch that allows control over the captured
 #' # expression:
 #' expr_inputs(say(!!what), !!what)
@@ -218,22 +219,33 @@ exprs <- function(...,
                   .named = FALSE,
                   .ignore_empty = c("trailing", "none", "all"),
                   .unquote_names = TRUE) {
-  .Call(rlang_exprs_interp, environment(), .named, .ignore_empty, .unquote_names)
+  .Call(rlang_exprs_interp,
+    frame_env = environment(),
+    named = .named,
+    ignore_empty = .ignore_empty,
+    unquote_names = .unquote_names,
+    homonyms = "keep",
+    check_assign = FALSE
+  )
 }
 #' @rdname quotation
 #' @export
 enexprs <- function(...,
                    .named = FALSE,
                    .ignore_empty = c("trailing", "none", "all"),
-                   .unquote_names = TRUE) {
+                   .unquote_names = TRUE,
+                   .homonyms = c("keep", "first", "last", "error"),
+                   .check_assign = FALSE) {
   endots(
-    environment(),
-    parent.frame(),
-    rlang_enexpr,
-    rlang_exprs_interp,
-    .named,
-    .ignore_empty,
-    .unquote_names
+    call = sys.call(),
+    frame_env = parent.frame(),
+    capture_arg = rlang_enexpr,
+    capture_dots = rlang_exprs_interp,
+    named = .named,
+    ignore_empty = .ignore_empty,
+    unquote_names = .unquote_names,
+    homonyms = .homonyms,
+    check_assign = .check_assign
   )
 }
 
@@ -247,15 +259,19 @@ ensym <- function(arg) {
 ensyms <- function(...,
                    .named = FALSE,
                    .ignore_empty = c("trailing", "none", "all"),
-                   .unquote_names = TRUE) {
+                   .unquote_names = TRUE,
+                   .homonyms = c("keep", "first", "last", "error"),
+                   .check_assign = FALSE) {
   exprs <- endots(
-    environment(),
-    parent.frame(),
-    rlang_enexpr,
-    rlang_exprs_interp,
-    .named,
-    .ignore_empty,
-    .unquote_names
+    call = sys.call(),
+    frame_env = parent.frame(),
+    capture_arg = rlang_enexpr,
+    capture_dots = rlang_exprs_interp,
+    named = .named,
+    ignore_empty = .ignore_empty,
+    unquote_names = .unquote_names,
+    homonyms = .homonyms,
+    check_assign = .check_assign
   )
   if (!every(exprs, function(x) is_symbol(x) || is_string(x))) {
     abort("Must supply symbols or strings as argument")
@@ -281,35 +297,60 @@ quos <- function(...,
                  .named = FALSE,
                  .ignore_empty = c("trailing", "none", "all"),
                  .unquote_names = TRUE) {
-  .Call(rlang_quos_interp, environment(), .named, .ignore_empty, .unquote_names)
+  .Call(rlang_quos_interp,
+    frame_env = environment(),
+    named = .named,
+    ignore_empty = .ignore_empty,
+    unquote_names = .unquote_names,
+    homonyms = "keep",
+    check_assign = FALSE
+  )
 }
 #' @rdname quotation
 #' @export
 enquos <- function(...,
                    .named = FALSE,
                    .ignore_empty = c("trailing", "none", "all"),
-                   .unquote_names = TRUE) {
+                   .unquote_names = TRUE,
+                   .homonyms = c("keep", "first", "last", "error"),
+                   .check_assign = FALSE) {
   quos <- endots(
-    environment(),
-    parent.frame(),
-    rlang_enquo,
-    rlang_quos_interp,
-    .named,
-    .ignore_empty,
-    .unquote_names
+    call = sys.call(),
+    frame_env = parent.frame(),
+    capture_arg = rlang_enquo,
+    capture_dots = rlang_quos_interp,
+    named = .named,
+    ignore_empty = .ignore_empty,
+    unquote_names = .unquote_names,
+    homonyms = .homonyms,
+    check_assign = .check_assign
   )
   structure(quos, class = "quosures")
 }
 
 
-endots <- function(frame, env,
-                   capture_arg, capture_dots,
-                   .named, .ignore_empty, .unquote_names) {
-  sys_call <- eval_bare(quote(sys.call()), frame)
-  syms <- as.list(node_cdr(sys_call))
+capture_args <- c(
+  ".named",
+  ".ignore_empty",
+  ".unquote_names",
+  ".homonyms",
+  ".check_assign"
+)
+
+endots <- function(call,
+                   frame_env,
+                   capture_arg,
+                   capture_dots,
+                   named,
+                   ignore_empty,
+                   unquote_names,
+                   homonyms,
+                   check_assign) {
+  ignore_empty <- arg_match(ignore_empty, c("trailing", "none", "all"))
+  syms <- as.list(node_cdr(call))
 
   if (!is_null(names(syms))) {
-    is_arg <- names(syms) %in% c(".named", ".ignore_empty", ".unquote_names")
+    is_arg <- names(syms) %in% capture_args
     syms <- syms[!is_arg]
   }
 
@@ -323,16 +364,33 @@ endots <- function(frame, env,
     }
     if (identical(sym, dots_sym)) {
       splice_dots <<- TRUE
-      splice(dot_call(capture_dots, env, .named, .ignore_empty, .unquote_names))
+      splice(dot_call(capture_dots,
+        frame_env = frame_env,
+        named = named,
+        ignore_empty = ignore_empty,
+        unquote_names = unquote_names,
+        homonyms = homonyms,
+        check_assign = check_assign
+      ))
     } else {
-      dot_call(capture_arg, sym, env)
+      dot_call(capture_arg, sym, frame_env)
     }
   })
 
   if (splice_dots) {
     dots <- flatten_if(dots, is_spliced)
   }
-  if (.named) {
+
+  if (ignore_empty == "all") {
+    if (identical(capture_arg, rlang_enquo)) {
+      dot_is_missing <- quo_is_missing
+    } else {
+      dot_is_missing <- is_missing
+    }
+    dots <- keep(dots, negate(dot_is_missing))
+  }
+
+  if (named) {
     dots <- quos_auto_name(dots)
   }
   names(dots) <- names2(dots)
@@ -340,25 +398,37 @@ endots <- function(frame, env,
   dots
 }
 
-#' Ensure that list of expressions are all named
+#' Ensure that all elements of a list of expressions are named
 #'
 #' This gives default names to unnamed elements of a list of
 #' expressions (or expression wrappers such as formulas or
 #' quosures). `exprs_auto_name()` deparses the expressions with
-#' [expr_text()] by default. `quos_auto_name()` deparses with
-#' [quo_text()].
+#' [expr_name()] by default. `quos_auto_name()` deparses with
+#' [quo_name()].
 #'
 #' @param exprs A list of expressions.
-#' @param width Maximum width of names.
-#' @param printer A function that takes an expression and converts it
-#'   to a string. This function must take an expression as first
-#'   argument and `width` as second argument.
+#' @param width Soft-deprecated. Maximum width of names.
+#' @param printer Soft-deprecated. A function that takes an expression
+#'   and converts it to a string. This function must take an
+#'   expression as the first argument and `width` as the second
+#'   argument.
 #' @export
-exprs_auto_name <- function(exprs, width = 60L, printer = expr_text) {
-  have_name <- have_name(exprs)
+exprs_auto_name <- function(exprs, width = NULL, printer = NULL) {
+  if (!is_null(width)) {
+    signal_soft_deprecated(env = empty_env(), paste_line(
+      "The `width` argument is soft-deprecated as of rlang 0.3.0."
+    ))
+  }
 
+  if (!is_null(printer)) {
+    signal_soft_deprecated(env = empty_env(), paste_line(
+      "The `printer` argument is soft-deprecated as of rlang 0.3.0."
+    ))
+  }
+
+  have_name <- have_name(exprs)
   if (any(!have_name)) {
-    nms <- map_chr(exprs[!have_name], printer, width = width)
+    nms <- map_chr(exprs[!have_name], label)
     names(exprs)[!have_name] <- nms
   }
 
@@ -367,6 +437,6 @@ exprs_auto_name <- function(exprs, width = 60L, printer = expr_text) {
 #' @rdname exprs_auto_name
 #' @param quos A list of quosures.
 #' @export
-quos_auto_name <- function(quos, width = 60L) {
-  exprs_auto_name(quos, width = width, printer = quo_text)
+quos_auto_name <- function(quos, width = NULL) {
+  exprs_auto_name(quos, width = width)
 }

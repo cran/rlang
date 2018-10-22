@@ -6,18 +6,35 @@
 \alias{list2}
 \title{Collect dots tidily}
 \usage{
-dots_list(..., .ignore_empty = c("trailing", "none", "all"))
+dots_list(..., .ignore_empty = c("trailing", "none", "all"),
+  .preserve_empty = FALSE, .homonyms = c("keep", "first", "last",
+  "error"), .check_assign = FALSE)
 
 list2(...)
 }
 \arguments{
-\item{...}{Arguments with explicit (\code{dots_list()}) or list
-(\code{dots_splice()}) splicing semantics. The contents of spliced
-arguments are embedded in the returned list.}
+\item{...}{Arguments to collect with \code{!!!} support.}
 
 \item{.ignore_empty}{Whether to ignore empty arguments. Can be one
 of \code{"trailing"}, \code{"none"}, \code{"all"}. If \code{"trailing"}, only the
 last argument is ignored if it is empty.}
+
+\item{.preserve_empty}{Whether to preserve the empty arguments that
+were not ignored. If \code{TRUE}, empty arguments are stored with
+\code{\link[=missing_arg]{missing_arg()}} values. If \code{FALSE} (the default) an error is
+thrown when an empty argument is detected.}
+
+\item{.homonyms}{How to treat arguments with the same name. The
+default, \code{"keep"}, preserves these arguments. Set \code{.homonyms} to
+\code{"first"} to only keep the first occurrences, to \code{"last"} to keep
+the last occurrences, and to \code{"error"} to raise an informative
+error and indicate what arguments have duplicated names.}
+
+\item{.check_assign}{Whether to check for \code{<-} calls passed in
+dots. When \code{TRUE} and a \code{<-} call is detected, a warning is
+issued to advise users to use \code{=} if they meant to match a
+function parameter, or wrap the \code{<-} call in braces otherwise.
+This ensures assignments are explicit.}
 }
 \value{
 A list of arguments. This list is always named: unnamed
@@ -91,7 +108,44 @@ fn <- function(data, ...) {
 # provides a workaround:
 fn("wrong!", data = letters)  # exact matching of `data`
 fn("wrong!", dat = letters)   # partial matching of `data`
-fn(some_data, !!! list(data = letters))  # no matching
+fn(some_data, !!!list(data = letters))  # no matching
+
+
+# Empty arguments trigger an error by default:
+try(fn(, ))
+
+# You can choose to preserve empty arguments instead:
+list3 <- function(...) dots_list(..., .preserve_empty = TRUE)
+
+# Note how the last empty argument is still ignored because
+# `.ignore_empty` defaults to "trailing":
+list3(, )
+
+# The list with preserved empty arguments is equivalent to:
+list(missing_arg())
+
+
+# Arguments with duplicated names are kept by default:
+list2(a = 1, a = 2, b = 3, b = 4, 5, 6)
+
+# Use the `.homonyms` argument to keep only the first of these:
+dots_list(a = 1, a = 2, b = 3, b = 4, 5, 6, .homonyms = "first")
+
+# Or the last:
+dots_list(a = 1, a = 2, b = 3, b = 4, 5, 6, .homonyms = "last")
+
+# Or raise an informative error:
+try(dots_list(a = 1, a = 2, b = 3, b = 4, 5, 6, .homonyms = "error"))
+
+
+# dots_list() can be configured to warn when a `<-` call is
+# detected:
+my_list <- function(...) dots_list(..., .check_assign = TRUE)
+my_list(a <- 1)
+
+# There is no warning if the assignment is wrapped in braces.
+# This requires users to be explicit about their intent:
+my_list({ a <- 1 })
 }
 \seealso{
 \code{\link[=exprs]{exprs()}} for extracting dots without evaluation.

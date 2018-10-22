@@ -3,10 +3,6 @@
 \name{quasiquotation}
 \alias{quasiquotation}
 \alias{UQ}
-\alias{UQE}
-\alias{UQS}
-\alias{UQ}
-\alias{UQE}
 \alias{UQS}
 \alias{!!}
 \alias{!!!}
@@ -14,24 +10,9 @@
 \alias{qq_show}
 \title{Quasiquotation of an expression}
 \usage{
-UQ(x)
-
-UQE(x)
-
-UQS(x)
-
-"!!"(x)
-
-":="(x, y)
-
 qq_show(expr)
 }
 \arguments{
-\item{x}{An expression to unquote.}
-
-\item{y}{An R expression that will be given the argument name
-supplied to \code{x}.}
-
 \item{expr}{An expression to be quasiquoted.}
 }
 \description{
@@ -48,10 +29,15 @@ forms for unquoting.
 \item The \code{!!} operator unquotes its argument. It gets evaluated
 immediately in the surrounding context.
 \item The \code{!!!} operator unquotes and splices its argument. The
-argument should represents a list or a vector. Each element will
+argument should represent a list or a vector. Each element will
 be embedded in the surrounding call, i.e. each element is
 inserted as an argument. If the vector is named, the names are
 used as argument names.
+
+If the vector is a classed object (like a factor), it is
+converted to a list with \code{\link[base:as.list]{base::as.list()}} to ensure proper
+dispatch. If it is an S4 objects, it is converted to a list with
+\code{\link[methods:as]{methods::as()}}.
 }
 
 Use \code{qq_show()} to experiment with quasiquotation or debug the
@@ -78,7 +64,7 @@ flexible \code{:=} operator an alias of \code{=}. You can use it to supply
 names, e.g. \code{a := b} is equivalent to \code{a = b}. Since its syntax is
 more flexible you can unquote on the LHS:\preformatted{name <- "Jane"
 
-dots_list(!!name := 1 + 2)
+list2(!!name := 1 + 2)
 exprs(!!name := 1 + 2)
 quos(!!name := 1 + 2)
 }
@@ -102,12 +88,20 @@ and
 
 \itemize{
 \item Calling \code{UQ()} and \code{UQS()} with the rlang namespace qualifier is
-soft-deprecated as of rlang 0.2.0. Just use the unqualified forms
-instead.
+deprecated as of rlang 0.3.0. Just use the unqualified forms
+instead:\preformatted{# Bad
+rlang::expr(mean(rlang::UQ(var) * 100))
+
+# Ok
+rlang::expr(mean(UQ(var) * 100))
+
+# Good
+rlang::expr(mean(!!var * 100))
+}
 
 Supporting namespace qualifiers complicates the implementation of
 unquotation and is misleading as to the nature of unquoting
-operators (these are syntactic operators that operates at
+operators (which are syntactic operators that operates at
 quotation-time rather than function calls at evaluation-time).
 \item \code{UQ()} and \code{UQS()} were soft-deprecated in rlang 0.2.0 in order
 to make the syntax of quasiquotation more consistent. The prefix
@@ -131,17 +125,6 @@ by the tidy eval parser interpreting \code{rlang::UQ()} as \code{!!}. In
 reality unquoting is \emph{not} a function call, it is a syntactic
 operation. The operator form makes it clearer that unquoting is
 special.
-\item \code{UQE()} was deprecated in rlang 0.2.0 in order to make the is
-deprecated in order to simplify the quasiquotation syntax. You
-can replace its use by a combination of \code{!!} and \code{get_expr()}.
-E.g. \code{!! get_expr(x)} is equivalent to \code{UQE(x)}.
-\item The use of \code{:=} as alias of \code{~} is defunct as of rlang 0.2.0. It
-caused surprising results when invoked in wrong places. For
-instance in the expression \code{dots_list(name := 1)} this operator
-was interpreted as a synonym to \code{=} that supports quasiquotation,
-but not in \code{dots_list(list(name := 1))}. Since \code{:=} was an alias
-for \code{~} the inner list would contain formula-like object. This
-kind of mistakes now trigger an error.
 }
 }
 
@@ -167,7 +150,7 @@ quo(how_many(!!(1 + 2)))
 
 
 # Note that when you unquote complex objects into an expression,
-# the base R printer may be a bit misleading. For anstance compare
+# the base R printer may be a bit misleading. For instance compare
 # the output of `expr()` and `quo()` (which uses a custom printer)
 # when we unquote an integer vector:
 expr(how_many(!!(1:10)))
@@ -202,7 +185,7 @@ quos(!!var := bernard, mouse2 = bianca)
 
 # All these features apply to dots captured by enquos():
 fn <- function(...) enquos(...)
-fn(!!! args, !!var := penny)
+fn(!!!args, !!var := penny)
 
 
 # Unquoting is especially useful for building an expression by

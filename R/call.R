@@ -59,7 +59,7 @@ call2 <- function(.fn, ..., .ns = NULL) {
     .fn <- new_call(namespace_sym, pairlist(sym(.ns), .fn))
   }
 
-  new_call(.fn, as.pairlist(dots_list(...)))
+  new_call(.fn, as.pairlist(list2(...)))
 }
 
 #' Is an object callable?
@@ -83,7 +83,7 @@ call2 <- function(.fn, ..., .ns = NULL) {
 #'
 #' # node_poke_car() lets you modify calls without any checking:
 #' lang <- quote(foo(10))
-#' node_poke_car(lang, get_env())
+#' node_poke_car(lang, current_env())
 #'
 #' # Use is_callable() to check an input object is safe to put as CAR:
 #' obj <- base::identity
@@ -128,6 +128,10 @@ is_callable <- function(x) {
 #'   `""` and `x` is a namespaced call, `is_call()` returns
 #'   `FALSE`. If any other string, `is_call()` checks that `x` is
 #'   namespaced within `ns`.
+#'
+#'   Can be a character vector of namespaces, in which case the call
+#'   has to match at least one of them, otherwise `is_call()` returns
+#'   `FALSE`.
 #' @seealso [is_expression()]
 #' @export
 #' @examples
@@ -155,6 +159,15 @@ is_callable <- function(x) {
 #' is_call(ns_expr, "list", ns = "utils")
 #' is_call(ns_expr, "list", ns = "base")
 #'
+#' # You can supply multiple namespaces:
+#' is_call(ns_expr, "list", ns = c("utils", "base"))
+#' is_call(ns_expr, "list", ns = c("utils", "stats"))
+#'
+#' # If one of them is "", unnamespaced calls will match as well:
+#' is_call(quote(list()), "list", ns = "base")
+#' is_call(quote(list()), "list", ns = c("base", ""))
+#' is_call(quote(base::list()), "list", ns = c("base", ""))
+#'
 #'
 #' # The name argument is vectorised so you can supply a list of names
 #' # to match with:
@@ -167,9 +180,19 @@ is_call <- function(x, name = NULL, n = NULL, ns = NULL) {
   }
 
   if (!is_null(ns)) {
-    if (identical(ns, "") && is_namespaced_call(x, private = FALSE)) {
-      return(FALSE)
-    } else if (!is_namespaced_call(x, ns, private = FALSE)) {
+    good_ns <- FALSE
+
+    for (elt in ns) {
+      if (identical(elt, "") && !is_namespaced_call(x, private = FALSE)) {
+        good_ns <- TRUE
+        break
+      } else if (is_namespaced_call(x, elt, private = FALSE)) {
+        good_ns <- TRUE
+        break
+      }
+    }
+
+    if (!good_ns) {
       return(FALSE)
     }
   }
@@ -202,32 +225,157 @@ is_call <- function(x, name = NULL, n = NULL, ns = NULL) {
   TRUE
 }
 
+#' How does a call print at the console?
+#'
+#' @description
+#'
+#' `call_print_type()` returns the way a call is deparsed and printed
+#' at the console. This is useful when generating documents based on R
+#' code. The types of calls are:
+#'
+#' * `"prefix"` for calls like `foo()`, unary operators, `-1`, and
+#'   operators with more than 2 arguments like \code{`+`(1, 2, 3)}
+#'   (the latter can be obtained by building calls manually).
+#'
+#' * `"infix"` for operators like `1 + 2` or `foo$bar`.
+#'
+#' * `"special"` for function definitions, control-flow calls like
+#'   `if` or `for`, and subscripting calls like `foo[]` and `foo[[]]`.
+#'
+#'
+#' @param call A quoted function call. An error is raised if not a call.
+#' @examples
+#' call_print_type(quote(foo(bar)))
+#' call_print_type(quote(foo[[bar]]))
+#' call_print_type(quote(+foo))
+#' call_print_type(quote(function() foo))
+#'
+#' # When an operator call has an artificial number of arguments, R
+#' # often prints it in prefix form:
+#' call <- call("+", 1, 2, 3)
+#' call
+#' call_print_type(call)
+#'
+#' # But not always:
+#' call <- call("$", 1, 2, 3)
+#' call
+#' call_print_type(call)
+#' @noRd
+call_print_type <- function(call) {
+  type <- call_print_fine_type(call)
+
+  switch(type,
+    call = "prefix",
+    control = ,
+    delim = ,
+    subset = "special",
+    type
+  )
+}
+call_print_fine_type <- function(call) {
+  if (!is_call(call)) {
+    abort("`call` must be a call")
+  }
+
+  op <- which_operator(call)
+  if (op == "") {
+    return("call")
+  }
+
+  switch(op,
+    `+unary` = ,
+    `-unary` = ,
+    `~unary` = ,
+    `?unary` = ,
+    `!` = ,
+    `!!` = ,
+    `!!!` =
+      "prefix",
+    `function` = ,
+    `while` = ,
+    `for` = ,
+    `repeat` = ,
+    `if` =
+      "control",
+    `(` = ,
+    `{` =
+      "delim",
+    `[` = ,
+    `[[` =
+      "subset",
+    # These operators always print in infix form even if they have
+    # more arguments
+    `<-` = ,
+    `<<-` = ,
+    `=` = ,
+    `::` = ,
+    `:::` = ,
+    `$` = ,
+    `@` =
+      "infix",
+    `+` = ,
+    `-` = ,
+    `?` = ,
+    `~` = ,
+    `:=` = ,
+    `|` = ,
+    `||` = ,
+    `&` = ,
+    `&&` = ,
+    `>` = ,
+    `>=` = ,
+    `<` = ,
+    `<=` = ,
+    `==` = ,
+    `!=` = ,
+    `*` = ,
+    `/` = ,
+    `%%` = ,
+    `special` = ,
+    `:` = ,
+    `^` =
+      if (length(node_cdr(call)) == 2) {
+        "infix"
+      } else {
+        "call"
+      }
+  )
+}
+
 
 #' Modify the arguments of a call
 #'
+#' If you are working with a user-supplied call, make sure the
+#' arguments are standardised with [call_standardise()] before
+#' modifying the call.
 #'
-#' @section Life cycle:
 #'
-#' In rlang 0.2.0, `lang_modify()` was soft-deprecated and renamed to
-#' `call_modify()`. See lifecycle section in [call2()] for more about
-#' this change.
-#'
+#' @inheritParams tidy-dots
 #' @param .call Can be a call, a formula quoting a call in the
 #'   right-hand side, or a frame object from which to extract the call
 #'   expression.
 #' @param ... Named or unnamed expressions (constants, names or calls)
-#'   used to modify the call. Use `NULL` to remove arguments. These
-#'   dots support [tidy dots][tidy-dots] features.
-#' @param .standardise If `TRUE`, the call is standardised beforehand
-#'   to match existing unnamed arguments to their argument names. This
-#'   prevents new named arguments from accidentally replacing original
-#'   unnamed arguments.
-#' @param .env The environment where to find the `call` definition in
-#'   case `call` is not wrapped in a quosure. This is passed to
-#'   `call_standardise()` if `.standardise` is `TRUE`.
+#'   used to modify the call. Use [zap()] to remove arguments. These
+#'   dots support [tidy dots][tidy-dots] features. Empty arguments are
+#'   allowed and preserved.
+#' @param .standardise,.env Soft-deprecated as of rlang 0.3.0. Please
+#'   call [call_standardise()] manually.
+#'
+#' @section Life cycle:
+#'
+#' * Prior to rlang 0.3.0, `NULL` was the sentinel for removing
+#'   arguments. As of 0.3.0, [zap()] objects remove arguments and
+#'   `NULL` simply adds an argument set to `NULL`. This breaking
+#'   change allows the deletion sentinel to be distinct from valid
+#'   argument values.
+#'
+#' * The `.standardise` argument is soft-deprecated as of rlang 0.3.0.
+#'
+#' * In rlang 0.2.0, `lang_modify()` was soft-deprecated and renamed to
+#'   `call_modify()`. See lifecycle section in [call2()] for more about
+#'   this change.
 #'
 #' @return A quosure if `.call` is a quosure, a call otherwise.
-#' @seealso lang
 #' @export
 #' @examples
 #' call <- quote(mean(x, na.rm = TRUE))
@@ -237,59 +385,154 @@ is_call <- function(x, name = NULL, n = NULL, ns = NULL) {
 #' call_modify(call, x = quote(y))
 #'
 #' # Remove an argument
-#' call_modify(call, na.rm = NULL)
+#' call_modify(call, na.rm = zap())
 #'
 #' # Add a new argument
 #' call_modify(call, trim = 0.1)
 #'
-#' # Add an explicit missing argument
-#' call_modify(call, na.rm = quote(expr = ))
+#' # Add an explicit missing argument:
+#' call_modify(call, na.rm = )
 #'
 #' # Supply a list of new arguments with `!!!`
 #' newargs <- list(na.rm = NULL, trim = 0.1)
-#' call_modify(call, !!! newargs)
+#' call <- call_modify(call, !!!newargs)
+#' call
 #'
-#' # Supply a call frame to extract the frame expression:
-#' f <- function(bool = TRUE) {
-#'   call_modify(call_frame(), splice(list(bool = FALSE)))
-#' }
-#' f()
+#' # Remove multiple arguments by splicing zaps:
+#' newargs <- rep_named(c("na.rm", "trim"), list(zap()))
+#' call <- call_modify(call, !!!newargs)
+#' call
+#'
+#'
+#' # Modify the `...` arguments as if it were a named argument:
+#' call <- call_modify(call, ... = )
+#' call
+#'
+#' call <- call_modify(call, ... = zap())
+#' call
+#'
+#'
+#' # When you're working with a user-supplied call, standardise it
+#' # beforehand because it might contain unmatched arguments:
+#' user_call <- quote(matrix(x, nc = 3))
+#' call_modify(user_call, ncol = 1)
+#'
+#' # Standardising applies the usual argument matching rules:
+#' user_call <- call_standardise(user_call)
+#' user_call
+#' call_modify(user_call, ncol = 1)
 #'
 #'
 #' # You can also modify quosures inplace:
 #' f <- quo(matrix(bar))
 #' call_modify(f, quote(foo))
-call_modify <- function(.call, ...,
-                        .standardise = FALSE,
+#'
+#'
+#' # By default, arguments with the same name are kept. This has
+#' # subtle implications, for instance you can move an argument to
+#' # last position by removing it and remapping it:
+#' call <- quote(foo(bar = , baz))
+#' call_modify(call, bar = NULL, bar = missing_arg())
+#'
+#' # You can also choose to keep only the first or last homonym
+#' # arguments:
+#' args <-  list(bar = NULL, bar = missing_arg())
+#' call_modify(call, !!!args, .homonyms = "first")
+#' call_modify(call, !!!args, .homonyms = "last")
+call_modify <- function(.call,
+                        ...,
+                        .homonyms = c("keep", "first", "last", "error"),
+                        .standardise = NULL,
                         .env = caller_env()) {
-  args <- dots_list(...)
-  if (any(duplicated(names(args)) & names(args) != "")) {
-    abort("Duplicate arguments")
+  args <- dots_list(..., .preserve_empty = TRUE, .homonyms = .homonyms)
+  expr <- get_expr(.call)
+
+  if (!is_null(.standardise)) {
+    signal_soft_deprecated(paste_line(
+      "`.standardise` is soft-deprecated as of rlang 0.3.0.",
+      "Please use `call_standardise()` prior to calling `call_modify()`."
+    ))
+    if (.standardise) {
+      expr <- get_expr(call_standardise(.call, env = .env))
+    }
   }
 
-  if (.standardise) {
-    expr <- get_expr(call_standardise(.call, env = .env))
-  } else {
-    expr <- get_expr(.call)
+  if (!is_call(expr)) {
+    abort_call_input_type()
   }
 
-  # Named arguments can be spliced by R
+  expr <- duplicate(expr, shallow = TRUE)
+
+  # Discard "" names
   named <- have_name(args)
-  for (nm in names(args)[named]) {
-    expr[[nm]] <- args[[nm]]
+  named_args <- args[named]
+  nms <- names(named_args)
+
+  for (i in seq_along(named_args)) {
+    tag <- sym(nms[[i]])
+    arg <- named_args[[i]]
+
+    if (identical(tag, dots_sym)) {
+      if (!is_missing(arg) && !is_zap(arg)) {
+        abort("`...` arguments must be `zap()` or empty")
+      }
+      node_accessor <- node_car
+    } else {
+      node_accessor <- node_tag
+    }
+
+    prev <- expr
+    node <- node_cdr(expr)
+
+    while (!is_null(node)) {
+      if (identical(node_accessor(node), tag)) {
+        # Remove argument from the list if a zap sentinel
+        if (is_zap(maybe_missing(arg))) {
+          node <- node_cdr(node)
+          node_poke_cdr(prev, node)
+          next
+        }
+
+        # If `...` it can only be missing at this point, which means
+        # we keep it in the argument list as is
+        if (!identical(tag, dots_sym)) {
+          node_poke_car(node, maybe_missing(arg))
+        }
+
+        break
+      }
+
+      prev <- node
+      node <- node_cdr(node)
+    }
+
+    if (is_null(node) && !is_zap(maybe_missing(arg))) {
+      if (identical(tag, dots_sym)) {
+        node <- new_node(dots_sym, NULL)
+        node_poke_cdr(prev, node)
+      } else {
+        node <- new_node(maybe_missing(arg), NULL)
+        node_poke_tag(node, tag)
+        node_poke_cdr(prev, node)
+      }
+    }
   }
 
   if (any(!named)) {
-    # Duplicate list structure in case it wasn't before
-    if (!any(named)) {
-      expr <- duplicate(expr, shallow = TRUE)
+    remaining_args <- args[!named]
+
+    if (some(remaining_args, is_zap)) {
+      abort("Zap sentinels can't be unnamed")
     }
 
-    remaining_args <- as.pairlist(args[!named])
-    expr <- node_append(expr, remaining_args)
+    expr <- node_append(expr, as.pairlist(remaining_args))
   }
 
   set_expr(.call, expr)
+}
+
+abort_call_input_type <- function() {
+  abort("`.call` must be a quoted call")
 }
 
 #' Standardise a call
@@ -313,6 +556,10 @@ call_modify <- function(.call, ...,
 #' @export
 call_standardise <- function(call, env = caller_env()) {
   expr <- get_expr(call)
+  if (!is_call(expr)) {
+    abort_call_input_type()
+  }
+
   if (is_frame(call)) {
     fn <- call$fn
   } else {
@@ -321,8 +568,12 @@ call_standardise <- function(call, env = caller_env()) {
     fn <- eval_bare(node_car(expr), env)
   }
 
-  matched <- match.call(as_closure(fn), expr)
-  set_expr(call, matched)
+  if (is_primitive(fn)) {
+    call
+  } else {
+    matched <- match.call(fn, expr)
+    set_expr(call, matched)
+  }
 }
 
 #' Extract function from a call
@@ -358,10 +609,10 @@ call_fn <- function(call, env = caller_env()) {
   env <- get_env(call, env)
 
   if (!is_call(expr)) {
-    abort("`call` must quote a call")
+    abort_call_input_type()
   }
 
-  switch_lang(expr,
+  switch_call(expr,
     recursive = abort("`call` does not call a named or inlined function"),
     inlined = node_car(expr),
     named = ,
@@ -403,10 +654,10 @@ call_fn <- function(call, env = caller_env()) {
 call_name <- function(call) {
   call <- get_expr(call)
   if (!is_call(call)) {
-    abort("`call` must be a call or must wrap a call (e.g. in a quosure)")
+    abort_call_input_type()
   }
 
-  switch_lang(call,
+  switch_call(call,
     named = as_string(node_car(call)),
     namespaced = as_string(node_cadr(node_cdar(call))),
     NULL
@@ -442,6 +693,10 @@ call_name <- function(call) {
 #' call_args_names(call)
 call_args <- function(call) {
   call <- get_expr(call)
+  if (!is_call(call)) {
+    abort_call_input_type()
+  }
+
   args <- as.list(call[-1])
   set_names((args), names2(args))
 }
@@ -449,6 +704,9 @@ call_args <- function(call) {
 #' @export
 call_args_names <- function(call) {
   call <- get_expr(call)
+  if (!is_call(call)) {
+    abort_call_input_type()
+  }
   names2(call[-1])
 }
 

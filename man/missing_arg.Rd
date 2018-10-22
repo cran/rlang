@@ -57,16 +57,13 @@ use a bit of magic to determine if the input is the missing
 argument without triggering a missing error.
 
 \code{maybe_missing()} is particularly useful for prototyping
-meta-programming algorithm in R. The missing argument is a likely
+meta-programming algorithms in R. The missing argument is a likely
 input when computing on the language because it is a standard
 object in formals lists. While C functions are always allowed to
 return the missing argument and pass it to other C functions, this
 is not the case on the R side. If you're implementing your
 meta-programming algorithm in R, use \code{maybe_missing()} when an
 input might be the missing argument object.
-
-[[1]: R:[1
-[[1]: R:[1
 }
 
 \section{Life cycle}{

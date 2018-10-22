@@ -1,5 +1,9 @@
 #' Evaluate an expression in an environment
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
+#'
 #' `eval_bare()` is a lower-level version of function [base::eval()].
 #' Technically, it is a simple wrapper around the C function
 #' `Rf_eval()`. You generally don't need to use `eval_bare()` instead
@@ -7,6 +11,8 @@
 #' (calls such as `return()`, `on.exit()` or `parent.frame()`) more
 #' consistently when you pass an enviroment of a frame on the call
 #' stack.
+#'
+#' @details
 #'
 #' These semantics are possible because `eval_bare()` creates only one
 #' frame on the call stack whereas `eval()` creates two frames, the
@@ -38,10 +44,6 @@
 #' loop.
 #'
 #'
-#' @section Life cycle:
-#'
-#' `eval_bare()` is stable.
-#'
 #' @param expr An expression to evaluate.
 #' @param env The environment in which to evaluate the expression.
 #'
@@ -72,16 +74,16 @@
 #' # To explore the consequences of stack inconsistent semantics, let's
 #' # create a function that evaluates `parent.frame()` deep in the call
 #' # stack, in an environment corresponding to a frame in the middle of
-#' # the stack. For consistency we R's lazy evaluation semantics, we'd
+#' # the stack. For consistency with R's lazy evaluation semantics, we'd
 #' # expect to get the caller of that frame as result:
 #' fn <- function(eval_fn) {
 #'   list(
 #'     returned_env = middle(eval_fn),
-#'     actual_env = get_env()
+#'     actual_env = current_env()
 #'   )
 #' }
 #' middle <- function(eval_fn) {
-#'   deep(eval_fn, get_env())
+#'   deep(eval_fn, current_env())
 #' }
 #' deep <- function(eval_fn, eval_env) {
 #'   expr <- quote(parent.frame())
@@ -93,12 +95,6 @@
 #'
 #' # But that's not the case with base::eval():
 #' fn(base::eval)
-#'
-#' # Another difference of eval_bare() compared to base::eval() is
-#' # that it does not insert parasite frames in the evaluation stack:
-#' get_stack <- quote(identity(ctxt_stack()))
-#' eval_bare(get_stack)
-#' eval(get_stack)
 eval_bare <- function(expr, env = parent.frame()) {
   .Call(rlang_eval, expr, env)
 }
@@ -125,7 +121,7 @@ eval_bare <- function(expr, env = parent.frame()) {
 #'
 #' @inheritParams eval_bare
 #' @param env An environment within which to evaluate `expr`. Can be
-#'   an object with an [get_env()] method.
+#'   an object with a [get_env()] method.
 #' @export
 #' @examples
 #' # with_env() is handy to create formulas with a given environment:
@@ -141,7 +137,7 @@ eval_bare <- function(expr, env = parent.frame()) {
 #' # Unlike eval() it doesn't create duplicates on the evaluation
 #' # stack. You can thus use it e.g. to create non-local returns:
 #' fn <- function() {
-#'   g(get_env())
+#'   g(current_env())
 #'   "normal return"
 #' }
 #' g <- function(env) {
@@ -167,9 +163,15 @@ locally <- function(expr) {
 
 #' Invoke a function with a list of arguments
 #'
+#' @description
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("soft-deprecated")}
+#'
 #' Normally, you invoke a R function by typing arguments manually. A
 #' powerful alternative is to call a function with a list of arguments
 #' assembled programmatically. This is the purpose of `invoke()`.
+#'
+#' @details
 #'
 #' Technically, `invoke()` is basically a version of [base::do.call()]
 #' that creates cleaner call traces because it does not inline the
@@ -182,14 +184,13 @@ locally <- function(expr) {
 #'
 #' @section Life cycle:
 #'
-#' `invoke()` is in questioning lifecycle stage. Now that we
+#' `invoke()` is soft-deprecated in favour of [exec()]. Now that we
 #' understand better the interaction between unquoting and dots
-#' capture, we believe that `invoke()` should not take a `.args`
-#' argument. Instead it should take dots with [dots_list()] in order
-#' to enable `!!!` syntax.
+#' capture, we can take a simpler approach in `exec()`.
 #'
-#' We ask rlang users not to use `invoke()` in CRAN packages because
-#' we plan a breaking API update to remove the `.args` argument.
+#' If you need finer control over the generated call, you should construct
+#' an environment and call yourself, manually burying large objects
+#' or complex expressions.
 #'
 #' @param .fn A function to invoke. Can be a function object or the
 #'   name of a function in scope of `.env`.
@@ -202,6 +203,7 @@ locally <- function(expr) {
 #'   prefix for the argument names. Set `.bury` to `NULL` if you
 #'   prefer to inline the function and its arguments in the call.
 #' @export
+#' @keywords internal
 #' @examples
 #' # invoke() has the same purpose as do.call():
 #' invoke(paste, letters)

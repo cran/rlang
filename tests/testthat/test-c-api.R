@@ -19,7 +19,7 @@ test_that("r_warn() signals", {
   handler <- function(c) expect_null(c$call)
 
   expect_warning(regexp = "foo",
-    with_handlers(warning = inplace(handler),
+    with_handlers(warning = calling(handler),
       .Call(rlang_test_r_warn, "foo")
     ))
 })
@@ -27,7 +27,7 @@ test_that("r_warn() signals", {
 test_that("r_on_exit() adds deferred expr", {
   var <- chr()
   fn <- function() {
-    .Call(rlang_test_r_on_exit, quote(var <<- c(var, "foo")), get_env())
+    .Call(rlang_test_r_on_exit, quote(var <<- c(var, "foo")), current_env())
     var <<- c(var, "bar")
   }
   fn()
@@ -43,7 +43,7 @@ test_that("r_is_special_op_sym() detects special operators", {
   expect_false(is_special_op(quote(`%%`)))
 })
 
-test_that("r_base_ns_get() and r_env_get() fail if object does not exist", {
+test_that("r_base_ns_get() fail if object does not exist", {
   expect_error(.Call(rlang_test_base_ns_get, "foobar"))
 })
 
@@ -86,6 +86,9 @@ test_that("r_sys_call() returns current frame call", {
 test_that("r_which_operator() returns correct tokens", {
   expect_identical(which_operator(quote(foo())), "")
   expect_identical(which_operator(""), "")
+
+  expect_identical(which_operator(quote(?a)), "?unary")
+  expect_identical(which_operator(quote(a ? b)), "?")
 
   expect_identical(which_operator(quote(while (a) b)), "while")
   expect_identical(which_operator(quote(for (a in b) b)), "for")
@@ -212,19 +215,9 @@ test_that("client library passes tests", {
   pkg_path <- file.path(temp_test_dir, "rlanglibtest")
 
 
-  # We store the library as a zip to avoid VCS noise
+  # We store the library as a zip to avoid VCS noise. Use
+  # fixtures/Makefile to regenerate it.
   utils::unzip(zip_file, exdir = file.path(pkg_path, "src"))
-
-  # For maintenance
-  regenerate_zip <- function() {
-    location <- file.path("..", "..", "src")
-    old <- setwd(location)
-    on.exit(setwd(old))
-
-    lib_files <- c("lib.c", "lib")
-    file.remove(zip_file)
-    utils::zip(zip_file, lib_files)
-  }
 
   install.packages(pkg_path,
     repos = NULL,
@@ -253,4 +246,173 @@ test_that("r_env_unbind() removes objects", {
   expect_warning(c_env_unbind(child, "a"), "not found")
   c_env_unbind(child, "a", inherits = TRUE)
   expect_false(env_has(env, "a"))
+})
+
+node_list_clone_until <- function(node, sentinel) {
+  .Call(rlang_test_node_list_clone_until, node, sentinel)
+}
+
+test_that("can clone-until with NULL list", {
+  expect_identical(node_list_clone_until(NULL, pairlist()), list(NULL, NULL))
+})
+
+test_that("can clone-until with NULL sentinel", {
+  node <- pairlist(a = 1, b = 2, c = 3)
+  out <- node_list_clone_until(node, NULL)
+
+  sentinel_out <- out[[2]]
+  expect_reference(node_cddr(out[[1]]), sentinel_out)
+
+  node_out <- out[[1]]
+  expect_identical(node_out, pairlist(a = 1, b = 2, c = 3))
+  while (!is_null(node_out)) {
+    expect_false(is_reference(node_out, node))
+    node_out <- node_cdr(node_out)
+    node <- node_cdr(node)
+  }
+})
+
+test_that("returned sentinel and value are NULL if couldn't be found", {
+  node <- pairlist(a = NULL)
+  out <- node_list_clone_until(node, pairlist(NULL))
+
+  expect_false(is_reference(out[[1]], node))
+  expect_null(out[[1]])
+  expect_null(out[[2]])
+})
+
+test_that("can clone until sentinel", {
+  node1 <- pairlist(a = 1, b = 2, c = 3)
+  node2 <- node_cdr(node1)
+  node3 <- node_cdr(node2)
+
+  out <- node_list_clone_until(node1, node2)
+
+  # No modification by reference of original list
+  expect_false(is_reference(out, node1))
+  expect_true(is_reference(node_cdr(node1), node2))
+  expect_true(is_reference(node_cdr(node2), node3))
+
+  node_out <- out[[1]]
+  expect_identical(node_out, pairlist(a = 1, b = 2, c = 3))
+  expect_false(is_reference(node_out, node1))
+  expect_true(is_reference(node_cdr(node_out), node2))
+  expect_true(is_reference(node_out, out[[2]]))
+})
+
+get_attributes <- function(x) {
+  .Call(rlang_get_attributes, x)
+}
+c_set_attribute <- function(x, name, value) {
+  .Call(rlang_test_set_attribute, x, sym(name), value)
+}
+
+test_that("r_set_attribute() sets elements", {
+  x <- list()
+  out1 <- c_set_attribute(x, "foo", 1L)
+  attrs1 <- get_attributes(out1)
+  expect_identical(attrs1, pairlist(foo = 1L))
+  expect_false(is_reference(x, out1))
+  expect_null(get_attributes(x))
+
+  out2 <- c_set_attribute(out1, "bar", 2L)
+  attrs2 <- get_attributes(out2)
+  expect_identical(attrs2, pairlist(bar = 2L, foo = 1L))
+
+  expect_reference(get_attributes(out1), attrs1)
+  expect_reference(node_cdr(attrs2), attrs1)
+})
+
+test_that("r_set_attribute() zaps one element", {
+  x <- structure(list(), foo = 1)
+  attrs <- get_attributes(x)
+  out <- c_set_attribute(x, "foo", NULL)
+
+  expect_reference(get_attributes(x), attrs)
+  expect_null(get_attributes(out))
+})
+
+test_that("r_set_attribute() zaps several elements", {
+  x <- structure(list(), foo = 1, bar = 2, baz = 3)
+  attrs <- get_attributes(x)
+
+  out1 <- c_set_attribute(x, "foo", NULL)
+  attrs1 <- get_attributes(out1)
+
+  expect_identical(attrs1, pairlist(bar = 2, baz = 3))
+  expect_true(is_reference(attrs1, node_cdr(attrs)))
+  expect_true(is_reference(node_cdr(attrs1), node_cddr(attrs)))
+
+
+  out2 <- c_set_attribute(x, "bar", NULL)
+  attrs2 <- get_attributes(out2)
+
+  expect_identical(attrs2, pairlist(foo = 1, baz = 3))
+  expect_false(is_reference(attrs2, attrs))
+  expect_true(is_reference(node_cdr(attrs2), node_cddr(attrs)))
+
+
+  out3 <- c_set_attribute(x, "baz", NULL)
+  attrs3 <- get_attributes(out3)
+
+  expect_identical(attrs3, pairlist(foo = 1, bar = 2))
+  expect_false(is_reference(attrs3, attrs))
+  expect_false(is_reference(node_cdr(attrs3), node_cdr(attrs)))
+})
+
+test_that("can zap non-existing attributes", {
+  x <- list()
+  out <- c_set_attribute(x, "foo", NULL)
+  expect_identical(out, list())
+  expect_false(is_reference(x, out))
+
+  x2 <- structure(list(), foo = 1, bar = 2)
+  out2 <- c_set_attribute(x2, "baz", NULL)
+  attrs2 <- get_attributes(out2)
+  expect_identical(attrs2, pairlist(foo = 1, bar = 2))
+  expect_reference(attrs2, get_attributes(x2))
+})
+
+test_that("r_parse()", {
+  expect_equal(.Call(rlang_test_parse, "{ foo; bar }"), quote({ foo; bar }))
+  expect_error(.Call(rlang_test_parse, "foo; bar"), "single expression")
+  expect_error(.Call(rlang_test_parse, "foo\n bar"), "single expression")
+})
+
+test_that("r_parse_eval()", {
+  parse_eval <- function(x, env = caller_env()) {
+    .Call(rlang_test_parse_eval, x, env)
+  }
+  foo <- "quux"
+  expect_identical(parse_eval("toupper(foo)"), "QUUX")
+  expect_error(parse_eval("toupper(foo); foo"), "single expression")
+})
+
+test_that("failed parses are printed if `rlang__verbose_errors` is non-NULL", {
+  err <- catch_cnd(expect_output(
+      regexp =  "foo; bar",
+      with_options(rlang__verbose_errors = TRUE,
+        .Call(rlang_test_parse, "foo; bar")
+      )
+    ))
+  expect_error(cnd_signal(err), regexp = "single expression")
+})
+
+test_that("r_warn_deprecated() warns once", {
+  expect_warning(warn_deprecated("retired", "foo"), "retired")
+  expect_no_warning(warn_deprecated("retired", "foo"))
+  expect_warning(warn_deprecated("retired", "bar"), "retired")
+})
+
+test_that("r_nms_are_duplicated() detects duplicates", {
+  out <- nms_are_duplicated(letters)
+  expect_identical(out, rep(FALSE, length(letters)))
+
+  out <- nms_are_duplicated(c("a", "b", "a", "a", "c", "c"))
+  expect_identical(out, c(FALSE, FALSE, TRUE, TRUE, FALSE, TRUE))
+})
+
+test_that("r_nms_are_duplicated() handles empty and missing names", {
+  out <- nms_are_duplicated(c("a", NA, NA, "b", "", "", "a"))
+  expect_identical(out, c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE))
 })

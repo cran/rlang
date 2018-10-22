@@ -14,7 +14,7 @@ test_that("quos() captures correct environment", {
 
   expect_identical(get_env(out$dots$x), out$env)
   expect_identical(get_env(out$dots$y), out$env)
-  expect_identical(get_env(out$dots$z), get_env())
+  expect_identical(get_env(out$dots$z), current_env())
 })
 
 test_that("dots are interpolated", {
@@ -58,7 +58,7 @@ test_that("dots can be spliced in", {
     var <- "var"
     list(
       out = g(!!! quos(...), bar(baz), !!! list(a = var, b = ~foo)),
-      env = get_env()
+      env = current_env()
     )
   }
   g <- function(...) {
@@ -111,7 +111,7 @@ test_that("dots are forwarded to named arguments", {
   inner <- function(...) fn(...)
   fn <- function(x) enquo(x)
 
-  env <- child_env(get_env())
+  env <- child_env(current_env())
   expect_identical(with_env(env, outer(foo(bar))), new_quosure(quote(foo(bar)), env))
 })
 
@@ -449,4 +449,50 @@ test_that("the missing argument is captured", {
 test_that("missing names are forwarded", {
   x <- set_names(1:2, c(NA, NA))
   expect_identical_(names(exprs(!!!x)), chr(na_chr, na_chr))
+})
+
+test_that("`.named` must be integerish", {
+  expect_error(exprs(foo, .named = 100.5), "must be a scalar logical")
+})
+
+test_that("auto-naming uses type_sum() (#573)", {
+  expect_named(quos(foo, !!(1:3), .named = TRUE), c("foo", "<int>"))
+
+  x <- list(env(), 1:3, letters)
+  expect_named(exprs_auto_name(x), c("<env>", "<int>", "<chr>"))
+})
+
+test_that("auto-naming supports the .data pronoun", {
+  exprs <- exprs(.data[[toupper("foo")]], .data$bar, .named = TRUE)
+  expect_named(exprs, c("FOO", "bar"))
+})
+
+test_that("enexprs() and enquos() support `.ignore_empty = 'all'` (#414)", {
+  myexprs <- function(what, x, y) enexprs(x = x, y = y, .ignore_empty = what)
+  expect_identical(myexprs("none"), exprs(x = , y = ))
+  expect_identical(myexprs("trailing"), exprs(x = , y = ))
+  expect_identical(myexprs("all"), exprs())
+
+  myquos <- function(what, x, y) enquos(x = x, y = y, .ignore_empty = what)
+  expect_identical(myquos("none"), quos(x = , y = ))
+  expect_identical(myquos("trailing"), quos(x = , y = ))
+  expect_identical(myquos("all"), quos())
+})
+
+test_that("enexprs() and enquos() support empty dots", {
+  myexprs <- function(what, ...) enexprs(..., .ignore_empty = what)
+  expect_identical(myexprs("none"), exprs())
+  expect_identical(myexprs("trailing"), exprs())
+  expect_identical(myexprs("all"), exprs())
+
+  myquos <- function(what, ...) enquos(..., .ignore_empty = what)
+  expect_identical(myquos("none"), quos())
+  expect_identical(myquos("trailing"), quos())
+  expect_identical(myquos("all"), quos())
+})
+
+test_that("supplying `!!!` with a name warns", {
+  expect_no_warning_(quos(!!!1, 2, !!!NULL))
+  expect_warning_(out <- quos(foo = !!!1, 2, bar = !!!NULL), "Only the operand's names are retained")
+  expect_identical(out, quos(1, 2))
 })
