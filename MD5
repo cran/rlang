@@ -1,4 +1,4 @@
-0eea1f00938bdd1ba222354a363db0c0 *DESCRIPTION
+fc1eaa873cbc02ce05a3c392a448db73 *DESCRIPTION
 cee93368e5dbd1dffdcf29456043200e *NAMESPACE
 a31e32db52bc30a555db2747f3b7b5f3 *NEWS.md
 ade0d49c42c88027a591f5f1adbb59d1 *R/arg.R
@@ -49,7 +49,7 @@ c385c983f67b71461d7b0951db6a9c5d *R/vec-squash.R
 68ea7e2cf2ded56ffef501534294055c *R/vec-utils.R
 92b06300bec98bc6fa98d2250bcfdb9a *R/vec.R
 e9ca1b4a0f36ba494dfef12953c228c0 *README.md
-951ba07b3a6dc74f7571506eae25dfb6 *build/rlang.pdf
+801eb12a49293883357cccb21eba6d7b *build/rlang.pdf
 f4d750826404c888c803c9fdf884d93d *configure
 54f22b352b8ea141f6a89485fd5a6916 *configure.win
 d5d71504d001dd7dec12f9c761bb9f34 *man/UQE.Rd
@@ -246,7 +246,7 @@ e5dfa19176fe46917df6c35e526fd646 *src/internal/dots.c
 b8e1a6d1f250ca347a4dd099090d601c *src/internal/dots.h
 d104e5b5217bba98352776650e685619 *src/internal/env-binding.c
 89d1c417dfdf35daf96afd2f105bfa9e *src/internal/env.c
-f355a6037ecbfcefeb00e3bef5b2f59c *src/internal/eval-tidy.c
+9f98867084e153fbb4873f80c68d161f *src/internal/eval-tidy.c
 4f59e263727c3af88c2dd0b9028673dc *src/internal/expr-interp-rotate.c
 d94334212a74d3d56e347d85675e5ea5 *src/internal/expr-interp-rotate.h
 ad030696a1b08816da66a622ba9e695f *src/internal/expr-interp.c
