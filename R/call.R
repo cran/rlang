@@ -2,16 +2,67 @@
 #'
 #' @description
 #'
-#' Language objects are (with symbols) one of the two types of
-#' [symbolic][is_symbolic] objects in R. These symbolic objects form
-#' the backbone of [expressions][is_expression]. They represent a value,
-#' unlike literal objects which are their own values. While symbols
-#' are directly [bound][env_bind] to a value, language objects
-#' represent _function calls_, which is why they are commonly referred
-#' to as calls.
+#' Quoted function calls are one of the two types of
+#' [symbolic][is_symbolic] objects in R. They represent the action of
+#' calling a function, possibly with arguments. There are two ways of
+#' creating a quoted call:
 #'
-#' `call2()` creates a call from a function name (or a literal
-#' function to inline in the call) and a list of arguments.
+#' * By [quoting][quotation] it. Quoting prevents functions from being
+#'   called. Instead, you get the description of the function call as
+#'   an R object. That is, a quoted function call.
+#'
+#' * By constructing it with [base::call()], [base::as.call()], or
+#'   `call2()`. In this case, you pass the call elements (the function
+#'   to call and the arguments to call it with) separately.
+#'
+#' See section below for the difference between `call2()` and the base
+#' constructors.
+#'
+#'
+#' @param .fn Function to call. Must be a callable object: a string,
+#'   symbol, call, or a function.
+#' @param ... Arguments to the call either in or out of a list. These dots
+#'   support [tidy dots][tidy-dots] features.
+#' @param .ns Namespace with which to prefix `.fn`. Must be a string
+#'   or symbol.
+#'
+#'
+#' @section Difference with base constructors:
+#'
+#' `call2()` is more flexible and convenient than `base::call()`:
+#'
+#' * The function to call can be a string or a [callable][is_callable]
+#'   object: a symbol, another call (e.g. a `$` or `[[` call), or a
+#'   function to inline. `base::call()` only supports strings and you
+#'   need to use `base::as.call()` to construct a call with a callable
+#'   object.
+#'
+#'   ```
+#'   call2(list, 1, 2)
+#'
+#'   as.call(list(list, 1, 2))
+#'   ```
+#'
+#' * The `.ns` argument is convenient for creating namespaced calls.
+#'
+#'   ```
+#'   call2("list", 1, 2, .ns = "base")
+#'
+#'   ns_call <- as.call(list(as.name("::"), as.name("list"), as.name("base")))
+#'   as.call(list(ns_call, 1, 2))
+#'   ```
+#'
+#' * `call2()` has [tidy dots][list2] support and you can splice lists
+#'   of arguments with `!!!`. With base R, you need to use `as.call()`
+#'   instead of `call()` if the arguments are in a list.
+#'
+#'   ```
+#'   args <- list(na.rm = TRUE, trim = 0)
+#'
+#'   call2("mean", 1:10, !!!args)
+#'
+#'   as.call(c(list(as.name("mean"), 1:10), args))
+#'   ```
 #'
 #'
 #' @section Life cycle:
@@ -25,14 +76,8 @@
 #' between S modes and R types. With hindsight we find it is better to
 #' use more meaningful type names.
 #'
-#' @param .fn Function to call. Must be a callable object: a string,
-#'   symbol, call, or a function.
-#' @param ... Arguments to the call either in or out of a list. These dots
-#'   support [tidy dots][tidy-dots] features.
-#' @param .ns Namespace with which to prefix `.fn`. Must be a string
-#'   or symbol.
+#'
 #' @seealso call_modify
-#' @export
 #' @examples
 #' # fn can either be a string, a symbol or a call
 #' call2("f", a = 1)
@@ -41,10 +86,11 @@
 #'
 #' #' Can supply arguments individually or in a list
 #' call2(quote(f), a = 1, b = 2)
-#' call2(quote(f), splice(list(a = 1, b = 2)))
+#' call2(quote(f), !!!list(a = 1, b = 2))
 #'
-#' # Creating namespaced calls:
+#' # Creating namespaced calls is easy:
 #' call2("fun", arg = quote(baz), .ns = "mypkg")
+#' @export
 call2 <- function(.fn, ..., .ns = NULL) {
   if (is_character(.fn)) {
     if (length(.fn) != 1) {
@@ -458,21 +504,34 @@ call_modify <- function(.call,
   }
 
   if (!is_call(expr)) {
-    abort_call_input_type()
+    abort_call_input_type(".call")
   }
 
   expr <- duplicate(expr, shallow = TRUE)
 
   # Discard "" names
+  nms <- names2(args)
   named <- have_name(args)
   named_args <- args[named]
-  nms <- names(named_args)
 
-  for (i in seq_along(named_args)) {
+  for (i in seq_along(args)) {
     tag <- sym(nms[[i]])
-    arg <- named_args[[i]]
+    arg <- args[[i]]
+
+    if (is_missing(tag)) {
+      if (is_zap(arg)) {
+        abort("Zap sentinels can't be unnamed")
+      }
+      node_append(expr, new_node(arg))
+      next
+    }
 
     if (identical(tag, dots_sym)) {
+      # Unwrap empty quosures. Useful for passing captured arguments
+      # to `call_modify()`.
+      if (identical(maybe_missing(arg), quo())) {
+        arg <- missing_arg()
+      }
       if (!is_missing(arg) && !is_zap(arg)) {
         abort("`...` arguments must be `zap()` or empty")
       }
@@ -518,21 +577,11 @@ call_modify <- function(.call,
     }
   }
 
-  if (any(!named)) {
-    remaining_args <- args[!named]
-
-    if (some(remaining_args, is_zap)) {
-      abort("Zap sentinels can't be unnamed")
-    }
-
-    expr <- node_append(expr, as.pairlist(remaining_args))
-  }
-
   set_expr(.call, expr)
 }
 
-abort_call_input_type <- function() {
-  abort("`.call` must be a quoted call")
+abort_call_input_type <- function(arg) {
+  abort(sprintf("`%s` must be a quoted call", arg))
 }
 
 #' Standardise a call
@@ -557,7 +606,7 @@ abort_call_input_type <- function() {
 call_standardise <- function(call, env = caller_env()) {
   expr <- get_expr(call)
   if (!is_call(expr)) {
-    abort_call_input_type()
+    abort_call_input_type("call")
   }
 
   if (is_frame(call)) {
@@ -609,7 +658,7 @@ call_fn <- function(call, env = caller_env()) {
   env <- get_env(call, env)
 
   if (!is_call(expr)) {
-    abort_call_input_type()
+    abort_call_input_type("call")
   }
 
   switch_call(expr,
@@ -621,8 +670,7 @@ call_fn <- function(call, env = caller_env()) {
   )
 }
 
-#' Extract function name of a call
-#'
+#' Extract function name or namespaced of a call
 #'
 #' @section Life cycle:
 #'
@@ -640,10 +688,6 @@ call_fn <- function(call, env = caller_env()) {
 #' call_name(quote(foo(bar)))
 #' call_name(quo(foo(bar)))
 #'
-#' # Or from a frame:
-#' foo <- function(bar) call_name(call_frame())
-#' foo(bar)
-#'
 #' # Namespaced calls are correctly handled:
 #' call_name(~base::matrix(baz))
 #'
@@ -651,10 +695,22 @@ call_fn <- function(call, env = caller_env()) {
 #' call_name(quote(foo$bar()))
 #' call_name(quote(foo[[bar]]()))
 #' call_name(quote(foo()()))
+#'
+#' # Extract namespace of a call with call_ns():
+#' call_ns(quote(base::bar()))
+#'
+#' # If not namespaced, call_ns() returns NULL:
+#' call_ns(quote(bar()))
 call_name <- function(call) {
-  call <- get_expr(call)
+  if (is_quosure(call) || is_formula(call)) {
+    call <- get_expr(call)
+  }
+
+  # FIXME: Disabled for the 0.3.1 release
+  # if (!is_call(call) || is_call(call, c("::", ":::"))) {
+
   if (!is_call(call)) {
-    abort_call_input_type()
+    abort_call_input_type("call")
   }
 
   switch_call(call,
@@ -662,6 +718,24 @@ call_name <- function(call) {
     namespaced = as_string(node_cadr(node_cdar(call))),
     NULL
   )
+}
+#' @rdname call_name
+#' @export
+call_ns <- function(call) {
+  if (is_quosure(call) || is_formula(call)) {
+    call <- get_expr(call)
+  }
+
+  if (!is_call(call)) {
+    abort_call_input_type("call")
+  }
+
+  head <- node_car(call)
+  if (is_call(head, c("::", ":::"))) {
+    as_string(node_cadr(head))
+  } else {
+    NULL
+  }
 }
 
 #' Extract arguments from a call
@@ -694,7 +768,7 @@ call_name <- function(call) {
 call_args <- function(call) {
   call <- get_expr(call)
   if (!is_call(call)) {
-    abort_call_input_type()
+    abort_call_input_type("call")
   }
 
   args <- as.list(call[-1])
@@ -705,7 +779,7 @@ call_args <- function(call) {
 call_args_names <- function(call) {
   call <- get_expr(call)
   if (!is_call(call)) {
-    abort_call_input_type()
+    abort_call_input_type("call")
   }
   names2(call[-1])
 }

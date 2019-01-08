@@ -48,6 +48,67 @@ is_symbol <- function(x, name = NULL) {
   as_string(x) %in% name
 }
 
+#' Cast symbol to string
+#'
+#' `as_string()` converts [symbols][sym] to character strings.
+#'
+#' @param x A string or symbol. If a string, the attributes are
+#'   removed, if any.
+#' @return A character vector of length 1.
+#'
+#' @section Unicode tags:
+#'
+#' Unlike [base::as.symbol()] and [base::as.name()], `as_string()`
+#' automatically transforms unicode tags such as `"<U+5E78>"` to the
+#' proper UTF-8 character. This is important on Windows because:
+#'
+#' * R on Windows has no UTF-8 support, and uses native encoding instead.
+#'
+#' * The native encodings do not cover all Unicode characters. For
+#'   example, Western encodings do not support CKJ characters.
+#'
+#' * When a lossy UTF-8 -> native transformation occurs, uncovered
+#'   characters are transformed to an ASCII unicode tag like `"<U+5E78>"`.
+#'
+#' * Symbols are always encoded in native. This means that
+#'   transforming the column names of a data frame to symbols might be
+#'   a lossy operation.
+#'
+#' * This operation is very common in the tidyverse because of data
+#'   masking APIs like dplyr where data frames are transformed to
+#'   environments. While the names of a data frame are stored as a
+#'   character vector, the bindings of environments are stored as
+#'   symbols.
+#'
+#' Because it reencodes the ASCII unicode tags to their UTF-8
+#' representation, the string -> symbol -> string roundtrip is
+#' more stable with `as_string()`.
+#'
+#' @seealso [as_name()] for a higher-level variant of `as_string()`
+#'   that automatically unwraps quosures.
+#' @examples
+#' # Let's create some symbols:
+#' foo <- quote(foo)
+#' bar <- sym("bar")
+#'
+#' # as_string() converts symbols to strings:
+#' foo
+#' as_string(foo)
+#'
+#' typeof(bar)
+#' typeof(as_string(bar))
+#' @export
+as_string <- function(x) {
+  coerce_type(x, "a string",
+    symbol = {
+      .Call(rlang_symbol_to_character, x)
+    },
+    string = {
+      attributes(x) <- NULL
+      x
+    }
+  )
+}
 
 namespace_sym <- quote(`::`)
 namespace2_sym <- quote(`:::`)

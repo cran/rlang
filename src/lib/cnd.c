@@ -52,55 +52,37 @@ sexp* r_interp_str(const char* fmt, ...) {
 static sexp* signal_soft_deprecated_call = NULL;
 void r_signal_soft_deprecated(const char* msg,
                               const char* id,
-                              const char* package,
                               sexp* env) {
   id = id ? id : msg;
   env = env ? env : r_empty_env;
-  if (!msg || !package) {
-    r_abort("Internal error: NULL `msg` or `package` in r_signal_soft_deprecated()");
+  if (!msg) {
+    r_abort("Internal error: NULL `msg` in r_signal_soft_deprecated()");
   }
 
   sexp* msg_ = KEEP(r_chr(msg));
   sexp* id_ = KEEP(r_chr(id));
-  sexp* package_ = KEEP(r_chr(package));
 
-  r_eval_with_wxyz(signal_soft_deprecated_call, r_base_env, msg_, id_, package_, env);
+  r_eval_with_xyz(signal_soft_deprecated_call, r_base_env, msg_, id_, env);
 
-  FREE(3);
+  FREE(2);
 }
 
 static void signal_retirement(const char* source, const char* buf);
-static sexp* deprecated_env = NULL;
+static sexp* warn_deprecated_call = NULL;
 
 void r_warn_deprecated(const char* id, const char* fmt, ...) {
   char buf[BUFSIZE];
   INTERP(buf, fmt, ...);
+  sexp* msg_ = KEEP(r_chr(buf));
 
   id = id ? id : buf;
-  sexp* id_ = r_sym(id);
+  sexp* id_ = KEEP(r_chr(id));
 
-  // Warn once per session
-  if (r_env_has(deprecated_env, id_)) {
-    return;
-  }
-  r_env_poke(deprecated_env, id_, r_shared_true);
-
-
-  const char* note;
-  if (r_has_colour()) {
-    note = "\n\033[90mThis warning is displayed once per session.\033[39m";
-  } else {
-    note = "\nThis warning is displayed once per session.";
-  }
-
-  if (strlen(buf) + strlen(note) + 1 < BUFSIZE) {
-    strcat(buf, note);
-  }
-
-  signal_retirement(".Deprecated(msg = x)", buf);
+  r_eval_with_xy(warn_deprecated_call, r_base_env, msg_, id_);
+  FREE(2);
 }
 
-void r_abort_defunct(const char* fmt, ...) {
+void r_stop_defunct(const char* fmt, ...) {
   char buf[BUFSIZE];
   INTERP(buf, fmt, ...);
 
@@ -275,8 +257,9 @@ void r_init_library_cnd() {
   cnd_signal_call = r_parse(cnd_signal_source);
   r_mark_precious(cnd_signal_call);
 
-  deprecated_env = rlang_ns_get("deprecation_env");
+  warn_deprecated_call = r_parse("rlang:::warn_deprecated(x, id = y)");
+  r_mark_precious(warn_deprecated_call);
 
-  signal_soft_deprecated_call = r_parse("rlang:::signal_soft_deprecated(w, id = x, package = y, env = z)");
+  signal_soft_deprecated_call = r_parse("rlang:::signal_soft_deprecated(x, id = y, env = z)");
   r_mark_precious(signal_soft_deprecated_call);
 }

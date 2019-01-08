@@ -68,6 +68,8 @@ test_that("as_box_if() ensures boxed value if predicate returns TRUE", {
   expect_null(unbox(boxbox))
 
   expect_null(as_box_if(NULL, is_vector, "null_box"))
+
+  expect_error(as_box_if(NULL, ~ 10), "Predicate functions must return a single")
 })
 
 test_that("unboxing a non-boxed value is an error", {
@@ -77,4 +79,32 @@ test_that("unboxing a non-boxed value is an error", {
 test_that("zap() creates a zap", {
   expect_is(zap(), "rlang_zap")
   expect_true(is_zap(zap()))
+})
+
+test_that("can pass additional attributes to boxes", {
+  box <- new_box(NA, "foo", bar = "baz")
+  expect_identical(box %@% bar, "baz")
+})
+
+test_that("done() boxes values", {
+  expect_true(is_done_box(done(3)))
+  expect_identical(unbox(done(3)), 3)
+  expect_identical(done(3) %@% empty, FALSE)
+})
+
+test_that("done() can be empty", {
+  empty <- done()
+
+  expect_identical(unbox(empty), missing_arg())
+
+  expect_true(is_done_box(empty))
+  expect_is(empty, "rlang_box_done")
+  expect_identical(empty %@% empty, TRUE)
+
+  expect_true(is_done_box(empty, empty = TRUE))
+  expect_false(is_done_box(empty, empty = FALSE))
+
+  nonempty <- done(missing_arg())
+  expect_false(is_done_box(nonempty, empty = TRUE))
+  expect_true(is_done_box(nonempty, empty = FALSE))
 })

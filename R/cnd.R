@@ -535,10 +535,10 @@ interrupt <- function() {
 #' # Note how execution of `fn()` continued normally after dealing
 #' # with that particular message.
 #'
-#' # Since cnd_muffle() is a calling handler itself, it can also be
-#' # passed to with_handlers() directly:
+#' # cnd_muffle() can also be passed to with_handlers() as a calling
+#' # handler:
 #' with_handlers(fn(),
-#'   my_particular_msg = cnd_muffle
+#'   my_particular_msg = calling(cnd_muffle)
 #' )
 cnd_muffle <- function(cnd) {
   switch(cnd_type(cnd),
@@ -552,27 +552,34 @@ cnd_muffle <- function(cnd) {
 
   abort("Can't find a muffling restart")
 }
-class(cnd_muffle) <- c("calling", "handler")
 
 #' Catch a condition
 #'
 #' This is a small wrapper around `tryCatch()` that captures any
 #' condition signalled while evaluating its argument. It is useful for
-#' debugging and unit testing.
+#' situations where you expect a specific condition to be signalled,
+#' for debugging, and for unit testing.
 #'
-#' @param expr Expression to be evaluated with a catch-all condition
+#' @param expr Expression to be evaluated with a catching condition
 #'   handler.
+#' @param classes A character vector of condition classes to catch. By
+#'   default, catches all conditions.
 #' @return A condition if any was signalled, `NULL` otherwise.
 #' @export
 #' @examples
 #' catch_cnd(10)
 #' catch_cnd(abort("an error"))
 #' catch_cnd(cnd_signal("my_condition", .msg = "a condition"))
-catch_cnd <- function(expr) {
-  tryCatch(condition = identity, {
-    force(expr)
-    return(NULL)
-  })
+catch_cnd <- function(expr, classes = "condition") {
+  stopifnot(is_character(classes))
+  handlers <- rep_named(classes, list(identity))
+
+  eval_bare(rlang::expr(
+    tryCatch(!!!handlers, {
+      force(expr)
+      return(NULL)
+    })
+  ))
 }
 
 #' @export
@@ -629,13 +636,13 @@ print.rlang_error <- function(x,
   }
 
   if (!is_null(x$parent)) {
-    print(x$parent, ..., child = x, simplify = simplify, fields = fields)
+    print.rlang_error(x$parent, ..., child = x, simplify = simplify, fields = fields)
   }
 
-  # Recommend summary() for printing the full backtrace. Only do it
-  # after having printed all parent errors first.
+  # Recommend printing the full backtrace. Only do it after having
+  # printed all parent errors first.
   if (simplify == "branch" && is_null(x$parent) && !is_null(trace)) {
-    cat_line(silver("Call `summary(rlang::last_error())` to see the full backtrace"))
+    cat_line(silver("Call `rlang::last_trace()` to see the full backtrace"))
   }
 
   invisible(x)
@@ -763,12 +770,123 @@ format_onerror_backtrace <- function(trace) {
   )
 }
 
-add_backtrace <- function() {
-  trace <- trace_back()
-  trace <- trace_subset(trace, -trace_length(trace))
+#' Add backtrace from error handler
+#'
+#' @description
+#'
+#' Set the `error` global option to `quote(rlang::entrace())` to
+#' transform base errors to rlang errors. These enriched errors
+#' include a backtrace. The RProfile is a good place to set the
+#' handler.
+#'
+#' `entrace()` also works as a [calling][calling] handler, though it
+#' is often more practical to use the higher-level function
+#' [with_abort()].
+#'
+#' @inheritParams trace_back
+#' @param cnd When `entrace()` is used as a calling handler, `cnd` is
+#'   the condition to handle.
+#' @param ... Unused. These dots are for future extensions.
+#'
+#' @seealso [with_abort()] to promote conditions to rlang errors.
+#' @examples
+#' if (FALSE) {  # Not run
+#'
+#' # Set the error handler in your RProfile like this:
+#' if (requireNamespace("rlang", quietly = TRUE)) {
+#'   options(error = rlang::entrace)
+#' }
+#'
+#' }
+#' @export
+entrace <- function(cnd, ..., top = NULL, bottom = NULL) {
+  check_dots_empty(...)
 
-  stop_call <- sys.call(-1)
-  stop_frame <- sys.frame(-1)
+  if (!missing(cnd) && inherits(cnd, "rlang_error")) {
+    return()
+  }
+
+  if (is_null(bottom)) {
+    nframe <- sys.nframe() - 1
+    info <- signal_context_info(nframe)
+    bottom <- sys.frame(info[[2]])
+  }
+  trace <- trace_back(top = top, bottom = bottom)
+
+  if (missing(cnd)) {
+    entrace_handle_top(trace)
+  } else {
+    abort(cnd$message %||% "", error = cnd, trace = trace)
+  }
+}
+
+signal_context_info <- function(nframe) {
+  first <- sys_body(nframe)
+
+  if (is_same_body(first, body(.handleSimpleError))) {
+    if (is_same_body(sys_body(nframe - 1), body(stop))) {
+      return(list("stop_message", nframe - 2))
+    } else {
+      return(list("stop_native", nframe - 1))
+    }
+  }
+
+  if (is_same_body(first, body(stop))) {
+    if (is_same_body(sys_body(nframe - 1), body(abort))) {
+      return(list("stop_rlang", nframe - 2))
+    } else {
+      return(list("stop_condition", nframe - 1))
+    }
+  }
+
+  if (is_same_body(first, body(signalCondition))) {
+    if (from_withrestarts(nframe - 1) && is_same_body(sys_body(nframe - 4), body(message))) {
+      if (is_same_body(sys_body(nframe - 5), body(inform))) {
+        return(list("message_rlang", nframe - 6))
+      } else {
+        return(list("message", nframe - 5))
+      }
+    } else {
+      return(list("condition", nframe - 1))
+    }
+  }
+
+  if (from_withrestarts(nframe)) {
+    withrestarts_caller <- sys_body(nframe - 3)
+    if (is_same_body(withrestarts_caller, body(.signalSimpleWarning))) {
+      if (is_same_body(sys_body(nframe - 4), body(warning))) {
+        return(list("warning_message", nframe - 5))
+      } else {
+        return(list("warning_native", nframe - 4))
+      }
+    } else if (is_same_body(withrestarts_caller, body(warning))) {
+      if (is_same_body(sys_body(nframe - 4), body(warn))) {
+        return(list("warning_rlang", nframe - 5))
+      } else {
+        return(list("warning_condition", nframe - 4))
+      }
+    }
+  }
+
+  list("unknown", nframe)
+}
+
+from_withrestarts <- function(nframe) {
+  is_call(sys.call(nframe), "doWithOneRestart") &&
+    is_same_body(sys_body(nframe - 2), body(withRestarts))
+}
+sys_body <- function(n) {
+  body(sys.function(n))
+}
+
+entrace_handle_top <- function(trace) {
+  # Happens with ctrl-c at top-level
+  if (!trace_length(trace)) {
+    return()
+  }
+
+  stop_call <- sys.call(-2)
+  stop_frame <- sys.frame(-2)
   cnd <- stop_frame$cond
 
   # False for errors thrown from the C side
@@ -803,16 +921,25 @@ add_backtrace <- function() {
   NULL
 }
 
+add_backtrace <- function() {
+  # Warnings don't go through when error is being handled
+  msg <- "Warning: `add_backtrace()` is now exported as `enframe()` as of rlang 0.3.1"
+  cat_line(msg, file = stderr())
+  entrace(bottom = sys.frame(-1))
+}
+
 #' Promote all errors to rlang errors
 #'
 #' @description
 #'
-#' `with_abort()` promotes all errors as if they were thrown with
+#' `with_abort()` promotes conditions as if they were thrown with
 #' [abort()]. These errors embed a [backtrace][trace_back]. They are
 #' particularly suitable to be set as *parent errors* (see `parent`
 #' argument of [abort()]).
 #'
 #' @param expr An expression run in a context where errors are
+#'   promoted to rlang errors.
+#' @param classes Character vector of condition classes that should be
 #'   promoted to rlang errors.
 #'
 #' @details
@@ -853,85 +980,8 @@ add_backtrace <- function() {
 #' # Reset to default
 #' options(rlang_trace_top_env = NULL)
 #' @export
-with_abort <- function(expr) {
-  withCallingHandlers(expr, error = function(err) {
-    if (inherits(err, "rlang_error")) {
-      return()
-    }
-
-    trace <- trace_back(bottom = 2)
-
-    # Find second-to-last tree - last tree is handleSimpleError()
-    i <- length(trace_level(trace)) - 1L
-    trace <- trace_subset_across(trace, i)
-
-    abort(err$message %||% "", error = err, trace = trace)
-  })
-}
-
-#' Signal deprecation
-#'
-#' `signal_soft_deprecated()` warns only if option is set, the package
-#'  is attached, or if called from the global environment.
-#'  `warn_deprecated()` warns unconditionally. Both functions warn
-#'  only once.
-#'
-#' @param msg The deprecation message.
-#' @param id The id of the deprecation. A warning is issued only once
-#'   for each `id`. Defaults to `msg`, but you should give a unique ID
-#'   when the message is built programmatically and depends on inputs.
-#' @param package The soft-deprecation warning is forced when this
-#'   package is attached. Automatically detected from the caller
-#'   environment.
-#'
-#' @noRd
-NULL
-
-signal_soft_deprecated <- function(msg,
-                                   id = msg,
-                                   package = NULL,
-                                   env = caller_env(2)) {
-  if (is_true(peek_option("lifecycle_disable_verbose_retirement"))) {
-    return(invisible(NULL))
-  }
-
-  if (is_true(peek_option("lifecycle_force_verbose_retirement")) ||
-      is_reference(env, global_env())) {
-    warn_deprecated(msg, id)
-    return(invisible(NULL))
-  }
-
-  if (package_attached(package, caller_env())) {
-    warn_deprecated(msg, id)
-    return(invisible(NULL))
-  }
-
-  signal(msg, "lifecycle_soft_deprecated")
-}
-
-package_attached <- function(package, env) {
-  if (is_null(package)) {
-    top <- topenv(env)
-    if (!is_namespace(top)) {
-      abort("`signal_soft_deprecated()` must be called from a package function")
-    }
-    package <- ns_env_name(top)
-  } else {
-    stopifnot(is_string(package))
-  }
-
-  pkg_env_name(package) %in% search()
-}
-
-warn_deprecated <- function(msg, id = msg) {
-  if (is_true(peek_option("lifecycle_disable_verbose_retirement"))) {
-    return(invisible(NULL))
-  }
-
-  .Call(rlang_warn_deprecated_once, id, msg)
-}
-deprecation_env <- new.env(parent = emptyenv())
-
-abort_defunct <- function(msg) {
-  .Defunct(msg = msg)
+with_abort <- function(expr, classes = "error") {
+  handlers <- rep_named(classes, list(entrace))
+  handle_call <- rlang::expr(withCallingHandlers(expr, !!!handlers))
+  .Call(rlang_eval, handle_call, current_env())
 }

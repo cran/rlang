@@ -107,7 +107,7 @@ static inline void mark_spliced_dots(sexp* x) {
   r_poke_attribute(x, rlang_spliced_flag, rlang_spliced_flag);
 }
 
-void signal_retired_splice() {
+void signal_retired_splice(sexp* env) {
   const char* msg =
     "Unquoting language objects with `!!!` is soft-deprecated as of rlang 0.3.0.\n"
     "Please use `!!` instead.\n"
@@ -118,11 +118,12 @@ void signal_retired_splice() {
     "  # Good:\n"
     "  dplyr::select(data, !!enquo(x))    # Unquote single quosure\n"
     "  dplyr::select(data, !!!enquos(x))  # Splice list of quosures\n";
-    r_signal_soft_deprecated(msg, msg, "rlang", r_empty_env);
+    r_signal_soft_deprecated(msg, msg, env);
 }
 
-// Maintain parity with deep_big_bang_coerce() in expr-interp.c
-static sexp* dots_big_bang_coerce(sexp* x) {
+// Maintain parity with deep_big_bang_coerce() in expr-interp.c.
+// The `env` argument is only needed for the soft-deprecation warning.
+static sexp* dots_big_bang_coerce(sexp* x, sexp* env) {
   switch (r_typeof(x)) {
   case r_type_null:
   case r_type_pairlist:
@@ -151,7 +152,7 @@ static sexp* dots_big_bang_coerce(sexp* x) {
     }
     // else fallthrough
   case r_type_symbol:
-    signal_retired_splice();
+    signal_retired_splice(env);
     return r_new_list(x, NULL);
 
   default:
@@ -162,8 +163,8 @@ static sexp* dots_big_bang_coerce(sexp* x) {
   }
 }
 
-static sexp* dots_value_big_bang(sexp* x) {
-  x = KEEP(dots_big_bang_coerce(x));
+static sexp* dots_value_big_bang(sexp* x, sexp* env) {
+  x = KEEP(dots_big_bang_coerce(x, env));
   r_push_class(x, "spliced");
 
   FREE(1);
@@ -173,7 +174,7 @@ static sexp* dots_value_big_bang(sexp* x) {
 static sexp* dots_big_bang(struct dots_capture_info* capture_info,
                            sexp* expr, sexp* env, bool quosured) {
   sexp* value = KEEP(r_eval(expr, env));
-  value = KEEP(dots_big_bang_coerce(value));
+  value = KEEP(dots_big_bang_coerce(value, env));
   mark_spliced_dots(value);
 
   r_ssize n = r_length(value);
@@ -336,7 +337,7 @@ static sexp* dots_unquote(sexp* dots, struct dots_capture_info* capture_info) {
       if (expr == r_null) {
         expr = empty_spliced_list();
       } else {
-        expr = dots_value_big_bang(expr);
+        expr = dots_value_big_bang(expr, env);
         capture_info->count += 1;
       }
       FREE(1);
@@ -388,7 +389,7 @@ static enum dots_homonyms arg_match_homonyms(sexp* homonyms) {
 
 void signal_soft_deprecated_width() {
   const char* msg = "`.named` can no longer be a width";
-  r_signal_soft_deprecated(msg, msg, "rlang", r_empty_env);
+  r_signal_soft_deprecated(msg, msg, r_empty_env);
 }
 static bool should_auto_name(sexp* named) {
   if (r_length(named) != 1) {
@@ -439,6 +440,7 @@ static sexp* init_names(sexp* x) {
 sexp* capturedots(sexp* frame);
 
 sexp* dots_expand(sexp* dots, struct dots_capture_info* capture_info) {
+  int n_protect = 0;
   sexp* dots_names = r_vec_names(dots);
 
   sexp** dots_names_ptr = NULL;
@@ -446,12 +448,12 @@ sexp* dots_expand(sexp* dots, struct dots_capture_info* capture_info) {
     dots_names_ptr = r_chr_deref(dots_names);
   }
 
-  sexp* out = KEEP(r_new_vector(r_type_list, capture_info->count));
+  sexp* out = KEEP_N(r_new_vector(r_type_list, capture_info->count), n_protect);
 
   // Add default empty names unless dots are captured by values
   sexp* out_names = r_null;
   if (capture_info->type != DOTS_VALUE || dots_names != r_null) {
-    out_names = init_names(out);
+    out_names = KEEP_N(init_names(out), n_protect);
   }
 
   r_ssize n = r_length(dots);
@@ -463,7 +465,7 @@ sexp* dots_expand(sexp* dots, struct dots_capture_info* capture_info) {
     if (is_spliced_dots(elt)) {
       if (dots_names_ptr && *dots_names_ptr != r_empty_str) {
         const char* msg = "`!!!` shouldn't be supplied with a name. Only the operand's names are retained.";
-        r_signal_soft_deprecated(msg, msg, "rlang", r_empty_env);
+        r_signal_soft_deprecated(msg, msg, r_empty_env);
       }
 
       sexp* names = r_vec_names(elt);
@@ -505,14 +507,14 @@ sexp* dots_expand(sexp* dots, struct dots_capture_info* capture_info) {
 
   out = maybe_auto_name(out, capture_info->named);
 
-  FREE(1);
+  FREE(n_protect);
   return out;
 }
 
 static sexp* dots_keep(sexp* dots, sexp* nms, bool first) {
   r_ssize n = r_length(dots);
 
-  sexp* dups = r_nms_are_duplicated(nms, !first);
+  sexp* dups = KEEP(r_nms_are_duplicated(nms, !first));
   r_ssize out_n = n - r_lgl_sum(dups);
 
   sexp* out = KEEP(r_new_vector(r_type_list, out_n));
@@ -530,7 +532,7 @@ static sexp* dots_keep(sexp* dots, sexp* nms, bool first) {
     }
   }
 
-  FREE(2);
+  FREE(3);
   return out;
 }
 

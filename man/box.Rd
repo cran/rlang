@@ -4,32 +4,23 @@
 \alias{box}
 \alias{new_box}
 \alias{is_box}
-\alias{as_box}
-\alias{as_box_if}
 \alias{unbox}
 \title{Box a value}
 \usage{
-new_box(x, class = NULL)
+new_box(.x, class = NULL, ...)
 
 is_box(x, class = NULL)
-
-as_box(x, class = NULL)
-
-as_box_if(.x, .p, .class = NULL, ...)
 
 unbox(box)
 }
 \arguments{
+\item{class}{For \code{new_box()}, an additional class for the
+boxed value (in addition to \code{rlang_box}). For \code{is_box()}, a class
+or vector of classes passed to \code{\link[=inherits_all]{inherits_all()}}.}
+
+\item{...}{Additional attributes passed to \code{\link[base:structure]{base::structure()}}.}
+
 \item{x, .x}{An R object.}
-
-\item{class, .class}{For \code{new_box()}, an additional class for the
-boxed value (in addition to \code{rlang_box}). For \code{is_box()},
-\code{as_box()} and \code{as_box_if()}, a class (or vector of classes) to
-be passed to \code{\link[=inherits_all]{inherits_all()}}.}
-
-\item{.p}{A predicate function.}
-
-\item{...}{Arguments passed to \code{.p}.}
 
 \item{box}{A boxed value to unbox.}
 }

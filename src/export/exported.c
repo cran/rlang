@@ -33,17 +33,6 @@ sexp* rlang_interrupt() {
   return r_null;
 }
 
-sexp* rlang_warn_deprecated_once(sexp* id, sexp* msg) {
-  if (r_typeof(id) != r_type_character ||
-      r_length(id) != 1 ||
-      r_typeof(msg) != r_type_character ||
-      r_length(msg) != 1) {
-    r_abort("`id` and `msg` must be scalar strings");
-  }
-  r_warn_deprecated(r_chr_get_c_string(id, 0), r_chr_get_c_string(msg, 0));
-  return r_null;
-}
-
 
 // env.c
 
@@ -76,6 +65,10 @@ sexp* rlang_env_frame(sexp* env) {
 }
 sexp* rlang_env_hash_table(sexp* env) {
   return HASHTAB(env);
+}
+
+sexp* rlang_env_inherits(sexp* env, sexp* ancestor) {
+  return r_lgl(r_env_inherits(env, ancestor, r_empty_env));
 }
 
 

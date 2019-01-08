@@ -65,12 +65,14 @@ test_that("as_environment() dispatches correctly", {
 })
 
 test_that("env_inherits() finds ancestor", {
-  env <- child_env(current_env())
-  env <- child_env(env)
+  env <- env(env(current_env()))
   expect_true(env_inherits(env, current_env()))
   expect_false(env_inherits(env, ns_env("utils")))
+})
 
-  expect_error(env_inherits(empty_env(), empty_env()), "has no parent")
+test_that("env_inherits() detects empty environment", {
+  expect_false(env_inherits(empty_env(), empty_env()))
+  expect_true(env_inherits(env(empty_env()), empty_env()))
 })
 
 test_that("env() creates child of current environment", {
@@ -445,7 +447,7 @@ test_that("env_name() requires an environment", {
 #  Lifecycle ---------------------------------------------------------
 
 test_that("env API warns with non-environments", {
-  scoped_options(lifecycle_force_verbose_retirement = TRUE)
+  scoped_options(lifecycle_verbose_soft_deprecation = TRUE)
 
   f <- local(~foo)
   expect_warning(env_parent(f) <- empty_env(), "deprecated")

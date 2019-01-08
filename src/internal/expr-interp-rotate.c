@@ -332,6 +332,11 @@ static sexp* maybe_rotate(sexp* op, sexp* env, struct ast_rotation_info* info) {
  * there is a &struct ast_rotation_info on the stack.
  */
 sexp* fixup_interp(sexp* x, sexp* env) {
+  // Happens with constructed calls without arguments such as `/`()
+  if (r_node_cdr(x) == r_null) {
+    return x;
+  }
+
   struct ast_rotation_info rotation_info;
   initialise_rotation_info(&rotation_info);
 
@@ -533,6 +538,11 @@ static sexp* node_list_interp_fixup(sexp* x, sexp* parent, sexp* env,
  */
 static void node_list_interp_fixup_rhs(sexp* rhs, sexp* rhs_node, sexp* parent,
                                        sexp* env, struct ast_rotation_info* info) {
+  // Happens with constructed calls like `/`(1)
+  if (rhs_node == r_null) {
+    return;
+  }
+
   // An upper pivot is an operand of a !! call that is a binary
   // operation whose precedence is problematic (between prec(`!`) and
   // prec(`!!`))

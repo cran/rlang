@@ -59,26 +59,6 @@ test_that("expr_name() with symbols, calls, and literals", {
   expect_error(expr_name(env()), "must quote")
 })
 
-test_that("label() with symbols, calls, and literals", {
-  expect_identical(label(quote(foo)), "foo")
-  expect_identical(label(quote(foo(bar))), "foo(bar)")
-  expect_identical(label(1L), "1L")
-  expect_identical(label("foo"), "\"foo\"")
-  expect_identical(label(function() NULL), "<fn>")
-  expect_identical(label(expr(function() { a; b })), "function() ...")
-  expect_identical(label(1:2), "<int>")
-  expect_identical(label(env()), "<env>")
-})
-
-test_that("label() supports special objects", {
-  expect_match(label(quote(foo := bar)), ":=")
-  expect_identical(label(quo(foo)), "foo")
-  expect_identical(label(quo(foo(!!quo(bar)))), "foo(bar)")
-  expect_identical(label(~foo), "~foo")
-  expect_identical(label(NULL), "NULL")
-})
-
-
 # --------------------------------------------------------------------
 
 test_that("get_expr() supports closures", {
@@ -94,4 +74,10 @@ test_that("set_expr() supports closures", {
 test_that("expressions are deparsed and printed", {
   expect_output(expr_print(1:2), "<int: 1L, 2L>")
   expect_identical(expr_deparse(1:2), "<int: 1L, 2L>")
+})
+
+test_that("imaginary numbers with real part are not syntactic", {
+  expect_true(is_syntactic_literal(0i))
+  expect_true(is_syntactic_literal(na_cpl))
+  expect_false(is_syntactic_literal(1 + 1i))
 })

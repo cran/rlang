@@ -25,11 +25,63 @@ test_that("as_closure() handles primitive functions", {
   expect_identical(as_closure(`c`)(1, 3, 5), c(1, 3, 5))
   expect_identical(as_closure(is.null)(1), FALSE)
   expect_identical(as_closure(is.null)(NULL), TRUE)
+})
 
-  eval_prim <- eval(quote(sys.function()))
-  eval_clos <- as_closure(eval_prim)
-  expect_identical(typeof(eval_clos), "closure")
-  expect_identical(eval_clos(quote(data.frame), base_env()), data.frame)
+test_that("as_closure() supports base-style and purrr-style arguments to binary operators", {
+  and <- as_closure(`&&`)
+
+  expect_error(and(), "Must supply `e1` or `.x` to binary operator")
+  expect_error(and(TRUE), "Must supply `e2` or `.y` to binary operator")
+
+  expect_error(and(.x = TRUE, e1 = TRUE), "Can't supply both `e1` and `.x` to binary operator")
+  expect_error(and(TRUE, .y = TRUE, e2 = TRUE), "Can't supply both `e2` and `.y` to binary operator")
+
+  expect_identical(and(FALSE, FALSE), FALSE)
+  expect_identical(and(TRUE, FALSE), FALSE)
+  expect_identical(and(FALSE, TRUE), FALSE)
+  expect_identical(and(TRUE, TRUE), TRUE)
+
+  expect_identical(and(.y = FALSE, TRUE), FALSE)
+  expect_identical(and(e2 = FALSE, TRUE), FALSE)
+  expect_identical(and(.y = FALSE, e1 = TRUE), FALSE)
+  expect_identical(and(e2 = FALSE, .x = TRUE), FALSE)
+  expect_identical(and(.y = FALSE, TRUE), FALSE)
+  expect_identical(and(e2 = FALSE, TRUE), FALSE)
+})
+
+test_that("as_closure() supports base-style and purrr-style arguments to versatile operators", {
+  minus <- as_closure(`-`)
+
+  expect_error(minus(), "Must supply `e1` or `.x` to binary operator")
+  expect_error(minus(.y = 3), "Must supply `e1` or `.x` to binary operator")
+
+  expect_error(minus(.x = 3, e1 = 1), "Can't supply both `e1` and `.x` to binary operator")
+  expect_error(minus(0, .y = 3, e2 = 1), "Can't supply both `e2` and `.y` to binary operator")
+
+  expect_identical(minus(3), -3)
+  expect_identical(minus(e1 = 3), -3)
+  expect_identical(minus(.x = 3), -3)
+
+  expect_identical(minus(1, 3), -2)
+  expect_identical(minus(3, 1), 2)
+
+  expect_identical(minus(.y = 3, 1), -2)
+  expect_identical(minus(e2 = 3, 1), -2)
+  expect_identical(minus(.y = 3, e1 = 1), -2)
+  expect_identical(minus(e2 = 3, .x = 1), -2)
+  expect_identical(minus(.y = 1, 3), 2)
+  expect_identical(minus(e2 = 1, 3), 2)
+})
+
+test_that("as_closure(`||`) shortcircuits", {
+  or <- as_closure(`||`)
+
+  expect_error(or(), "Must supply `e1` or `.x` to binary operator")
+  expect_error(or(FALSE), "Must supply `e2` or `.y` to binary operator")
+
+  expect_identical(or(TRUE), TRUE)
+  expect_identical(or(.x = TRUE), TRUE)
+  expect_identical(or(e1 = TRUE), TRUE)
 })
 
 test_that("as_closure() handles operators", {
@@ -202,4 +254,30 @@ test_that("as_function() adds a class to lambda functions", {
 
 test_that("fn_env() returns base namespace for primitives", {
   expect_reference(fn_env(base::list), ns_env("base"))
+})
+
+test_that("as_closure() wrappers dispatch properly", {
+  scoped_bindings(.env = global_env(),
+    as.character.foobar = function(...) "dispatched!"
+  )
+  x <- structure(list(), class = "foobar")
+  expect_identical(as_closure(as.character)(x), "dispatched!")
+})
+
+test_that("as_closure() wrappers are not masked", {
+  scoped_bindings(
+    .env = global_env(),
+    as.character = function(...) abort("tilt")
+  )
+  expect_identical(as_closure(as.character)(1), "1")
+})
+
+test_that("arguments of closured primitives are matched by name before `...` (tidyverse/purrr#411)", {
+  expect_false(as_closure(isS4)("foo"))
+})
+
+test_that("arguments of closured primitives are matched by name after `...`", {
+  fn <- as_closure(min)
+  expect_true(is_na(fn(1, NA)))
+  expect_identical(fn(na.rm = TRUE, 1, NA), 1)
 })

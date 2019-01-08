@@ -273,10 +273,12 @@ ensyms <- function(...,
     homonyms = .homonyms,
     check_assign = .check_assign
   )
-  if (!every(exprs, function(x) is_symbol(x) || is_string(x))) {
-    abort("Must supply symbols or strings as argument")
-  }
-  map(exprs, sym)
+  map(exprs, function(expr) {
+    if (is_quosure(expr)) {
+      expr <- quo_get_expr(expr)
+    }
+    sym(expr)
+  })
 }
 
 
@@ -428,7 +430,7 @@ exprs_auto_name <- function(exprs, width = NULL, printer = NULL) {
 
   have_name <- have_name(exprs)
   if (any(!have_name)) {
-    nms <- map_chr(exprs[!have_name], label)
+    nms <- map_chr(exprs[!have_name], as_label)
     names(exprs)[!have_name] <- nms
   }
 

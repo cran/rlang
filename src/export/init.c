@@ -107,7 +107,7 @@ extern sexp* rlang_is_raw(sexp*, sexp*);
 extern sexp* rlang_is_data_mask(sexp*);
 extern sexp* rlang_data_pronoun_get(sexp*, sexp*);
 extern sexp* rlang_cnd_type(sexp*);
-extern sexp* rlang_warn_deprecated_once(sexp*, sexp*);
+extern sexp* rlang_env_inherits(sexp*, sexp*);
 
 // Library initialisation defined below
 sexp* rlang_library_load();
@@ -127,6 +127,8 @@ extern sexp* rlang_test_node_list_clone_until(sexp*, sexp*);
 extern sexp* rlang_test_sys_frame(sexp*);
 extern sexp* rlang_test_sys_call(sexp*);
 extern sexp* rlang_test_nms_are_duplicated(sexp*, sexp*);
+extern sexp* rlang_test_Rf_warningcall(sexp*, sexp*);
+extern sexp* rlang_test_Rf_errorcall(sexp*, sexp*);
 
 static const r_callable r_callables[] = {
   {"rlang_library_load",                (r_fn_ptr) &rlang_library_load, 0},
@@ -197,6 +199,8 @@ static const r_callable r_callables[] = {
   {"rlang_test_set_attribute",          (r_fn_ptr) &r_set_attribute, 3},
   {"rlang_test_sys_frame",              (r_fn_ptr) &rlang_test_sys_frame, 1},
   {"rlang_test_sys_call",               (r_fn_ptr) &rlang_test_sys_call, 1},
+  {"rlang_test_Rf_warningcall",         (r_fn_ptr) &rlang_test_Rf_warningcall, 2},
+  {"rlang_test_Rf_errorcall",           (r_fn_ptr) &rlang_test_Rf_errorcall, 2},
   {"rlang_r_string",                    (r_fn_ptr) &rlang_r_string, 1},
   {"rlang_exprs_interp",                (r_fn_ptr) &rlang_exprs_interp, 6},
   {"rlang_quos_interp",                 (r_fn_ptr) &rlang_quos_interp, 6},
@@ -245,7 +249,7 @@ static const r_callable r_callables[] = {
   {"rlang_is_character",                (r_fn_ptr) &rlang_is_character, 2},
   {"rlang_is_raw",                      (r_fn_ptr) &rlang_is_raw, 2},
   {"rlang_cnd_type",                    (r_fn_ptr) &rlang_cnd_type, 1},
-  {"rlang_warn_deprecated_once",        (r_fn_ptr) &rlang_warn_deprecated_once, 2},
+  {"rlang_env_inherits",                (r_fn_ptr) &rlang_env_inherits, 2},
   {NULL, NULL, 0}
 };
 

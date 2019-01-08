@@ -102,7 +102,27 @@ is_expression <- function(x) {
 #' @export
 #' @rdname is_expression
 is_syntactic_literal <- function(x) {
-  typeof(x) == "NULL" || (length(x) == 1 && typeof(x) %in% parsable_atomic_types)
+  switch(typeof(x),
+    NULL = {
+      TRUE
+    },
+
+    logical = ,
+    integer = ,
+    double = ,
+    character = {
+      length(x) == 1
+    },
+
+    complex = {
+      if (length(x) != 1) {
+        return(FALSE)
+      }
+      is_na(x) || Re(x) == 0
+    },
+
+    FALSE
+  )
 }
 #' @export
 #' @rdname is_expression
@@ -185,34 +205,6 @@ expr_name <- function(expr) {
       name
     } else {
       abort("`expr` must quote a symbol, scalar, or call")
-    }
-  )
-}
-label <- function(expr) {
-  expr <- quo_squash(expr)
-
-  if (is_missing(expr)) {
-    return("<empty>")
-  }
-
-  switch(typeof(expr),
-    NULL = "NULL",
-    symbol = as_string(expr),
-    language = {
-      if (is_data_pronoun(expr)) {
-        data_pronoun_name(expr) %||% "<unknown>"
-      } else {
-        name <- deparse_one(expr)
-        name <- gsub("\n.*$", "...", name)
-        name
-      }
-    },
-    if (is_bare_atomic(expr, n = 1)) {
-      name <- expr_text(expr)
-      name <- gsub("\n.*$", "...", name)
-      name
-    } else {
-      paste0("<", rlang_type_sum(expr), ">")
     }
   )
 }

@@ -81,8 +81,8 @@ captureDots <- function() {
   .Call(rlang_capturedots, NULL, NULL, args, environment())
 }
 
-cat_line <- function(..., .trailing = TRUE) {
-  cat(paste_line(..., .trailing = .trailing))
+cat_line <- function(..., .trailing = TRUE, file = "") {
+  cat(paste_line(..., .trailing = .trailing), file = file)
 }
 paste_line <- function(..., .trailing = FALSE) {
   lines <- paste(chr(...), collapse = "\n")
@@ -212,4 +212,15 @@ pluralise_along <- function(x, singular, plural) {
 }
 pluralise_n <- function(n, singular, plural) {
   pluralise(n, singular, plural)
+}
+
+pad_spaces <- function(x, left = TRUE) {
+  widths <- nchar(x)
+  pads <- max(widths) - widths
+
+  if (left) {
+    paste0(spaces(pads), x)
+  } else {
+    paste0(x, spaces(pads))
+  }
 }

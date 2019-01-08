@@ -206,6 +206,15 @@ fn_body <- function(fn = caller_fn()) {
   fn
 }
 
+fn_body_node <- function(fn) {
+  body <- body(fn)
+  if (is_call(body, "{")) {
+    node_cdr(fn)
+  } else {
+    pairlist(body)
+  }
+}
+
 #' Is object a function?
 #'
 #' The R language defines two different types of functions: primitive
@@ -458,23 +467,28 @@ as_closure <- function(x, env = caller_env()) {
         return(fn)
       }
 
-      if (fn_name == "eval") {
-        # do_eval() starts a context with a fake primitive function as
-        # function definition. We replace it here with the .Internal()
-        # wrapper of eval() so we can match the arguments.
-        fmls <- formals(base::eval)
-      } else {
-        fmls <- formals(.ArgsEnv[[fn_name]] %||% .GenericArgsEnv[[fn_name]])
-      }
+      fmls <- formals(.ArgsEnv[[fn_name]] %||% .GenericArgsEnv[[fn_name]])
+      prim_call <- call2(x, !!!prim_args(fmls))
 
-      args <- syms(names(fmls))
-      args <- set_names(args)
-      names(args)[(names(args) == "...")] <- ""
-
-      prim_call <- call2(fn_name, splice(args))
-      new_function(fmls, prim_call, base_env())
+      # The closure wrapper should inherit from the global environment
+      # to ensure proper lexical dispatch with methods defined there
+      new_function(fmls, prim_call, global_env())
     }
   )
+}
+
+prim_args <- function(fmls) {
+  args <- names(fmls)
+
+  # Set argument names but only after `...`. Arguments before dots
+  # should be positionally matched.
+  dots_i <- match("...", args)
+  if (!is_na(dots_i)) {
+    idx <- seq2(dots_i + 1L, length(args))
+    names2(args)[idx] <- args[idx]
+  }
+
+  syms(args)
 }
 
 utils::globalVariables(c("!<-", "(<-", "enexpr<-"))
@@ -522,31 +536,33 @@ op_as_closure <- function(prim_nm) {
       values <- list(...)
       values[[length(values)]]
     },
-    `&` = function(.x, .y) .x & .y,
-    `|` = function(.x, .y) .x | .y,
-    `&&` = function(.x, .y) .x && .y,
-    `||` = function(.x, .y) .x || .y,
-    `!` = function(.x) !.x,
-    `+` = function(.x, .y) if (missing(.y)) .x else .x + .y,
-    `-` = function(.x, .y) if (missing(.y)) -.x else .x - .y,
-    `*` = function(.x, .y) .x * .y,
-    `/` = function(.x, .y) .x / .y,
-    `^` = function(.x, .y) .x ^ .y,
-    `%%` = function(.x, .y) .x %% .y,
-    `<` = function(.x, .y) .x < .y,
-    `<=` = function(.x, .y) .x <= .y,
-    `>` = function(.x, .y) .x > .y,
-    `>=` = function(.x, .y) .x >= .y,
-    `==` = function(.x, .y) .x == .y,
-    `!=` = function(.x, .y) .x != .y,
-    `:` = function(.x, .y) .x : .y,
-    `~` = function(.x, .y) {
+    `&`  = new_binary_closure(function(.x, .y) .x & .y),
+    `|`  = new_binary_closure(function(.x, .y) .x | .y),
+    `&&` = new_binary_closure(function(.x, .y) .x && .y),
+    `||` = new_binary_closure(function(.x, .y) .x || .y, shortcircuiting = TRUE),
+    `!`  = function(.x) !.x,
+    `+`  = new_binary_closure(function(.x, .y) if (missing(.y)) .x else .x + .y, versatile = TRUE),
+    `-`  = new_binary_closure(function(.x, .y) if (missing(.y)) -.x else .x - .y, versatile = TRUE),
+    `*`  = new_binary_closure(function(.x, .y) .x * .y),
+    `/`  = new_binary_closure(function(.x, .y) .x / .y),
+    `^`  = new_binary_closure(function(.x, .y) .x ^ .y),
+    `%%` = new_binary_closure(function(.x, .y) .x %% .y),
+    `<`  = new_binary_closure(function(.x, .y) .x < .y),
+    `<=` = new_binary_closure(function(.x, .y) .x <= .y),
+    `>`  = new_binary_closure(function(.x, .y) .x > .y),
+    `>=` = new_binary_closure(function(.x, .y) .x >= .y),
+    `==` = new_binary_closure(function(.x, .y) .x == .y),
+    `!=` = new_binary_closure(function(.x, .y) .x != .y),
+    `:`  = new_binary_closure(function(.x, .y) .x : .y),
+    `~`  = function(.x, .y) {
       if (is_missing(substitute(.y))) {
         new_formula(NULL, substitute(.x), caller_env())
       } else {
         new_formula(substitute(.x), substitute(.y), caller_env())
       }
     },
+
+    `c` = function(...) c(...),
 
     # Unsupported primitives
     `break` = ,
@@ -562,6 +578,71 @@ op_as_closure <- function(prim_nm) {
     }
   )
 }
+
+new_binary_closure <- function(fn,
+                               versatile = FALSE,
+                               shortcircuiting = FALSE) {
+  if (versatile) {
+    nodes <- versatile_check_nodes
+  } else if (shortcircuiting) {
+    nodes <- shortcircuiting_check_nodes
+  } else {
+    nodes <- binary_check_nodes
+  }
+
+  nodes <- duplicate(nodes, shallow = TRUE)
+  nodes <- node_append(nodes, fn_body_node(fn))
+  body <- new_call(brace_sym, nodes)
+
+  formals(fn) <- binary_fmls
+  body(fn) <- body
+
+  fn
+}
+
+binary_fmls <- as.pairlist(alist(
+  e1 = ,
+  e2 = ,
+  .x = e1,
+  .y = e2
+))
+binary_check_nodes <- pairlist(
+  quote(
+    if (missing(.x)) {
+      if (missing(e1)) {
+        abort("Must supply `e1` or `.x` to binary operator")
+      }
+      .x <- e1
+    } else if (!missing(e1)) {
+      abort("Can't supply both `e1` and `.x` to binary operator")
+    }
+  ),
+  quote(
+    if (missing(.y)) {
+      if (missing(e2)) {
+        abort("Must supply `e2` or `.y` to binary operator")
+      }
+      .y <- e2
+    } else if (!missing(e2)) {
+      abort("Can't supply both `e2` and `.y` to binary operator")
+    }
+  )
+)
+versatile_check_nodes <- as.pairlist(c(
+  binary_check_nodes[[1]],
+  quote(
+    if (missing(.y) && !missing(e2)) {
+      .y <- e2
+    } else if (!missing(e2)) {
+      abort("Can't supply both `e2` and `.y` to binary operator")
+    }
+  )
+))
+shortcircuiting_check_nodes <- as.pairlist(c(
+  binary_check_nodes[[1]],
+  quote(if (.x) return(TRUE)),
+  binary_check_nodes[[2]]
+))
 
 #' Make an `fn` object
 #'
@@ -596,4 +677,28 @@ print.fn <- function(x, ...) {
   attributes(x) <- NULL
   x <- structure(x, srcref = srcref)
   print(x)
+}
+
+as_predicate <- function(.fn, ...) {
+  .fn <- as_function(.fn)
+
+  function(...) {
+    out <- .fn(...)
+
+    if (!is_bool(out)) {
+      abort(sprintf(
+        "Predicate functions must return a single `TRUE` or `FALSE`, not %s",
+        as_predicate_friendly_type_of(out)
+      ))
+    }
+
+    out
+  }
+}
+as_predicate_friendly_type_of <- function(x) {
+  if (is_na(x)) {
+    "a missing value"
+  } else {
+    friendly_type_of(x, length = TRUE)
+  }
 }

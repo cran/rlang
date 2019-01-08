@@ -50,5 +50,5 @@ test_that("can convert strings (#138)", {
 })
 
 test_that("as_string(quo) produces informative error message", {
-  expect_error(as_string(quo(foo)), "a `quosure` object to a string")
+  expect_error(as_string(quo(foo)), "a `quosure/formula` object to a string")
 })

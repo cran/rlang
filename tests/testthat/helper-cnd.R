@@ -42,16 +42,6 @@ expect_no_message_ <- function(object, ...) {
   expect_message(object, regexp = NA, ...)
 }
 
-with_verbose_retirement <- function(expr) {
-  with_options(lifecycle_force_verbose_retirement = TRUE, expr)
-}
-with_non_verbose_retirement <- function(expr) {
-  with_options(lifecycle_disable_verbose_retirement = TRUE, expr)
-}
-
-options(lifecycle_force_verbose_retirement = TRUE)
-
-
 catch_wngs <- function(expr) {
   wngs <- list()
 
@@ -107,8 +97,4 @@ pluck_conditions_msgs <- function(cnds) {
 skip_silently <- function(reason, env = caller_env()) {
   expect_true(TRUE)
   return_from(env)
-}
-
-scoped_silent_retirement <- function(env = caller_env()) {
-  scoped_options(lifecycle_disable_verbose_retirement = TRUE, .frame = env)
 }

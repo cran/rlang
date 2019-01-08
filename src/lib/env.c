@@ -141,7 +141,10 @@ sexp* rlang_env_unbind(sexp* env, sexp* names, sexp* inherits) {
 }
 
 sexp* r_env_unbind_all(sexp* env, const char** names, bool inherits) {
-  return r_env_unbind_names(env, r_new_character(names), inherits);
+  sexp* nms = KEEP(r_new_character(names));
+  sexp* out = r_env_unbind_names(env, nms, inherits);
+  FREE(1);
+  return out;
 }
 
 sexp* r_env_unbind(sexp* env, const char* name, bool inherits) {
@@ -150,6 +153,32 @@ sexp* r_env_unbind(sexp* env, const char* name, bool inherits) {
   return r_env_unbind_all(env, names, inherits);
 }
 
+bool r_env_inherits(sexp* env, sexp* ancestor, sexp* top) {
+  top = top ? top : r_empty_env;
+
+  if (r_typeof(env) != r_type_environment) {
+    r_abort("`env` must be an environment");
+  }
+  if (r_typeof(ancestor) != r_type_environment) {
+    r_abort("`ancestor` must be an environment");
+  }
+  if (r_typeof(top) != r_type_environment) {
+    r_abort("`top` must be an environment");
+  }
+
+  if (env == r_empty_env) {
+    return false;
+  }
+
+  while (env != top && env != r_empty_env) {
+    if (env == ancestor) {
+      return true;
+    }
+    env = r_env_parent(env);;
+  }
+
+  return env == ancestor;
+}
 
 void r_init_rlang_ns_env() {
   rlang_ns_env = r_ns_env("rlang");

@@ -18,7 +18,7 @@ of R and the tidyverse:
 
 *   The __tidy eval__ framework, which is a well-founded system for
     non-standard evaluation built on quasiquotation (`!!`) and
-    quoted arguments (`enquo()`).
+    quoted arguments (`enquo()`). See <https://tidyeval.tidyverse.org>.
 
 *   User-friendly __error reporting__ with backtraces and chained errors
     (`abort()`, `trace_back()`, `with_abort()`).
@@ -54,3 +54,7 @@ Or install the development version from github with:
 # install.packages("devtools")
 devtools::install_github("r-lib/rlang", build_vignettes = TRUE)
 ```
+
+## Cheatsheet
+
+<a href="https://github.com/rstudio/cheatsheets/blob/master/tidyeval.pdf"><img src="https://raw.githubusercontent.com/rstudio/cheatsheets/master/pngs/thumbnails/tidy-eval-thumbs.png" alt = "tidy eval cheatsheet" width="630" height="252"/></a>  

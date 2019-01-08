@@ -75,7 +75,7 @@ test_that("can modify calls for functions containing dots", {
 test_that("accepts unnamed arguments", {
   expect_identical(
     call_modify(~get(), "foo", envir = "bar", "baz"),
-    ~get(envir = "bar", "foo", "baz")
+    ~get("foo", envir = "bar", "baz")
   )
 })
 
@@ -109,6 +109,32 @@ test_that("can refer to dots as named argument", {
 
 test_that("can't supply unnamed zaps", {
   expect_error(call_modify(quote(foo(bar)), zap()), "can't be unnamed")
+})
+
+test_that("positions are not changed", {
+  expect_identical(call_modify(quote(fn(1)), x = "foo"), quote(fn(1, x = "foo")))
+  expect_identical(call_modify(quote(fn(x = 1)), x = "foo"), quote(fn(x = "foo")))
+  expect_identical(call_modify(quote(fn(1, x = 1)), x = "foo"), quote(fn(1, x = "foo")))
+  expect_identical(call_modify(quote(fn(x = 1, 1)), x = "foo"), quote(fn(x = "foo", 1)))
+
+  expect_identical(call_modify(quote(fn(1)), ... = ), quote(fn(1, ...)))
+  expect_identical(call_modify(quote(fn(...)), ... = ), quote(fn(...)))
+  expect_identical(call_modify(quote(fn(1, ...)), ... = ), quote(fn(1, ...)))
+  expect_identical(call_modify(quote(fn(..., 1)), ... = ), quote(fn(..., 1)))
+
+  expect_identical(call_modify(quote(fn()), 1, x = "foo"), quote(fn(1, x = "foo")))
+  expect_identical(call_modify(quote(fn()), x = 1, x = "foo"), quote(fn(x = "foo")))
+  expect_identical(call_modify(quote(fn()), 1, x = 1, x = "foo"), quote(fn(1, x = "foo")))
+  expect_identical(call_modify(quote(fn()), x = 1, 1, x = "foo"), quote(fn(x = "foo", 1)))
+
+  expect_identical(call_modify(quote(fn()), 1, ... = ), quote(fn(1, ...)))
+  expect_identical(call_modify(quote(fn()), ... = , ... = ), quote(fn(...)))
+  expect_identical(call_modify(quote(fn()), 1, ... = , ... = ), quote(fn(1, ...)))
+  expect_identical(call_modify(quote(fn()), ... = , 1, ... = ), quote(fn(..., 1)))
+})
+
+test_that("empty quosures are treated as empty args", {
+  expect_identical(call_modify(quote(fn()), ... = quo()), quote(fn(...)))
 })
 
 
@@ -155,11 +181,8 @@ test_that("call_name() handles namespaced and anonymous calls", {
   expect_null(call_name(quote((function() NULL)())))
 })
 
-test_that("call_name() handles formulas and frames", {
+test_that("call_name() handles formulas", {
   expect_identical(call_name(~foo(baz)), "foo")
-
-  fn <- function() call_name(call_frame())
-  expect_identical(fn(), "fn")
 })
 
 test_that("call_fn() extracts function", {
@@ -418,4 +441,17 @@ test_that("call_print_fine_type() returns correct enum", {
   expect_identical(call_print_fine_type(quote(`:::`(a, b, c))), "infix")
   expect_identical(call_print_fine_type(quote(`$`(a, b, c))), "infix")
   expect_identical(call_print_fine_type(quote(`@`(a, b, c))), "infix")
+})
+
+test_that("call_name() fails with namespaced objects (#670)", {
+  skip("Disabled for the 0.3.1 release")
+  expect_error(call_name(~foo::bar), "`call` must be a quoted call")
+  expect_error(call_name(~foo:::bar), "`call` must be a quoted call")
+})
+
+test_that("call_ns() retrieves namespaces", {
+  expect_error(call_ns(quote(foo)), "must be a quoted call")
+  expect_null(call_ns(quote(foo())))
+  expect_identical(call_ns(quote(foo::bar())), "foo")
+  expect_identical(call_ns(quote(foo:::bar())), "foo")
 })
