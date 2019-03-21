@@ -652,25 +652,41 @@ quo_env_print <- function(env) {
 
 #' @export
 Ops.quosure <- function(e1, e2) {
-  if (is_quosure(e1) && is_quosure(e2)) {
-    bad <- c("myquosure1", "myquosure2")
-    good <- c("!!myquosure1", "!!myquosure2")
-  } else if (is_quosure(e1)) {
-    bad <- c("myquosure", "rhs")
-    good <- c("!!myquosure", "rhs")
-  } else {
-    bad <- c("lhs", "myquosure")
-    good <- c("lhs", "!!myquosure")
+  if (identical(.Generic, "!")) {
+    abort(paste_line(
+      "Quosures can only be unquoted within a quasiquotation context.",
+      "",
+      "  # Bad:",
+      "  list(!!myquosure)",
+      "",
+      "  # Good:",
+      "  dplyr::mutate(data, !!myquosure)"
+    ))
   }
+
+  if (missing(e2)) {
+    bad <- sprintf("  %s%s", .Generic, "myquosure")
+    good <- sprintf("  %s!!%s", .Generic, "myquosure")
+  } else if (is_quosure(e1) && is_quosure(e2)) {
+    bad <- sprintf("  myquosure1 %s myquosure2", .Generic)
+    good <- sprintf("  !!myquosure1 %s !!myquosure2", .Generic)
+  } else if (is_quosure(e1)) {
+    bad <- sprintf("  myquosure %s rhs", .Generic)
+    good <- sprintf("  !!myquosure %s rhs", .Generic)
+  } else {
+    bad <- sprintf("  lhs %s myquosure", .Generic)
+    good <- sprintf("  lhs %s !!myquosure", .Generic)
+  }
+
   abort(paste_line(
     "Base operators are not defined for quosures.",
     "Do you need to unquote the quosure?",
     "",
     "  # Bad:",
-    sprintf("  %s %s %s", bad[[1]], .Generic, bad[[2]]),
+    bad,
     "",
     "  # Good:",
-    sprintf("  %s %s %s", good[[1]], .Generic, good[[2]]),
+    good,
   ))
 }
 

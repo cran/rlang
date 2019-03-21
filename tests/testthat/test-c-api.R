@@ -416,3 +416,25 @@ test_that("r_nms_are_duplicated() handles empty and missing names", {
   out <- nms_are_duplicated(c("a", NA, NA, "b", "", "", "a"))
   expect_identical(out, c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE))
 })
+
+test_that("r_lgl_sum() handles NA", {
+  r_lgl_sum <- function(x, na_true) {
+    stopifnot(is_logical(x), is_bool(na_true))
+    .Call(rlang_test_lgl_sum, x, na_true)
+  }
+  expect_identical(r_lgl_sum(lgl(TRUE, FALSE), TRUE), 1L)
+  expect_identical(r_lgl_sum(lgl(TRUE, NA), TRUE), 2L)
+  expect_identical(r_lgl_sum(lgl(TRUE, NA), FALSE), 1L)
+})
+
+test_that("r_lgl_which() handles NA", {
+  r_lgl_which <- function(x, na_propagate) {
+    stopifnot(is_logical(x), is_bool(na_propagate))
+    .Call(rlang_test_lgl_which, x, na_propagate)
+  }
+
+  expect_identical(r_lgl_which(lgl(TRUE, FALSE), TRUE), 1L)
+  expect_identical(r_lgl_which(lgl(TRUE, FALSE), FALSE), 1L)
+  expect_identical(r_lgl_which(lgl(TRUE, NA), TRUE), int(1L, NA))
+  expect_identical(r_lgl_which(lgl(TRUE, NA), FALSE), 1L)
+})

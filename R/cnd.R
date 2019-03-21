@@ -261,15 +261,15 @@ cnd_call <- function(call) {
 #' and a full backtrace with `summary(last_error())`.
 #'
 #' You can also display a backtrace with the error message by setting
-#' the experimental option `rlang__backtrace_on_error`. It supports the
-#' following values:
+#' the option `rlang_backtrace_on_error`. It supports the following
+#' values:
 #'
 #' * `"reminder"`: Invite users to call `rlang::last_error()` to see a
 #'   backtrace.
 #' * `"branch"`: Display a simplified backtrace.
 #' * `"collapse"`: Display a collapsed backtrace tree.
 #' * `"full"`: Display a full backtrace tree.
-#'
+#' * `"none"`: Display nothing.
 #'
 #' @section Mufflable conditions:
 #'
@@ -689,8 +689,8 @@ conditionMessage.rlang_error <- function(c) {
 #' Errors thrown with [abort()] automatically save a backtrace that
 #' can be inspected by calling [last_error()]. Optionally, you can
 #' also display the backtrace alongside the error message by setting
-#' the experimental option `rlang__backtrace_on_error` to one of the
-#' following values:
+#' the option `rlang_backtrace_on_error` to one of the following
+#' values:
 #'
 #' * `"reminder"`: Display a reminder that the backtrace can be
 #'   inspected by calling [rlang::last_error()].
@@ -701,19 +701,16 @@ conditionMessage.rlang_error <- function(c) {
 #'
 #' @section Promote base errors to rlang errors:
 #'
-#' Call `options(error = rlang:::add_backtrace)` to instrument base
+#' Call `options(error = rlang::enframe)` to instrument base
 #' errors with rlang features. This handler does two things:
 #'
 #' * It saves the base error as an rlang object. This allows you to
 #'   call [last_error()] to print the backtrace or inspect its data.
 #'
 #' * It prints the backtrace for the current error according to the
-#'   [`rlang__backtrace_on_error`] option.
+#'   [`rlang_backtrace_on_error`] option.
 #'
-#' This experimental handler is not exported because it is meant for
-#' interactive use only.
-#'
-#' @name rlang__backtrace_on_error
+#' @name rlang_backtrace_on_error
 #' @aliases add_backtrace
 #'
 #' @examples
@@ -721,18 +718,23 @@ conditionMessage.rlang_error <- function(c) {
 #' # errors:
 #'
 #' # options(
-#' #   rlang__backtrace_on_error = "branch",
-#' #   error = rlang:::add_backtrace
+#' #   rlang_backtrace_on_error = "branch",
+#' #   error = rlang::enframe
 #' # )
 #' # stop("foo")
 NULL
 
 format_onerror_backtrace <- function(trace) {
-  show_trace <- peek_option("rlang__backtrace_on_error") %||% "reminder"
+  show_trace <- show_trace_p()
 
-  if (!is_string(show_trace) || !show_trace %in% c("reminder", "branch", "collapse", "full")) {
-    options(rlang__backtrace_on_error = NULL)
-    warn("Invalid `rlang__backtrace_on_error` option (resetting to `NULL`)")
+  opts <- c("none", "reminder", "branch", "collapse", "full")
+  if (!is_string(show_trace) || !show_trace %in% opts) {
+    options(rlang_backtrace_on_error = NULL)
+    warn("Invalid `rlang_backtrace_on_error` option (resetting to `NULL`)")
+    return(NULL)
+  }
+
+  if (show_trace == "none") {
     return(NULL)
   }
 
@@ -768,6 +770,35 @@ format_onerror_backtrace <- function(trace) {
     "Backtrace:",
     backtrace_lines
   )
+}
+
+show_trace_p <- function() {
+  old_opt <- peek_option("rlang__backtrace_on_error")
+  if (!is_null(old_opt)) {
+    warn_deprecated(paste_line(
+      "`rlang__backtrace_on_error` is no longer experimental.",
+      "It has been renamed to `rlang_backtrace_on_error`. Please update your RProfile."
+    ))
+    return(old_opt)
+  }
+
+  opt <- peek_option("rlang_backtrace_on_error")
+  if (!is_null(opt)) {
+    return(opt)
+  }
+
+  # FIXME: parameterise `is_interactive()`?
+  interactive <- with_options(
+    knitr.in.progress = NULL,
+    rstudio.notebook.executing = NULL,
+    is_interactive()
+  )
+
+  if (interactive) {
+    "reminder"
+  } else {
+    "full"
+  }
 }
 
 #' Add backtrace from error handler
@@ -826,6 +857,8 @@ signal_context_info <- function(nframe) {
   if (is_same_body(first, body(.handleSimpleError))) {
     if (is_same_body(sys_body(nframe - 1), body(stop))) {
       return(list("stop_message", nframe - 2))
+    } else if (is_same_body(sys_body(nframe - 4), body(.signalSimpleWarning))) {
+      return(list("warning_promoted", nframe - 6))
     } else {
       return(list("stop_native", nframe - 1))
     }

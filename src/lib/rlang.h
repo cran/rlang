@@ -8,8 +8,6 @@
 #define R_NO_REMAP
 #include <Rinternals.h>
 
-#include "../config.h"
-
 typedef struct SEXPREC sexp;
 typedef Rbyte r_byte_t;
 typedef Rcomplex r_complex_t;
@@ -92,7 +90,7 @@ extern sexp* r_shared_false;
 #include "vec-lgl.h"
 #include "vec-list.h"
 
-void r_init_library();
+sexp* r_init_library();
 
 
 #endif

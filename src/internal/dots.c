@@ -478,16 +478,15 @@ sexp* dots_expand(sexp* dots, struct dots_capture_info* capture_info) {
 
         sexp* name = r_nms_get(names, i);
         if (name != r_string("")) {
+          // Names might not be initialised when dots are captured by value
+          if (out_names == r_null) {
+            out_names = KEEP_N(init_names(out), n_protect);
+          }
+
           // Serialised unicode points might arise when unquoting
           // lists because of the conversion to pairlist
           name = KEEP(r_str_unserialise_unicode(name));
-
-          // Names might not be initialised when dots are captured by value
-          if (out_names == r_null) {
-            out_names = init_names(out);
-          }
           r_chr_poke(out_names, count, name);
-
           FREE(1);
         }
 
@@ -515,7 +514,7 @@ static sexp* dots_keep(sexp* dots, sexp* nms, bool first) {
   r_ssize n = r_length(dots);
 
   sexp* dups = KEEP(r_nms_are_duplicated(nms, !first));
-  r_ssize out_n = n - r_lgl_sum(dups);
+  r_ssize out_n = n - r_lgl_sum(dups, false);
 
   sexp* out = KEEP(r_new_vector(r_type_list, out_n));
   sexp* out_nms = KEEP(r_new_vector(r_type_character, out_n));
@@ -540,7 +539,7 @@ static sexp* abort_dots_homonyms_call = NULL;
 static void dots_check_homonyms(sexp* dots, sexp* nms) {
   sexp* dups = KEEP(r_nms_are_duplicated(nms, false));
 
-  if (r_lgl_sum(dups)) {
+  if (r_lgl_sum(dups, false)) {
     r_eval_with_xy(abort_dots_homonyms_call, r_base_env, dots, dups);
     r_abort("Internal error: `dots_check_homonyms()` should have failed earlier");
   }

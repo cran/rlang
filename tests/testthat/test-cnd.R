@@ -166,7 +166,7 @@ test_that("error_cnd() checks its fields", {
 })
 
 test_that("error is printed with backtrace", {
-  skip_on_os("windows")
+  skip_unless_utf8()
 
   f <- function() g()
   g <- function() h()
@@ -177,7 +177,7 @@ test_that("error is printed with backtrace", {
   msg <- with_options(
     rlang_trace_format_srcrefs = FALSE,
     rlang_trace_top_env = current_env(),
-    rlang__backtrace_on_error = "branch",
+    rlang_backtrace_on_error = "branch",
     conditionMessage(catch_cnd(f()))
   )
 
@@ -187,7 +187,7 @@ test_that("error is printed with backtrace", {
 })
 
 test_that("error is printed with parent backtrace", {
-  skip_on_os("windows")
+  skip_unless_utf8()
 
   f <- function() g()
   g <- function() h()
@@ -217,7 +217,7 @@ test_that("error is printed with parent backtrace", {
 })
 
 test_that("summary.rlang_error() prints full backtrace", {
-  skip_on_os("windows")
+  skip_unless_utf8()
 
   scoped_options(
     rlang_trace_top_env = current_env(),
@@ -239,78 +239,6 @@ test_that("summary.rlang_error() prints full backtrace", {
   err <- catch_cnd(a())
   expect_known_output(file = test_path("test-cnd-error-str.txt"), summary(err))
 })
-
-test_that("signal_soft_deprecated() warns when called from global env", {
-  old <- Sys.getenv("TESTTHAT_PKG")
-  Sys.setenv("TESTTHAT_PKG" = "")
-  on.exit(Sys.setenv("TESTTHAT_PKG" = old))
-
-  retired <- function(id) signal_soft_deprecated("foo", id)
-  env_bind(global_env(), retired = retired)
-  on.exit(env_unbind(global_env(), "retired"), add = TRUE)
-
-  with_options(lifecycle_verbose_soft_deprecation = FALSE, {
-    locally({
-      expect_no_warning(retired("rlang_test3"), "foo")
-    })
-  })
-
-  with_options(lifecycle_verbose_soft_deprecation = FALSE, {
-    with_env(global_env(), {
-      expect_warning(retired("rlang_test4"), "foo")
-    })
-  })
-})
-
-test_that("signal_soft_deprecated() warns when called from package being tested", {
-  Sys.setenv("NOT_CRAN" = "true")
-  on.exit(Sys.setenv("NOT_CRAN" = ""))
-  retired <- function() signal_soft_deprecated("warns from package being tested")
-  expect_warning(retired(), "warns from")
-})
-
-test_that("signal_soft_deprecated() warns when option is set", {
-  retired <- function(id) signal_soft_deprecated("foo", id)
-  with_options(lifecycle_verbose_soft_deprecation = TRUE, {
-    expect_warning(retired("rlang_test5"), "foo")
-  })
-})
-
-test_that("warn_deprecated() repeats warnings when option is set", {
-  scoped_options(lifecycle_verbose_soft_deprecation = TRUE)
-
-  retired1 <- function() signal_soft_deprecated("soft deprecated repeats")
-  retired2 <- function() warn_deprecated("deprecated repeats")
-
-  expect_warning(retired1(), "repeats")
-  expect_warning(retired2(), "repeats")
-
-  expect_no_warning(retired1())
-  expect_no_warning(retired2())
-
-  scoped_options(lifecycle_repeat_warnings = TRUE)
-  expect_warning(retired1(), "repeats")
-  expect_warning(retired2(), "repeats")
-})
-
-test_that("lifecycle warnings helper enable warnings", {
-  retired1 <- function() signal_soft_deprecated("soft deprecated wrn enabled by helper")
-  retired2 <- function() warn_deprecated("deprecated wrn enabled by helper")
-
-  with_options(
-    lifecycle_disable_warnings = TRUE,
-    {
-      evalq({
-        scoped_lifecycle_warnings()
-        expect_warning(retired1(), "enabled")
-        expect_warning(retired1(), "enabled")
-        expect_warning(retired2(), "enabled")
-        expect_warning(retired2(), "enabled")
-      })
-    }
-  )
-})
-
 
 test_that("errors are saved", {
   # `outFile` argument
@@ -342,16 +270,16 @@ test_that("No backtrace is displayed with top-level active bindings", {
 
 test_that("Invalid on_error option resets itself", {
   with_options(
-    rlang__backtrace_on_error = NA,
+    rlang_backtrace_on_error = NA,
     {
       expect_warning(tryCatch(abort("foo"), error = identity), "Invalid")
-      expect_null(peek_option("rlang__backtrace_on_error"))
+      expect_null(peek_option("rlang_backtrace_on_error"))
     }
   )
 })
 
 test_that("on_error option can be tweaked", {
-  skip_on_os("windows")
+  skip_unless_utf8()
 
   f <- function() tryCatch(g())
   g <- function() h()
@@ -366,35 +294,34 @@ test_that("on_error option can be tweaked", {
 
     cat_line("", ">>> Default:", "")
     with_options(
-      rlang__backtrace_on_error = NULL,
+      rlang_backtrace_on_error = NULL,
       rlang_interactive = TRUE,
       msg()
     )
 
     cat_line("", "", "", ">>> Reminder:", "")
     with_options(
-      rlang__backtrace_on_error = "reminder",
+      rlang_backtrace_on_error = "reminder",
       rlang_interactive = TRUE,
       msg()
     )
 
-    cat_line("", "", "", ">>> Reminder (not interactive):", "")
+    cat_line("", "", "", ">>> Default (not interactive):", "")
     with_options(
-      rlang__backtrace_on_error = "reminder",
       rlang_interactive = FALSE,
       msg()
     )
 
     cat_line("", "", "", ">>> Branch:", "")
-    with_options(rlang__backtrace_on_error = "branch", msg())
+    with_options(rlang_backtrace_on_error = "branch", msg())
 
     cat_line("", "", "", ">>> Collapsed:", "")
-    with_options(rlang__backtrace_on_error = "collapse", msg())
+    with_options(rlang_backtrace_on_error = "collapse", msg())
   }))
 })
 
 test_that("format_onerror_backtrace handles empty and size 1 traces", {
-  scoped_options(rlang__backtrace_on_error = "branch")
+  scoped_options(rlang_backtrace_on_error = "branch")
 
   trace <- new_trace(list(), int(), chr())
   expect_identical(format_onerror_backtrace(trace), NULL)
@@ -412,7 +339,7 @@ test_that("don't print message or backtrace fields if empty", {
 })
 
 test_that("with_abort() promotes base errors to rlang errors", {
-  skip_on_os("windows")
+  skip_unless_utf8()
 
   f <- function() g()
   g <- function() h()
@@ -529,62 +456,47 @@ test_that("with_abort() entraces conditions properly", {
 })
 
 test_that("signal context is detected", {
-  get_type <- function(cnd) {
+  get_signal_info <- function(cnd) {
     nframe <- sys.nframe() - 1
-    out <- signal_context_info(nframe)[[1]]
-    invokeRestart("out", out)
+    out <- signal_context_info(nframe)
+    info <- list(out[[1]], sys.call(out[[2]]))
+    invokeRestart("out", info)
   }
-  signal_type <- function(signaller, arg) {
+  signal_info <- function(signaller, arg) {
     f <- function() signaller(arg)
     withRestarts(
       out = identity,
-      withCallingHandlers(condition = get_type, f())
+      withCallingHandlers(condition = get_signal_info, f())
     )
   }
 
-  expect_identical(signal_type(base::stop, ""), "stop_message")
-  expect_identical(signal_type(base::stop, cnd("error")), "stop_condition")
-  expect_identical(signal_type(function(msg) errorcall(NULL, msg), ""), "stop_native")
-  expect_identical(signal_type(abort, ""), "stop_rlang")
+  expect_equal(signal_info(base::stop, ""), list("stop_message", quote(f())))
+  expect_equal(signal_info(base::stop, cnd("error")), list("stop_condition", quote(f())))
+  expect_equal(signal_info(function(msg) errorcall(NULL, msg), ""), list("stop_native", quote(errorcall(NULL, msg))))
+  expect_equal(signal_info(abort, "")[[1]], "stop_rlang")
 
-  expect_identical(signal_type(base::warning, ""), "warning_message")
-  expect_identical(signal_type(base::warning, cnd("warning")), "warning_condition")
-  expect_identical(signal_type(function(msg) warningcall(NULL, msg), ""), "warning_native")
-  expect_identical(signal_type(warn, ""), "warning_rlang")
+  expect_equal(signal_info(base::warning, ""), list("warning_message", quote(f())))
+  expect_equal(signal_info(base::warning, cnd("warning")), list("warning_condition", quote(f())))
+  expect_equal(signal_info(function(msg) warningcall(NULL, msg), ""), list("warning_native", quote(warningcall(NULL, msg))))
+  expect_equal(signal_info(warn, "")[[1]], "warning_rlang")
 
-  expect_identical(signal_type(base::message, ""), "message")
-  expect_identical(signal_type(base::message, cnd("message")), "message")
-  expect_identical(signal_type(inform, ""), "message_rlang")
+  expect_equal(signal_info(base::message, ""), list("message", quote(f())))
+  expect_equal(signal_info(base::message, cnd("message")), list("message", quote(f())))
+  expect_equal(signal_info(inform, "")[[1]], "message_rlang")
 
-  expect_identical(signal_type(base::signalCondition, cnd("foo")), "condition")
-})
+  expect_equal(signal_info(base::signalCondition, cnd("foo")), list("condition", quote(f())))
 
-test_that("bottom of signalling context is detected", {
-  get_call <- function(cnd) {
-    nframe <- sys.nframe() - 1
-    info <- signal_context_info(nframe)
-    invokeRestart("out", sys.call(info[[2]]))
-  }
-  signal_call <- function(signaller, arg) {
+  # Warnings won't be promoted if `condition` is handled. We need to
+  # handle `error` instead.
+  signal_info_error <- function(signaller, arg) {
     f <- function() signaller(arg)
     withRestarts(
       out = identity,
-      withCallingHandlers(condition = get_call, f())
+      withCallingHandlers(error = get_signal_info, f())
     )
   }
-
-  expect_equal(signal_call(base::stop, ""), quote(f()))
-  expect_equal(signal_call(base::stop, cnd("error")), quote(f()))
-  expect_equal(signal_call(function(msg) errorcall(NULL, msg), ""), quote(errorcall(NULL, msg)))
-
-  expect_equal(signal_call(base::warning, ""), quote(f()))
-  expect_equal(signal_call(base::warning, cnd("warning")), quote(f()))
-  expect_equal(signal_call(function(msg) warningcall(NULL, msg), ""), quote(warningcall(NULL, msg)))
-
-  expect_equal(signal_call(base::message, ""), quote(f()))
-  expect_equal(signal_call(base::message, cnd("message")), quote(f()))
-
-  expect_equal(signal_call(base::signalCondition, cnd("foo")), quote(f()))
+  expr <- quote(with_options(warn = 2, signal_info_error(base::warning, "")))
+  expect_equal(eval_top(expr), list("warning_promoted", quote(f())))
 })
 
 

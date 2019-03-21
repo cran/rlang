@@ -108,6 +108,8 @@ extern sexp* rlang_is_data_mask(sexp*);
 extern sexp* rlang_data_pronoun_get(sexp*, sexp*);
 extern sexp* rlang_cnd_type(sexp*);
 extern sexp* rlang_env_inherits(sexp*, sexp*);
+extern sexp* rlang_eval_top(sexp*, sexp*);
+extern sexp* rlang_attrib(sexp*);
 
 // Library initialisation defined below
 sexp* rlang_library_load();
@@ -129,8 +131,11 @@ extern sexp* rlang_test_sys_call(sexp*);
 extern sexp* rlang_test_nms_are_duplicated(sexp*, sexp*);
 extern sexp* rlang_test_Rf_warningcall(sexp*, sexp*);
 extern sexp* rlang_test_Rf_errorcall(sexp*, sexp*);
+extern sexp* rlang_test_lgl_sum(sexp*, sexp*);
+extern sexp* rlang_test_lgl_which(sexp*, sexp*);
 
 static const r_callable r_callables[] = {
+  {"r_init_library",                    (r_fn_ptr) &r_init_library, 0},
   {"rlang_library_load",                (r_fn_ptr) &rlang_library_load, 0},
   {"rlang_library_unload",              (r_fn_ptr) &rlang_library_unload, 0},
   {"r_f_lhs",                           (r_fn_ptr) &r_f_lhs, 1},
@@ -201,6 +206,8 @@ static const r_callable r_callables[] = {
   {"rlang_test_sys_call",               (r_fn_ptr) &rlang_test_sys_call, 1},
   {"rlang_test_Rf_warningcall",         (r_fn_ptr) &rlang_test_Rf_warningcall, 2},
   {"rlang_test_Rf_errorcall",           (r_fn_ptr) &rlang_test_Rf_errorcall, 2},
+  {"rlang_test_lgl_sum",                (r_fn_ptr) &rlang_test_lgl_sum, 2},
+  {"rlang_test_lgl_which",              (r_fn_ptr) &rlang_test_lgl_which, 2},
   {"rlang_r_string",                    (r_fn_ptr) &rlang_r_string, 1},
   {"rlang_exprs_interp",                (r_fn_ptr) &rlang_exprs_interp, 6},
   {"rlang_quos_interp",                 (r_fn_ptr) &rlang_quos_interp, 6},
@@ -250,6 +257,8 @@ static const r_callable r_callables[] = {
   {"rlang_is_raw",                      (r_fn_ptr) &rlang_is_raw, 2},
   {"rlang_cnd_type",                    (r_fn_ptr) &rlang_cnd_type, 1},
   {"rlang_env_inherits",                (r_fn_ptr) &rlang_env_inherits, 2},
+  {"rlang_eval_top",                    (r_fn_ptr) &rlang_eval_top, 2},
+  {"rlang_attrib",                      (r_fn_ptr) &rlang_attrib, 1},
   {NULL, NULL, 0}
 };
 
@@ -287,7 +296,6 @@ void R_init_rlang(r_dll_info* dll) {
 void rlang_init_internal();
 
 sexp* rlang_library_load() {
-  r_init_library();
   rlang_init_internal();
   return r_null;
 }
