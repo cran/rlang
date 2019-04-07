@@ -1,6 +1,6 @@
-4522e33642b4091812540731b0eaea03 *DESCRIPTION
+9d0e6306aa1264979281ea3ad67508a8 *DESCRIPTION
 49327974c492a6fe3413416282b8f99b *NAMESPACE
-7f5defdb64873b05da2ea8b996a81a9b *NEWS.md
+8c5e5a9e9be9f59fa81261bf860b0570 *NEWS.md
 062ac183ee04a07320c1d2cce86eac95 *R/arg.R
 d5e13b39365f21df607f53b656865415 *R/attr.R
 06b10f15e1a94a4e5693484b664b69c5 *R/call.R
@@ -50,7 +50,7 @@ c385c983f67b71461d7b0951db6a9c5d *R/vec-squash.R
 68ea7e2cf2ded56ffef501534294055c *R/vec-utils.R
 92b06300bec98bc6fa98d2250bcfdb9a *R/vec.R
 93261f0a2edaa5b978201f356be792bc *README.md
-685d25cc44be986175caf49e7cc31244 *build/rlang.pdf
+45f55f295bedb1fe010fb69a912a3565 *build/rlang.pdf
 d5d71504d001dd7dec12f9c761bb9f34 *man/UQE.Rd
 9e1ce6e2d57160d5c93fe101d0469dc0 *man/abort.Rd
 8cdb7ebd16edb2c45c069202e18c031d *man/are_na.Rd
@@ -308,7 +308,7 @@ d7867bdffe192abf2025196d16a12d11 *src/lib/sym-unescape.c
 be56a7ec58304d586d50a565dd07cf5b *src/lib/sym.h
 cdce8bee71636b800f4734a062d98401 *src/lib/vec-chr.c
 96a7b3ec1b92f8af70e36af9f15b705f *src/lib/vec-chr.h
-d8bdbd991eb14b83f19669117ccf9f46 *src/lib/vec-lgl.c
+33b95efaea45265a1db5ae2fddcecb9b *src/lib/vec-lgl.c
 c686c77faeb522d5425eebae89ae024d *src/lib/vec-lgl.h
 2e4169e36a519cb5365fcaa5d8d517d4 *src/lib/vec-list.c
 4ac26e74a0437d8fcd605e23c2735f20 *src/lib/vec-list.h
@@ -339,7 +339,7 @@ c059719587ccdd423a0b7eaa2dba00fe *tests/testthat/helper-trace.R
 512dd39b4a02489cc9cbc68c76480b3d *tests/testthat/teardown-tests.R
 8b759aa010d0ebdb46372634e340b84b *tests/testthat/test-arg.R
 005390fcd8cf5b024f391c2ffcb47bcd *tests/testthat/test-attr.R
-efb86112b3f872b68f7b1eec12156f45 *tests/testthat/test-c-api.R
+47b0fd47dd0b48f53ba13c0c93c355c2 *tests/testthat/test-c-api.R
 835767353caf0a62a284bdcf85746c44 *tests/testthat/test-call.R
 23ffa482b66e10d1b938f1b00b0c6a55 *tests/testthat/test-cnd-error-parent-default.txt
 df5c6d90e342719931a811210b7a09a2 *tests/testthat/test-cnd-error-parent.txt
@@ -410,7 +410,7 @@ ffc6a7a756e17da1c97b153a623ada0d *tests/testthat/test-trace-summary.txt
 14d26652d1ea3ece060ff1e2629459c8 *tests/testthat/test-trace-trim.txt
 29b9bccd977f39167ee060b79363d70d *tests/testthat/test-trace-truncate-backtrace-branch.txt
 d10f376dad7ac53cbd2442a1cc5d8b6f *tests/testthat/test-trace-unexported-prefix.txt
-efda3fc87690ac2b1772df364af51911 *tests/testthat/test-trace.R
+78470b19e67cb22801a458fc6cd26934 *tests/testthat/test-trace.R
 6b1b3510ea7e63829803b8c61fa82162 *tests/testthat/test-trace.Rmd
 64d81178440996ec7ce2f404f37edd3e *tests/testthat/test-types.R
 b473ed8e931e8173fc92bcd0deb21198 *tests/testthat/test-utils.R
