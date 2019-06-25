@@ -6,7 +6,7 @@ test_that("names2() takes care of missing values", {
 })
 
 test_that("names2() fails for environments", {
-  expect_error(names2(env()), "Use env_names() for environments.", fixed = TRUE)
+  expect_error(names2(env()), "Use `env_names()` for environments.", fixed = TRUE)
 })
 
 test_that("inputs must be valid", {
@@ -38,4 +38,10 @@ test_that("set_names() coerces to character", {
 
 test_that("has_name() works with pairlists", {
   expect_true(has_name(fn_fmls(`[.data.frame`), "drop"))
+})
+
+test_that("set_names() first names the vector before applying a function (#688)", {
+  exp <- set_names(letters, toupper(letters))
+  expect_identical(set_names(set_names(letters), toupper), exp)
+  expect_identical(set_names(letters, toupper), exp)
 })

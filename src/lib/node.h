@@ -68,38 +68,21 @@ static inline sexp* r_new_node(sexp* car, sexp* cdr) {
 
 sexp* r_new_tagged_node(const char* tag, sexp* car, sexp* cdr);
 
-static inline sexp* r_new_node_list(sexp* car) {
-  return Rf_cons(car, r_null);
+static inline sexp* r_pairlist(sexp* car) {
+  return Rf_list1(car);
 }
-static inline sexp* r_new_node_list2(sexp* car1, sexp* car2) {
-  sexp* out = KEEP(Rf_cons(car2, r_null));
-  out = Rf_cons(car1, out);
-  FREE(1);
-  return out;
+static inline sexp* r_pairlist2(sexp* car1, sexp* car2) {
+  return Rf_list2(car1, car2);
 }
-
-static inline sexp* r_build_node(sexp* car, sexp* cdr) {
-  PROTECT(car);
-  PROTECT(cdr);
-  sexp* out = Rf_cons(car, cdr);
-  UNPROTECT(2);
-  return out;
-}
-
-static inline sexp* r_build_pairlist(sexp* car) {
-  return r_build_node(car, r_null);
-}
-static inline sexp* r_build_pairlist2(sexp* car1, sexp* car2) {
-  return r_build_node(car1, r_build_pairlist(car2));
-}
-static inline sexp* r_build_pairlist3(sexp* car1, sexp* car2, sexp* car3) {
-  return r_build_node(car1, r_build_pairlist2(car2, car3));
+static inline sexp* r_pairlist3(sexp* car1, sexp* car2, sexp* car3) {
+  return Rf_list3(car1, car2, car3);
 }
 
 sexp* r_node_tree_clone(sexp* x);
 sexp* r_node_list_clone_until(sexp* node, sexp* sentinel, sexp** sentinel_out);
 
 sexp* r_node_list_find_tag(sexp* node, sexp* tag);
+sexp* r_node_list_reverse(sexp* node);
 
 
 #endif

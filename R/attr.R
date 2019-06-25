@@ -98,8 +98,10 @@ nms_are_invalid <- function(x) {
 
 #' Does an object have an element with this name?
 #'
-#' This function returns a logical value that indicates if a data frame or
-#' another named object contains an element with a specific name.
+#' This function returns a logical value that indicates if a data
+#' frame or another named object contains an element with a specific
+#' name. Note that `has_name()` only works with vectors. For instance,
+#' environments need the specialised function [env_has()].
 #'
 #' Unnamed objects are treated as if all names are empty strings. `NA`
 #' input gives `FALSE` as output.
@@ -157,19 +159,30 @@ has_name <- function(x, name) {
 #' set_names(1:10, ~ letters[seq_along(.)])
 #' set_names(head(mtcars), toupper)
 #'
+#' # If the input vector is unnamed, it is first named after itself
+#' # before the function is applied:
+#' set_names(letters, toupper)
+#'
 #' # `...` is passed to the function:
 #' set_names(head(mtcars), paste0, "_foo")
 set_names <- function(x, nm = x, ...) {
   set_names_impl(x, x, nm, ...)
 }
+
+# FIXME: This can be simplified once the `_along` ctors are defunct
 set_names_impl <- function(x, mold, nm, ...) {
   if (!is_vector(x)) {
     abort("`x` must be a vector")
   }
 
   if (is_function(nm) || is_formula(nm)) {
+    if (is_null(names(mold))) {
+      mold <- as.character(mold)
+    } else {
+      mold <- names2(mold)
+    }
     nm <- as_function(nm)
-    nm <- nm(names2(mold), ...)
+    nm <- nm(mold, ...)
   } else if (!is_null(nm)) {
     if (dots_n(...)) {
       nm <- as.character(c(nm, ...))
@@ -211,7 +224,9 @@ set_names_impl <- function(x, mold, nm, ...) {
 #' x <- set_names(1:3, c("a", NA, "b"))
 #' names2(x)
 names2 <- function(x) {
-  if (type_of(x) == "environment") abort("Use env_names() for environments.")
+  if (typeof(x) == "environment") {
+    abort("Use `env_names()` for environments.")
+  }
   nms <- names(x)
   if (is_null(nms)) {
     rep("", length(x))

@@ -1,9 +1,6 @@
 #' Create a symbol or list of symbols
 #'
 #' These functions take strings as input and turn them into symbols.
-#' Contrarily to `as.name()`, they convert the strings to the native
-#' encoding beforehand. This is necessary because symbols remove
-#' silently the encoding mark of strings (see [set_str_encoding()]).
 #'
 #' @param x A string or list of strings.
 #' @return A symbol for `sym()` and a list of symbols for `syms()`.
@@ -99,15 +96,16 @@ is_symbol <- function(x, name = NULL) {
 #' typeof(as_string(bar))
 #' @export
 as_string <- function(x) {
-  coerce_type(x, "a string",
-    symbol = {
-      .Call(rlang_symbol_to_character, x)
-    },
-    string = {
-      attributes(x) <- NULL
-      x
-    }
-  )
+  if (is_string(x)) {
+    attributes(x) <- NULL
+    return(x)
+  }
+
+  if (is_symbol(x)) {
+    return(.Call(rlang_symbol_to_character, x))
+  }
+
+  abort_coercion(x, "a string")
 }
 
 namespace_sym <- quote(`::`)

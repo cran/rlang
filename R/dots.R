@@ -268,21 +268,24 @@ dots_split <- function(...,
 #' @keywords internal
 #' @export
 splice <- function(x) {
-  if (!is_list(x)) {
-    abort("Only lists can be spliced")
-  }
-  structure(x, class = "spliced")
+  .Call(rlang_new_splice_box, x)
 }
 #' @rdname splice
 #' @export
 is_spliced <- function(x) {
-  inherits(x, "spliced")
+  .Call(rlang_is_splice_box, x)
 }
 #' @rdname splice
 #' @export
 is_spliced_bare <- function(x) {
   is_bare_list(x) || is_spliced(x)
 }
+#' @export
+print.rlang_box_splice <- function(x, ...) {
+  cat_line("<spliced>")
+  print(unbox(x))
+}
+
 #' @rdname splice
 #' @inheritParams tidy-dots
 #' @export
@@ -328,8 +331,7 @@ dots_values <- function(...,
                         .preserve_empty = FALSE,
                         .homonyms = c("keep", "first", "last", "error"),
                         .check_assign = FALSE) {
-  .Call(rlang_dots_values,
-    frame_env = environment(),
+  .External2(rlang_ext2_dots_values,
     named = FALSE,
     ignore_empty = .ignore_empty,
     preserve_empty = .preserve_empty,
@@ -338,6 +340,15 @@ dots_values <- function(...,
     check_assign = .check_assign
   )
 }
+
+# Micro optimisation: Inline character vectors in formals list
+formals(dots_values) <- pairlist(
+  ... = quote(expr = ),
+  .ignore_empty = c("trailing", "none", "all"),
+  .preserve_empty = FALSE,
+  .homonyms = c("keep", "first", "last", "error"),
+  .check_assign = FALSE
+)
 
 #' Capture definition objects
 #'

@@ -14,15 +14,15 @@ new_language(head, tail = NULL)
 symbol, call, or a function.}
 
 \item{...}{Arguments to the call either in or out of a list. These dots
-support \link[=tidy-dots]{tidy dots} features.}
+support \link[=tidy-dots]{tidy dots} features. Empty arguments are preserved.}
 
 \item{.ns}{Namespace with which to prefix \code{.fn}. Must be a string
 or symbol.}
 }
 \description{
-\Sexpr[results=rd, stage=render]{rlang:::lifecycle("soft-deprecated")}
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("deprecated")}
 
-These functions are soft-deprecated, please use \code{\link[=call2]{call2()}} and
+These functions are deprecated, please use \code{\link[=call2]{call2()}} and
 \code{\link[=new_call]{new_call()}} instead.
 }
 \keyword{internal}

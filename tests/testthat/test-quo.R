@@ -212,7 +212,7 @@ test_that("quosures class has subset assign methods", {
 
   x[1:2] <- list(quo(3), quo(4))
   expect_identical(x, quos(3, 4))
-  expect_warning(x[2] <- list(4), "soft-deprecated")
+  expect_warning(x[2] <- list(4), "deprecated")
   ## expect_error(x[2] <- list(4), "Can't assign a double vector to a list of quosures")
 
   x[[2]] <- quo(10)
@@ -268,6 +268,14 @@ test_that("can cast quosure lists to bare lists", {
 
 test_that("can concatenate quosure lists", {
   expect_identical(c(quos(a, b), quos(foo = c)), quos(a, b, foo = c))
+})
+
+test_that("new_quosure() checks input", {
+  expect_error(new_quosure(NULL, NULL), "`env` must be an environment")
+})
+
+test_that("as_string(quo) produces informative error message", {
+  expect_error(as_string(quo(foo)), "a `quosure/formula` object to a string")
 })
 
 

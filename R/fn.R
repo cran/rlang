@@ -7,9 +7,10 @@
 #' This constructs a new function given its three components:
 #' list of arguments, body code and parent environment.
 #'
-#' @param args A named list of default arguments. Note that if you
-#'   want arguments that don't have defaults, you'll need to use the
-#'   special function [alist], e.g. `alist(a = , b = 1)`
+#' @param args A named list or pairlist of default arguments. Note
+#'   that if you want arguments that don't have defaults, you'll need
+#'   to use the special function [pairlist2()]. If you need quoted
+#'   defaults, use [exprs()].
 #' @param body A language object representing the code inside the
 #'   function. Usually this will be most easily generated with
 #'   [base::quote()]
@@ -17,25 +18,26 @@
 #'   calling environment of `new_function()`
 #' @export
 #' @examples
-#' f <- function(x) x + 3
-#' g <- new_function(alist(x = ), quote(x + 3))
-#'
-#' # The components of the functions are identical
-#' identical(formals(f), formals(g))
-#' identical(body(f), body(g))
-#' identical(environment(f), environment(g))
-#'
-#' # But the functions are not identical because f has src code reference
+#' f <- function() letters
+#' g <- new_function(NULL, quote(letters))
 #' identical(f, g)
 #'
-#' attr(f, "srcref") <- NULL
-#' # Now they are:
-#' stopifnot(identical(f, g))
+#' # Pass a list or pairlist of named arguments to create a function
+#' # with parameters. The name becomes the parameter name and the
+#' # argument the default value for this parameter:
+#' new_function(list(x = 10), quote(x))
+#' new_function(pairlist2(x = 10), quote(x))
+#'
+#' # Use `exprs()` to create quoted defaults. Compare:
+#' new_function(pairlist2(x = 5 + 5), quote(x))
+#' new_function(exprs(x = 5 + 5), quote(x))
+#'
+#' # Pass empty arguments to omit defaults. `list()` doesn't allow
+#' # empty arguments but `pairlist2()` does:
+#' new_function(pairlist2(x = , y = 5 + 5), quote(x + y))
+#' new_function(exprs(x = , y = 5 + 5), quote(x + y))
 new_function <- function(args, body, env = caller_env()) {
-  stopifnot(all(have_name(args)), is_environment(env))
-
-  args <- as.pairlist(args)
-  eval_bare(call("function", args, body), env)
+  .Call(rlang_new_function, args, body, env)
 }
 
 prim_eval <- eval(quote(sys.function(0)))
@@ -62,29 +64,8 @@ prim_name <- function(prim) {
 #' is especially useful for forwarding arguments in [constructed
 #' calls][lang].
 #'
-#' Unlike `formals()`, these helpers also work with primitive
-#' functions. See [is_function()] for a discussion of primitive and
-#' closure functions.
-#'
-#' Note that the argument names are taken from the closures that are
-#' created when passing the primitive to [as_closure()]. For instance,
-#' while the arguments of the primitive operator `+` are labelled `e1`
-#' and `e2`, `fn_fmls_names()` will return `.x` and `.y`. Note that
-#' for many primitives the base R argument names are purely
-#' placeholders since they don't perform regular argument matching.
-#' E.g. this returns `5` instead of `-5`:
-#'
-#' ```
-#' `-`(e2 = 10, 5)
-#' ```
-#'
-#' To regularise the semantics of primitive functions, it is usually a
-#' good idea to coerce them to a closure first:
-#'
-#' ```
-#' minus <- as_closure(`-`)
-#' minus(.y = 10, 5)
-#' ```
+#' Unlike `formals()`, these helpers throw an error with primitive
+#' functions instead of returning `NULL`.
 #'
 #' @param fn A function. It is lookep up in the calling frame if not
 #'   supplied.
@@ -94,9 +75,6 @@ prim_name <- function(prim) {
 #' # Extract from current call:
 #' fn <- function(a = 1, b = 2) fn_fmls()
 #' fn()
-#'
-#' # Works with primitive functions:
-#' fn_fmls(base::switch)
 #'
 #' # fn_fmls_syms() makes it easy to forward arguments:
 #' call2("apply", !!! fn_fmls_syms(lapply))
@@ -108,7 +86,7 @@ prim_name <- function(prim) {
 #' fn_fmls_names(fn) <- c("foo", "bar")
 #' fn()
 fn_fmls <- function(fn = caller_fn()) {
-  fn <- as_closure(fn)
+  check_closure(fn)
   formals(fn)
 }
 #' @rdname fn_fmls
@@ -134,7 +112,7 @@ fn_fmls_syms <- function(fn = caller_fn()) {
 #' @param value New formals or formals names for `fn`.
 #' @export
 `fn_fmls<-` <- function(fn, value) {
-  fn <- as_closure(fn)
+  check_closure(fn)
   attrs <- attributes(fn)
 
   formals(fn) <- value
@@ -147,7 +125,7 @@ fn_fmls_syms <- function(fn = caller_fn()) {
 #' @rdname fn_fmls
 #' @export
 `fn_fmls_names<-` <- function(fn, value) {
-  fn <- as_closure(fn)
+  check_closure(fn)
   attrs <- attributes(fn)
 
   fmls <- formals(fn)
@@ -158,6 +136,12 @@ fn_fmls_syms <- function(fn = caller_fn()) {
   attributes(fn) <- attrs
 
   fn
+}
+
+check_closure <- function(x) {
+  if (!is_closure(x)) {
+    abort(sprintf("`fn` must be an R function, not %s", friendly_type_of(x)))
+  }
 }
 
 #' Get or set function body
@@ -382,9 +366,8 @@ fn_env <- function(fn) {
 #'
 #' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
 #'
-#' * `as_function()` transform objects to functions. It fetches
-#'   functions by name if supplied a string or transforms formulas to
-#'   function.
+#' * `as_function()` transforms a one-sided formula into a function.
+#'   This powers the lambda syntax in packages like purrr.
 #'
 #' * `as_closure()` first passes its argument to `as_function()`. If
 #'   the result is a primitive function, it regularises it to a proper
@@ -395,16 +378,23 @@ fn_env <- function(fn) {
 #'   If a **function**, it is used as is.
 #'
 #'   If a **formula**, e.g. `~ .x + 2`, it is converted to a function
-#'   with two arguments, `.x` or `.` and `.y`. This allows you to
-#'   create very compact anonymous functions with up to two inputs.
-#'   Functions created from formulas have a special class. Use
-#'   `is_lambda()` to test for it.
+#'   with up to two arguments: `.x` (single argument) or `.x` and `.y`
+#'   (two arguments). The `.` placeholder can be used instead of `.x`.
+#'   This allows you to create very compact anonymous functions with up
+#'   to two inputs. Functions created from formulas have a special
+#'   class. Use `is_lambda()` to test for it.
 #' @param env Environment in which to fetch the function in case `x`
 #'   is a string.
 #' @export
 #' @examples
-#' f <- as_function(~ . + 1)
+#' f <- as_function(~ .x + 1)
 #' f(10)
+#'
+#' g <- as_function(~ -1 * .)
+#' g(4)
+#'
+#' h <- as_function(~ .x - .y)
+#' h(6, 3)
 #'
 #' # Functions created from a formula have a special class:
 #' is_lambda(f)
@@ -419,27 +409,30 @@ fn_env <- function(fn) {
 #' as_closure(`+`)
 #' as_closure(`~`)
 as_function <- function(x, env = caller_env()) {
-  coerce_type(x, friendly_type("function"),
-    primitive = ,
-    closure = {
-      x
-    },
-    formula = {
-      if (length(x) > 2) {
-        abort("Can't convert a two-sided formula to a function")
-      }
-      if (is_quosure(x)) {
-        eval(expr(function(...) eval_tidy(!!x)))
-      } else {
-        args <- list(... = missing_arg(), .x = quote(..1), .y = quote(..2), . = quote(..1))
-        fn <- new_function(args, f_rhs(x), f_env(x))
-        structure(fn, class = "rlang_lambda_function")
-      }
-    },
-    string = {
-      get(x, envir = env, mode = "function")
+  if (is_function(x)) {
+    return(x)
+  }
+
+  if (is_quosure(x)) {
+    return(eval(expr(function(...) eval_tidy(!!x))))
+  }
+
+  if (is_formula(x)) {
+    if (length(x) > 2) {
+      abort("Can't convert a two-sided formula to a function")
     }
-  )
+
+    args <- list(... = missing_arg(), .x = quote(..1), .y = quote(..2), . = quote(..1))
+    fn <- new_function(args, f_rhs(x), f_env(x))
+    fn <- structure(fn, class = c("rlang_lambda_function", "function"))
+    return(fn)
+  }
+
+  if (is_string(x)) {
+    return(get(x, envir = env, mode = "function"))
+  }
+
+  abort_coercion(x, friendly_type("function"))
 }
 #' @export
 print.rlang_lambda_function <- function(x, ...) {
@@ -456,25 +449,27 @@ is_lambda <- function(x) {
 #' @export
 as_closure <- function(x, env = caller_env()) {
   x <- as_function(x, env = env)
-  coerce_type(x, "a closure",
-    closure =
-      x,
-    primitive = {
-      fn_name <- prim_name(x)
 
-      fn <- op_as_closure(fn_name)
-      if (!is_null(fn)) {
-        return(fn)
-      }
+  if (is_closure(x)) {
+    return(x)
+  }
+  if (!is_primitive(x)) {
+    abort_coercion(x, "a closure")
+  }
 
-      fmls <- formals(.ArgsEnv[[fn_name]] %||% .GenericArgsEnv[[fn_name]])
-      prim_call <- call2(x, !!!prim_args(fmls))
+  fn_name <- prim_name(x)
+  fn <- op_as_closure(fn_name)
 
-      # The closure wrapper should inherit from the global environment
-      # to ensure proper lexical dispatch with methods defined there
-      new_function(fmls, prim_call, global_env())
-    }
-  )
+  if (!is_null(fn)) {
+    return(fn)
+  }
+
+  fmls <- formals(args(fn_name))
+  prim_call <- call2(x, !!!prim_args(fmls))
+
+  # The closure wrapper should inherit from the global environment
+  # to ensure proper lexical dispatch with methods defined there
+  new_function(fmls, prim_call, global_env())
 }
 
 prim_args <- function(fmls) {

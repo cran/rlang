@@ -42,25 +42,18 @@
 #' These functions are not yet part of the rlang API. Expect breaking
 #' changes.
 #'
-#' * [with_env()], [locally()]
-#' * [env_poke()]
-#'
-#' * [env_bind_fns()], [env_bind_exprs()]
-#' * [pkg_env()], [pkg_env_name()]
-#' * [scoped_env()], [scoped_names()], [scoped_envs()], [is_scoped()]
-#' * [ns_env()], [ns_imports_env()], [ns_env_name()]
+#' * [with_env()], [locally()], [env_poke()]
+#' * [pkg_env()], [pkg_env_name()], [ns_env()], [ns_imports_env()], [ns_env_name()]
 #'
 #' * [is_pairlist()], [as_pairlist()], [is_node()], [is_node_list()]
+#'
 #' * [is_definition()], [new_definition()], [is_formulaish()],
 #'   [dots_definitions()]
 #'
 #' * [scoped_options()], [with_options()], [push_options()],
 #'   [peek_options()], [peek_option()]
 #'
-#' * [as_bytes()], [chr_unserialise_unicode()], [set_chr_encoding()],
-#'   [chr_encoding()], [set_str_encoding()], [str_encoding()]
-#'
-#' * [mut_utf8_locale()], [mut_latin1_locale()], [mut_mbcs_locale()]
+#' * [as_bytes()], [chr_unserialise_unicode()]
 #'
 #' * [caller_fn()], [current_fn()]
 #'
@@ -69,15 +62,21 @@
 #'
 #' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
 #'
+#'
+#' **In the questioning stage as of rlang 0.4.0**
+#'
+#' These functions are likely to be moved to the vctrs package:
+#'
+#' * [lgl()], [int()], etc.
+#' * [new_logical()], [new_integer()], etc.
+#' * [na_lgl], [na_int], [is_lgl_na()], [is_int_na()], etc.
+#'
+#'
 #' **In the questioning stage as of rlang 0.3.0**
 #'
 #' * [child_env()]
-#' * [type_of()], [switch_type()], [coerce_type()]
-#' * [switch_class()], [coerce_class()]
-#' * [lang_type_of()], [switch_lang()], [coerce_lang()]
 #' * [flatten()], [squash()], and their atomic vector variants
 #' * [modify()] and [prepend()]
-#' * [as_logical()], [as_character()], etc.
 #' * [with_restarts()], [rst_list()], [rst_exists()], [rst_jump()],
 #'   [rst_maybe_jump()], [rst_abort()]. It is not clear yet whether we
 #'   want to recommend restarts as a style of programming in R.
@@ -95,22 +94,60 @@
 #'
 #' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("soft-deprecated")}
 #'
-#' **Soft-deprecated as of rlang 0.3.0**
 #'
-#' * [get_env()]: The `env` argument no longer has a default and must be supplied
-#' * [cnd_signal()]: The `.mufflable` argument no longer has any effect
+#' **Soft-deprecated in rlang 0.4.0**
+#'
+#' * [exiting()]: Handlers are now treated as exiting by default.
 #' * [invoke()]: Use the simpler [exec()] instead.
-#' * [set_attrs()], [mut_attrs()]
+#' * [as_logical()], [as_integer()], etc. => `vctrs::vec_cast()`.
+#' * [type_of()], [switch_type()], [coerce_type()], [switch_class()],
+#'   [coerce_class()]
+#'
+#'
+#' @section Deprecated functions and arguments:
+#'
+#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("deprecated")}
+#'
+#' **Bumped to deprecated in rlang 0.4.0**
+#'
+#' * [modify()] and [prepend()].
+#' * `new_logical_along()`, `new_integer_along()`,
+#'   `new_double_along()`, `new_complex_along()`,
+#'   `new_character_along()`, `new_raw_along()`, `new_list_along()`.
+#'
+#' * [lang_modify()] => [call_modify()]
+#' * [lang_standardise()] => [call_standardise()]
+#' * [lang_fn()] => [call_fn()]
+#' * [lang_name()] => [call_name()]
+#' * [lang_args()] => [call_args()]
+#' * [lang_args_names()] => [call_args_names()]
+#' * [lang_head()], [lang_tail()]
+#' * [lang()] => [call2()]
+#' * [new_language()] => [new_call()]
+#' * [is_lang()] => [is_call()]
+#' * [is_unary_lang()] => Use the `n` argument of [is_call()]
+#' * [is_binary_lang()] => Use the `n` argument of [is_call()]
+#' * [quo_is_lang()] => [quo_is_call()]
+#'
+#' * [call_modify()]: `.standardise` and `.env` arguments.
+#'
+#' * [is_expr()] => [is_expression()]
+#' * `quo_expr()` => [quo_squash()]
+#' * [parse_quosure()] => [parse_quo()]
+#' * [parse_quosures()] => [parse_quos()]
+#' * Assigning non-quosure objects to quosure lists.
+#' * `as.character()` on quosures.
 #'
 #' * [cnd_signal()]: `.cnd` => `cnd`
+#' * [cnd_signal()]: The `.mufflable` argument no longer has any effect
 #'
-#' * [is_frame()], [global_frame()], [current_frame()],
-#'   [ctxt_frame()], [call_frame()], [frame_position()],
-#'   [caller_frame()]
+#' * `scoped_names()` => [base::search()]
+#' * `is_scoped()` => [is_attached()]
+#' * `scoped_env()` => [search_env()]
+#' * `scoped_envs()` => [search_envs()]
 #'
-#' * [ctxt_depth()], [call_depth()], [ctxt_stack()], [call_stack()],
-#'   [stack_trim()]
-#'
+#' * `env_bind_exprs()` => [env_bind_lazy()]
+#' * `env_bind_fns()` => [env_bind_active()]
 #' * Passing a function or formula to `env_depth()`,
 #'   `env_poke_parent()`, `env_parent<-`, `env_tail()`, `set_env()`,
 #'   `env_clone()`, `env_inherits()`, `env_bind()`,
@@ -119,98 +156,45 @@
 #'   `env_bind_fns()`. This internal genericity was causing confusion
 #'   (see issue #427). You should now extract the environment
 #'   separately before calling these functions.
+#' * [get_env()]: The `env` argument no longer has a default and must be supplied
 #'
-#' * `env_bind_exprs()` => [env_bind_lazy()]
-#' * `env_bind_fns()` => [env_bind_active()]
+#' * [is_frame()], [global_frame()], [current_frame()],
+#'   [ctxt_frame()], [call_frame()], [frame_position()],
+#'   [caller_frame()]
 #'
-#' * `scoped_names()` => [base::search()]
-#' * `is_scoped()` => [is_attached()]
-#' * `scoped_env()` => [search_env()]
-#' * `scoped_envs()` => [search_envs()]
+#' * [ctxt_depth()], [call_depth()], [ctxt_stack()], [call_stack()],
+#'   [stack_trim()]
+#'
+#' * [set_attrs()], [mut_attrs()]
 #'
 #' * The `width` and `printer` arguments of [exprs_auto_name()] and
 #'   [quos_auto_name()] no longer have any effect. For the same
 #'   reason, passing a width as `.named` argument of dots collectors
-#'   like `quos()` is soft-deprecated.
+#'   like `quos()` is deprecated.
 #'
-#' * [call_modify()]: `.standardise` and `.env` arguments.
-#'
-#' * `new_logical_along()`, `new_integer_along()`,
-#'   `new_double_along()`, `new_complex_along()`,
-#'   `new_character_along()`, `new_raw_along()`, `new_list_along()`.
-#'
-#' * `as.character()` on quosures.
-#'
-#' * Assigning non-quosure objects to quosure lists.
-#'
-#' * Supplying a named `!!!` call.
-#'
-#'
-#' **Soft-deprecated as of rlang 0.2.0:**
-#'
-#' * [overscope_clean()]
-#' * [overscope_eval_next()] => [eval_tidy()]
-#'
-#' * [lang_head()], [lang_tail()]
-#'
-#' * [quo_expr()] => [quo_squash()]
-#' * [parse_quosure()] => [parse_quo()]
-#' * [parse_quosures()] => [parse_quos()]
-#' * [as_overscope()] => [as_data_mask()]
-#' * [new_overscope()] => [new_data_mask()]
-#'
-#' * [lang()] => [call2()]
-#' * [new_language()] => [new_call()]
-#' * [is_lang()] => [is_call()]
-#' * [is_unary_lang()] => Use the `n` argument of [is_call()]
-#' * [is_binary_lang()] => Use the `n` argument of [is_call()]
-#' * [quo_is_lang()] => [quo_is_call()]
-#' * [is_expr()] => [is_expression()]
-#'
-#' * [lang_modify()] => [call_modify()]
-#' * [lang_standardise()] => [call_standardise()]
-#' * [lang_fn()] => [call_fn()]
-#' * [lang_name()] => [call_name()]
-#' * [lang_args()] => [call_args()]
-#' * [lang_args_names()] => [call_args_names()]
-#'
-#'
-#' @section Deprecated functions and arguments:
-#'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("deprecated")}
-#'
-#' **Deprecated as of rlang 0.3.0**
-#'
-#' * [as_data_mask()]: `parent` argument
-#' * [new_data_mask()]: `parent` argument
-#'
-#' * [env_tail()]: `sentinel` => `last`
-#'
-#' * [abort()], [warn()], [inform()]: `msg`, `type` => `.msg`, `.type`
-#' * [abort()], [warn()], [inform()], [cnd()], [error_cnd()],
-#'   [warning_cnd()], [message_cnd()]: `call` argument.
-#'
-#' * `length()` and `names()` on tidy eval `.data` pronouns.
-#'
-#' * [is_character()], [is_string()], and variants: The `encoding`
-#'   argument.
+#' * `as_overscope()` => [as_data_mask()]
+#' * `new_overscope()` => [new_data_mask()]
+#' * `overscope_eval_next()` => [eval_tidy()]
+#' * `overscope_clean()`
 #'
 #'
 #' @section Defunct functions and arguments:
 #'
 #' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("defunct")}
 #'
-#' **Defunct as of rlang 0.3.0:**
+#' **Defunct as of rlang 0.4.0**
 #'
-#' * [UQE()]
-#' * [eval_tidy_()]
-#' * [is_quosureish()], [as_quosureish()]
-#' * `as_dictionary()` => [as_data_pronoun()]
+#' * `length()` and `names()` on tidy eval `.data` pronouns.
+#' * Supplying a named `!!!` call.
 #'
-#' * [cnd_signal()]: `.msg` and `.call`.
-#'
-#' * [cnd()], [error_cnd()], [warning_cnd()] and [message_cnd()]:
-#'   `.msg` => `message`.
+#' * [as_data_mask()]: `parent` argument
+#' * [new_data_mask()]: `parent` argument
+#' * [env_tail()]: `sentinel` => `last`
+#' * [abort()], [warn()], [inform()]: `msg`, `type` => `.msg`, `.type`
+#' * [abort()], [warn()], [inform()], [cnd()], [error_cnd()],
+#'   [warning_cnd()], [message_cnd()]: `call` argument.
+#' * [is_character()], [is_string()], and variants: The `encoding`
+#'   argument.
 #'
 #'
 #' @section Archived:
@@ -220,7 +204,20 @@
 #' These functions were entirely removed from the package. You will
 #' find them in the commit history and previous releases.
 #'
-#' **Archived in rlang 0.3.0:**
+#'
+#' **Archived as of rlang 0.4.0**
+#'
+#' * `UQE()`
+#' * `as_dictionary()`, `is_dictionary()`
+#' * `as_quosureish()`, `is_quosureish()`
+#' * `eval_tidy_()`
+#' * `mut_utf8_locale()`, `mut_latin1_locale()`, `mut_mbcs_locale()`
+#' * `set_chr_encoding()`, `chr_encoding()`, `set_str_encoding()`, `str_encoding()`
+#' * `as_native_character()`, `as_utf8_string()`, `as_native_string()`
+#' * `lang_type_of()`, `switch_lang()`, `coerce_lang()`
+#'
+#'
+#' **Archived as of rlang 0.3.0:**
 #'
 #' * `cnd_inform()`, `cnd_warn()` and `cnd_abort()`
 #'
@@ -231,6 +228,11 @@
 #' * `rst_muffle()` => [cnd_muffle()]
 #' * `inplace()` => [calling()]. The `muffle` argument of `inplace()`
 #'   has not been implemented in `calling()` and is now defunct.
+#'
+#' * [cnd_signal()]: `.msg` and `.call`.
+#' * [cnd()], [error_cnd()], [warning_cnd()] and [message_cnd()]:
+#'   `.msg` => `message`.
+#'
 #'
 #' @name lifecycle
 NULL

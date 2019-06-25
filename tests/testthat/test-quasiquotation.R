@@ -557,11 +557,6 @@ test_that("unquoting with rlang namespace is deprecated", {
   expect_error_(dots_values(rlang::UQ(quote(.))), "`!!` in a non-quoting function")
 })
 
-test_that("UQE() is defunct", {
-  expect_error_(expr(foo$UQE(NULL)), "defunct")
-  expect_error_(UQE(), "defunct")
-})
-
 test_that("splicing language objects still works", {
   scoped_lifecycle_silence()
 
@@ -579,5 +574,47 @@ test_that("splicing language objects still works", {
 })
 
 test_that("can unquote string in function position", {
-  expect_identical(expr((!!"foo")()), quote("foo"()))
+  expect_identical_(expr((!!"foo")()), quote("foo"()))
+})
+
+test_that("{{ is a quote-unquote operator", {
+  fn <- function(foo) expr(list({{ foo }}))
+  expect_identical_(fn(bar), expr(list(!!quo(bar))))
+  expect_identical_(expr(list({{ letters }})), expr(list(!!quo(!!letters))))
+  expect_error_(expr(list({{ quote(foo) }})), "must be a symbol")
+})
+
+test_that("{{ only works in quoting functions", {
+  expect_error_(
+    list2({{ "foo" }}),
+    "Can't use `{{` in a non-quoting function",
+    fixed = TRUE
+  )
+})
+
+test_that("{{ on the LHS of :=", {
+  foo <- "bar"
+  expect_identical_(exprs({{ foo }} := NA), exprs(bar = NA))
+
+  foo <- quote(bar)
+  expect_identical_(exprs({{ foo }} := NA), exprs(bar = NA))
+
+  foo <- quo(bar)
+  expect_identical_(exprs({{ foo }} := NA), exprs(bar = NA))
+
+  fn <- function(foo) exprs({{ foo }} := NA)
+  expect_identical_(fn(bar), exprs(bar = NA))
+
+  expect_error_(exprs({{ foo() }} := NA), "must be a symbol")
+})
+
+test_that("can unquote-splice in atomic capture", {
+  expect_identical_(chr("a", !!!c("b", "c"), !!!list("d")), c("a", "b", "c", "d"))
+})
+
+test_that("can unquote-splice multiple times (#771)", {
+  expect_identical(call2("foo", !!!list(1, 2), !!!list(3, 4)), quote(foo(1, 2, 3, 4)))
+  expect_identical(list2(!!!list(1, 2), !!!list(3, 4)), list(1, 2, 3, 4))
+  expect_identical(exprs(!!!list(1, 2), !!!list(3, 4)), named_list(1, 2, 3, 4))
+  expect_identical(expr(foo(!!!list(1, 2), !!!list(3, 4))), quote(foo(1, 2, 3, 4)))
 })

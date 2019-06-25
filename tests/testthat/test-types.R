@@ -11,35 +11,11 @@ test_that("predicates match definitions", {
 })
 
 test_that("can bypass string serialisation", {
-  bar <- chr(list("cafe", string(c(0x63, 0x61, 0x66, 0xE9))), .encoding = "latin1")
+  bar <- chr(list("cafe", string(c(0x63, 0x61, 0x66, 0xE9))))
+  Encoding(bar) <- "latin1"
   bytes <- list(bytes(c(0x63, 0x61, 0x66, 0x65)), bytes(c(0x63, 0x61, 0x66, 0xE9)))
   expect_identical(map(bar, as_bytes), bytes)
-  expect_identical(str_encoding(bar[[2]]), "latin1")
-})
-
-test_that("type_of() returns correct type", {
-  expect_identical(type_of("foo"), "string")
-  expect_identical(type_of(letters), "character")
-  expect_identical(type_of(base::`$`), "primitive")
-  expect_identical(type_of(base::list), "primitive")
-  expect_identical(type_of(base::eval), "closure")
-  expect_identical(type_of(~foo), "formula")
-  expect_identical(type_of(quo(foo)), "formula")
-  expect_identical(type_of(quote(a := b)), "definition")
-  expect_identical(type_of(quote(foo())), "language")
-})
-
-test_that("lang_type_of() returns correct lang subtype", {
-  expect_identical(lang_type_of(quote(foo())), "named")
-  expect_identical(lang_type_of(quote(foo::bar())), "namespaced")
-  expect_identical(lang_type_of(quote(foo@bar())), "recursive")
-
-  lang <- quote(foo())
-  node_poke_car(lang, 10)
-  expect_error(lang_type_of(lang), "corrupt")
-
-  node_poke_car(lang, base::list)
-  expect_identical(lang_type_of(lang), "inlined")
+  expect_identical(Encoding(bar[[2]]), "latin1")
 })
 
 test_that("types are friendly", {
@@ -144,4 +120,22 @@ test_that("is_integerish() supports large numbers (#578)", {
   expect_false(is_integerish(2^50 - 0.1))
   expect_false(is_integerish(2^49 - 0.05))
   expect_false(is_integerish(2^40 - 0.0001))
+})
+
+test_that("is_string() matches on string", {
+  expect_true(is_string("foo"))
+  expect_true(is_string("foo", "foo"))
+  expect_false(is_string("foo", "bar"))
+  expect_false(is_string(NA, NA))
+
+  expect_true(is_string("foo", c("foo", "bar")))
+  expect_true(is_string("foo", c("bar", "foo")))
+  expect_false(is_string("foo", c("bar", "baz")))
+})
+
+test_that("is_bool() checks for single `TRUE` or `FALSE`", {
+  expect_true(is_bool(TRUE))
+  expect_true(is_bool(FALSE))
+  expect_false(is_bool(NA))
+  expect_false(is_bool(c(TRUE, FALSE)))
 })

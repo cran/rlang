@@ -171,9 +171,9 @@ new_environment <- function(data = list(), parent = empty_env()) {
 #' Coerce to an environment
 #'
 #' `as_environment()` coerces named vectors (including lists) to an
-#' environment. It first checks that `x` is a dictionary (see
-#' [is_dictionaryish()]). If supplied an unnamed string, it returns the
-#' corresponding package environment (see [pkg_env()]).
+#' environment. The names must be unique. If supplied an unnamed
+#' string, it returns the corresponding package environment (see
+#' [pkg_env()]).
 #'
 #' If `x` is an environment and `parent` is not `NULL`, the
 #' environment is duplicated before being set a new parent. The return
@@ -207,34 +207,27 @@ new_environment <- function(data = list(), parent = empty_env()) {
 #' # With NULL it returns the empty environment:
 #' as_environment(NULL)
 as_environment <- function(x, parent = NULL) {
-  coerce_type(x, "an environment",
-    NULL = {
-      empty_env()
-    },
-    environment = {
-      x
-    },
-    string = {
-      if (length(x) > 1 || is_named(x)) {
-        return(as_env_(x, parent))
-      }
-      pkg_env(x)
-    },
+  if (is_string(x) && !is_named(x)) {
+    return(pkg_env(x))
+  }
+
+  switch(typeof(x),
+    NULL = empty_env(),
+    environment = x,
     logical = ,
     integer = ,
     double = ,
-    complex = ,
     character = ,
+    complex = ,
     raw = ,
-    list = {
-      as_env_(x, parent)
-    }
+    list = vec_as_environment(x, parent),
+    abort_coercion(x, "an environment")
   )
 }
-as_env_ <- function(x, parent = NULL) {
+vec_as_environment <- function(x, parent = NULL) {
   stopifnot(is_dictionaryish(x))
   if (is_atomic(x)) {
-    x <- as_list(x)
+    x <- vec_coerce(x, "list")
   }
   list2env(x, parent = parent %||% empty_env())
 }
@@ -258,7 +251,7 @@ as_env_ <- function(x, parent = NULL) {
 #' @section Life cycle:
 #'
 #' The `sentinel` argument of `env_tail()` has been deprecated in
-#' rlang 0.2.0 and renamed to `last`.
+#' rlang 0.2.0 and renamed to `last`. It is defunct as of rlang 0.4.0.
 #'
 #' @inheritParams get_env
 #' @param n The number of generations to go up.
@@ -269,8 +262,7 @@ as_env_ <- function(x, parent = NULL) {
 #'
 #'   `env_tail()` returns the environment which has `last` as parent
 #'   and `env_parents()` returns the list of environments up to `last`.
-#' @param sentinel This argument is soft-deprecated, please use `last`
-#'   instead.
+#' @param sentinel This argument is defunct, please use `last` instead.
 #' @return An environment for `env_parent()` and `env_tail()`, a list
 #'   of environments for `env_parents()`.
 #' @export
@@ -311,7 +303,7 @@ env_parent <- function(env = caller_env(), n = 1) {
 env_tail <- function(env = caller_env(), last = global_env(),
                      sentinel = NULL) {
   if (!is_null(sentinel)) {
-    warn_deprecated(paste_line(
+    stop_defunct(paste_line(
       "`sentinel` is deprecated as of version 0.3.0.",
       "Please use `last` instead."
     ))
@@ -414,12 +406,12 @@ is_empty_env <- function(env) {
 #'
 #' @section Life cycle:
 #'
-#' - Using `get_env()` without supplying `env` is soft-deprecated as
+#' - Using `get_env()` without supplying `env` is deprecated as
 #'   of rlang 0.3.0. Please use [current_env()] to retrieve the
 #'   current environment.
 #'
 #' - Passing environment wrappers like formulas or functions instead
-#'   of bare environments is soft-deprecated as of rlang 0.3.0. This
+#'   of bare environments is deprecated as of rlang 0.3.0. This
 #'   internal genericity was causing confusion (see issue #427). You
 #'   should now extract the environment separately before calling
 #'   these functions.
@@ -457,35 +449,36 @@ is_empty_env <- function(env) {
 #' identical(get_env(f, default), default)
 get_env <- function(env, default = NULL) {
   if (missing(env)) {
-    signal_soft_deprecated("The `env` argument of `get_env()` must now be supplied")
+    warn_deprecated("The `env` argument of `get_env()` must now be supplied")
     env <- caller_env()
   }
 
-  out <- switch_type(env,
+  out <- switch(typeof(env),
     environment = env,
     definition = ,
-    formula = attr(env, ".Environment"),
+    language = if (is_formula(env)) attr(env, ".Environment"),
+    builtin = ,
+    special = ,
     primitive = base_env(),
-    closure = environment(env),
-    list = switch_class(env, frame = env$env)
+    closure = environment(env)
   )
 
   out <- out %||% default
 
   if (is_null(out)) {
-    type <- friendly_type(type_of(env))
+    type <- friendly_type_of(env)
     abort(paste0("Can't extract an environment from ", type))
   } else {
     out
   }
 }
-get_env_retired <- function(x, fn, env = caller_env(2)) {
+get_env_retired <- function(x, fn) {
   if (is_environment(x)) {
     return(x)
   }
 
   type <- friendly_type_of(x)
-  signal_soft_deprecated(env = env, paste_line(
+  warn_deprecated(paste_line(
     sprintf("Passing an environment wrapper like %s is deprecated.", type),
     sprintf("Please retrieve the environment before calling `%s`", fn)
   ))
@@ -520,18 +513,17 @@ get_env_retired <- function(x, fn, env = caller_env(2)) {
 set_env <- function(env, new_env = caller_env()) {
   new_env <- get_env_retired(new_env, "set_env()")
 
-  switch_type(env,
-    definition = ,
-    formula = ,
-    closure = {
-      environment(env) <- new_env
-      env
-    },
-    environment = new_env,
-    abort(paste0(
-      "Can't set environment for ", friendly_type(type_of(env)), ""
-    ))
-  )
+  if (is_formulaish(env) || is_closure(env)) {
+    environment(env) <- new_env
+    return(env)
+  }
+  if (is_environment(env)) {
+    return(new_env)
+  }
+
+  abort(paste0(
+    "Can't set environment for ", friendly_type_of(env)
+  ))
 }
 #' @rdname get_env
 #' @export

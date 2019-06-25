@@ -174,10 +174,6 @@ sexp* rlang_node_poke_cddr(sexp* x, sexp* newcdr) {
   return x;
 }
 
-sexp* rlang_new_node_(sexp* car, sexp* cdr) {
-  return Rf_cons(car, cdr);
-}
-
 sexp* rlang_node_tag(sexp* x) {
   return TAG(x);
 }
@@ -316,9 +312,29 @@ sexp* rlang_attrib(sexp* x) {
   return ATTRIB(x);
 }
 
+// Picks up symbols from parent environment to avoid bumping namedness
+// during promise resolution
+sexp* rlang_named(sexp* x, sexp* env) {
+  int n_protect = 0;
+
+  x = PROTECT(Rf_findVarInFrame3(env, x, FALSE));
+  ++n_protect;
+
+  if (TYPEOF(x) == PROMSXP) {
+    x = PROTECT(Rf_eval(x, env));
+    ++n_protect;
+  }
+
+  UNPROTECT(n_protect);
+  return Rf_ScalarInteger(NAMED(x));
+}
+
 
 // vec.h
 
+sexp* rlang_vec_alloc(sexp* type, sexp* n) {
+  return Rf_allocVector(Rf_str2type(r_chr_get_c_string(type, 0)), r_int_get(n, 0));
+}
 sexp* rlang_vec_coerce(sexp* x, sexp* type) {
   return Rf_coerceVector(x, Rf_str2type(r_chr_get_c_string(type, 0)));
 }
@@ -436,4 +452,37 @@ sexp* rlang_is_character(sexp* x, sexp* n_) {
 sexp* rlang_is_raw(sexp* x, sexp* n_) {
   r_ssize n = validate_n(n_);
   return r_shared_lgl(r_is_raw(x, n));
+}
+
+sexp* rlang_is_string(sexp* x, sexp* string) {
+  if (r_typeof(x) != r_type_character || r_length(x) != 1) {
+    return r_shared_false;
+  }
+
+  sexp* value = r_chr_get(x, 0);
+
+  if (value == NA_STRING) {
+    return r_shared_false;
+  }
+
+  if (string == r_null) {
+    return r_shared_true;
+  }
+
+  if (!rlang_is_string(string, r_null)) {
+    r_abort("`string` must be `NULL` or a string");
+  }
+
+  bool out = false;
+  r_ssize n = r_length(string);
+  sexp** p = r_chr_deref(string);
+
+  for (r_ssize i = 0; i < n; ++i, ++p) {
+    if (*p == value) {
+      out = true;
+      break;
+    }
+  }
+
+  return r_shared_lgl(out);
 }

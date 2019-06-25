@@ -229,6 +229,11 @@ locally <- function(expr) {
 #' invoke(call_inspect, mtcars, .bury = c("inspect!", "col"))
 invoke <- function(.fn, .args = list(), ...,
                    .env = caller_env(), .bury = c(".fn", "")) {
+  signal_soft_deprecated(c(
+    "`invoke()` is deprecated as of rlang 0.4.0.",
+    "Please use `exec()` or `eval(expr())`instead."
+  ))
+
   args <- c(.args, list(...))
 
   if (is_null(.bury) || !length(args)) {
@@ -267,4 +272,54 @@ value <- function(expr) {
 
 eval_top <- function(expr, env = caller_env()) {
   .Call(rlang_eval_top, expr, env)
+}
+
+
+#' Execute a function
+#'
+#' @description
+#'
+#' This function constructs and evaluates a call to `.fn`.
+#' It has two primary uses:
+#'
+#' * To call a function with arguments stored in a list (if the function
+#'   doesn't support [tidy-dots])
+#'
+#' * To call every function stored in a list (in conjunction with `map()`/
+#'   [lapply()])
+#'
+#' @param .fn A function, or function name as a string.
+#' @param ... Arguments to function.
+#'
+#'   These dots support [tidy-dots] features.
+#' @param  .env Environment in which to evaluate the call. This will be
+#'   most useful if `f` is a string, or the function has side-effects.
+#' @export
+#' @examples
+#' args <- list(x = c(1:10, 100, NA), na.rm = TRUE)
+#' exec("mean", !!!args)
+#' exec("mean", !!!args, trim = 0.2)
+#'
+#' fs <- list(a = function() "a", b = function() "b")
+#' lapply(fs, exec)
+#'
+#' # Compare to do.call it will not automatically inline expressions
+#' # into the evaluated call.
+#' x <- 10
+#' args <- exprs(x1 = x + 1, x2 = x * 2)
+#' exec(list, !!!args)
+#' do.call(list, args)
+#'
+#' # exec() is not designed to generate pretty function calls. This is
+#' # most easily seen if you call a function that captures the call:
+#' f <- disp ~ cyl
+#' exec("lm", f, data = mtcars)
+#'
+#' # If you need finer control over the generated call, you'll need to
+#' # construct it yourself. This may require creating a new environment
+#' # with carefully constructed bindings
+#' data_env <- env(data = mtcars)
+#' eval(expr(lm(!!f, data)), data_env)
+exec <- function(.fn, ..., .env = caller_env()) {
+  .External2(rlang_exec, .fn, .env)
 }

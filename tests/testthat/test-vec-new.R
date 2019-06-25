@@ -35,7 +35,7 @@ test_that("objects are not spliced", {
 })
 
 test_that("explicitly spliced lists are spliced", {
-  expect_identical(lgl(FALSE, structure(list(TRUE, TRUE), class = "spliced")), c(FALSE, TRUE, TRUE))
+  expect_identical(lgl(FALSE, splice(list(TRUE, TRUE))), c(FALSE, TRUE, TRUE))
 })
 
 test_that("splicing uses inner names", {
@@ -111,4 +111,9 @@ test_that("rep_named() repeats along names", {
 
 test_that("rep_along() reps along vector", {
   expect_identical(rep_along(1:2, list(zap())), list(zap(), zap()))
+})
+
+test_that("chr() supports logical NA", {
+  expect_identical(chr(NA), na_chr)
+  expect_identical(chr(NA, NA), c(na_chr, na_chr))
 })

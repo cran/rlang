@@ -22,7 +22,7 @@
 #' @param .fn Function to call. Must be a callable object: a string,
 #'   symbol, call, or a function.
 #' @param ... Arguments to the call either in or out of a list. These dots
-#'   support [tidy dots][tidy-dots] features.
+#'   support [tidy dots][tidy-dots] features. Empty arguments are preserved.
 #' @param .ns Namespace with which to prefix `.fn`. Must be a string
 #'   or symbol.
 #'
@@ -90,23 +90,43 @@
 #'
 #' # Creating namespaced calls is easy:
 #' call2("fun", arg = quote(baz), .ns = "mypkg")
+#'
+#' # Empty arguments are preserved:
+#' call2("[", quote(x), , drop = )
 #' @export
 call2 <- function(.fn, ..., .ns = NULL) {
-  if (is_character(.fn)) {
-    if (length(.fn) != 1) {
-      abort("`.fn` must be a length 1 string")
-    }
-    .fn <- sym(.fn)
-  } else if (!is_callable(.fn)) {
-    abort("Can't create call to non-callable object")
-  }
-
-  if (!is_null(.ns)) {
-    .fn <- new_call(namespace_sym, pairlist(sym(.ns), .fn))
-  }
-
-  new_call(.fn, as.pairlist(list2(...)))
+  .External2(rlang_call2_external, .fn, .ns)
 }
+#' Create pairlists with splicing support
+#'
+#' This pairlist constructor supports [tidy dots][tidy-dots] features
+#' like `!!!`. Use it to manually create argument lists for calls or
+#' parameter lists for functions.
+#'
+#' @param ... Arguments stored in the pairlist. Empty arguments are
+#'   preserved.
+#'
+#' @export
+#' @examples
+#' # Unlike `exprs()`, `pairlist2()` evaluates its arguments.
+#' new_function(pairlist2(x = 1, y = 3 * 6), quote(x * y))
+#' new_function(exprs(x = 1, y = 3 * 6), quote(x * y))
+#'
+#' # It preserves missing arguments, which is useful for creating
+#' # parameters without defaults:
+#' new_function(pairlist2(x = , y = 3 * 6), quote(x * y))
+pairlist2 <- function(...) {
+  .Call(rlang_dots_pairlist,
+    frame_env = environment(),
+    named = FALSE,
+    ignore_empty = "trailing",
+    preserve_empty = TRUE,
+    unquote_names = TRUE,
+    homonyms = "keep",
+    check_assign = FALSE
+  )
+}
+
 
 #' Is an object callable?
 #'
@@ -409,15 +429,9 @@ call_print_fine_type <- function(call) {
 #'
 #' @section Life cycle:
 #'
-#' * Prior to rlang 0.3.0, `NULL` was the sentinel for removing
-#'   arguments. As of 0.3.0, [zap()] objects remove arguments and
-#'   `NULL` simply adds an argument set to `NULL`. This breaking
-#'   change allows the deletion sentinel to be distinct from valid
-#'   argument values.
+#' * The `.standardise` argument is deprecated as of rlang 0.3.0.
 #'
-#' * The `.standardise` argument is soft-deprecated as of rlang 0.3.0.
-#'
-#' * In rlang 0.2.0, `lang_modify()` was soft-deprecated and renamed to
+#' * In rlang 0.2.0, `lang_modify()` was deprecated and renamed to
 #'   `call_modify()`. See lifecycle section in [call2()] for more about
 #'   this change.
 #'
@@ -494,8 +508,8 @@ call_modify <- function(.call,
   expr <- get_expr(.call)
 
   if (!is_null(.standardise)) {
-    signal_soft_deprecated(paste_line(
-      "`.standardise` is soft-deprecated as of rlang 0.3.0.",
+    warn_deprecated(paste_line(
+      "`.standardise` is deprecated as of rlang 0.3.0.",
       "Please use `call_standardise()` prior to calling `call_modify()`."
     ))
     if (.standardise) {
@@ -592,9 +606,9 @@ abort_call_input_type <- function(arg) {
 #'
 #' @section Life cycle:
 #'
-#' In rlang 0.2.0, `lang_standardise()` was soft-deprecated and
-#' renamed to `call_standardise()`. See lifecycle section in [call2()]
-#' for more about this change.
+#' In rlang 0.2.0, `lang_standardise()` was deprecated and renamed to
+#' `call_standardise()`. See lifecycle section in [call2()] for more
+#' about this change.
 #'
 #' @param call Can be a call or a quosure that wraps a call.
 #' @param env The environment where to find the definition of the
@@ -634,7 +648,7 @@ call_standardise <- function(call, env = caller_env()) {
 #'
 #' @section Life cycle:
 #'
-#' In rlang 0.2.0, `lang_fn()` was soft-deprecated and renamed to
+#' In rlang 0.2.0, `lang_fn()` was deprecated and renamed to
 #' `call_fn()`. See lifecycle section in [call2()] for more about this
 #' change.
 #'
@@ -661,7 +675,7 @@ call_fn <- function(call, env = caller_env()) {
     abort_call_input_type("call")
   }
 
-  switch_call(expr,
+  switch(call_type(expr),
     recursive = abort("`call` does not call a named or inlined function"),
     inlined = node_car(expr),
     named = ,
@@ -674,9 +688,9 @@ call_fn <- function(call, env = caller_env()) {
 #'
 #' @section Life cycle:
 #'
-#' In rlang 0.2.0, `lang_name()` was soft-deprecated and renamed to
-#' `call_name()`. See lifecycle section in [call2()] for more about this
-#' change.
+#' In rlang 0.2.0, `lang_name()` was deprecated and renamed to
+#' `call_name()`. See lifecycle section in [call2()] for more about
+#' this change.
 #'
 #' @inheritParams call_standardise
 #' @return A string with the function name, or `NULL` if the function
@@ -713,7 +727,7 @@ call_name <- function(call) {
     abort_call_input_type("call")
   }
 
-  switch_call(call,
+  switch(call_type(call),
     named = as_string(node_car(call)),
     namespaced = as_string(node_cadr(node_cdar(call))),
     NULL
@@ -743,9 +757,8 @@ call_ns <- function(call) {
 #' @section Life cycle:
 #'
 #' In rlang 0.2.0, `lang_args()` and `lang_args_names()` were
-#' soft-deprecated and renamed to `call_args()` and
-#' `call_args_names()`. See lifecycle section in [call2()] for more
-#' about this change.
+#' deprecated and renamed to `call_args()` and `call_args_names()`.
+#' See lifecycle section in [call2()] for more about this change.
 #'
 #' @inheritParams call_standardise
 #' @return A named list of arguments.
@@ -836,4 +849,22 @@ which_operator <- function(call) {
 }
 call_has_precedence <- function(call, parent_call, side = NULL) {
   .Call(rlang_call_has_precedence, call, parent_call, side)
+}
+
+call_type <- function(x) {
+  x <- get_expr(x)
+  stopifnot(typeof(x) == "language")
+
+  type <- typeof(node_car(x))
+  if (type == "symbol") {
+    "named"
+  } else if (is_namespaced_symbol(node_car(x))) {
+    "namespaced"
+  } else if (type == "language") {
+    "recursive"
+  } else if (type %in% c("closure", "builtin", "special")) {
+    "inlined"
+  } else {
+    abort("corrupt language object")
+  }
 }

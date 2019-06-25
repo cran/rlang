@@ -21,15 +21,13 @@ static inline const char* r_str_deref(sexp* str) {
   return CHAR(str);
 }
 
-static inline const char* r_chr_get_c_string(sexp* scalar_chr, r_ssize i) {
-  return CHAR(r_chr_get(scalar_chr, i));
+static inline const char* r_chr_get_c_string(sexp* chr, r_ssize i) {
+  return CHAR(r_chr_get(chr, i));
 }
 
 static inline sexp* r_nms_get(sexp* nms, r_ssize i) {
   if (nms == r_null) {
-    static sexp* empty_str = NULL;
-    if (!empty_str) empty_str = Rf_mkChar("");
-    return empty_str;
+    return r_empty_str;
   } else {
     return r_chr_get(nms, i);
   }
@@ -53,15 +51,6 @@ static inline sexp* r_chr(const char* c_string) {
 
 sexp* chr_prepend(sexp* chr, sexp* r_string);
 sexp* chr_append(sexp* chr, sexp* r_string);
-
-static inline bool r_is_empty_string(sexp* str) {
-  const char* c_str = CHAR(str);
-  return strcmp(c_str, "") == 0;
-}
-
-static inline bool r_chr_has_empty_string_at(sexp* chr, r_ssize i) {
-  return r_is_empty_string(r_chr_get(chr, i));
-}
 
 sexp* r_nms_are_duplicated(sexp* nms, bool from_last);
 
@@ -88,7 +77,7 @@ static inline bool r_str_is_name(sexp* str) {
   if (str == r_missing_str) {
     return false;
   }
-  if (r_is_empty_string(str)) {
+  if (str == r_empty_str) {
     return false;
   }
   return true;

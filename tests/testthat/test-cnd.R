@@ -18,8 +18,11 @@ test_that("cnd_signal() creates muffle restarts", {
   )
 })
 
-test_that("error when msg is not a string", {
-  expect_error(warn(letters), "must be a string")
+test_that("signallers support character vectors as `message` parameter", {
+  expect_message(inform(c("foo", "bar")), "foo\nbar")
+  expect_warning(warn(c("foo", "bar")), "foo\nbar")
+  expect_error(abort(c("foo", "bar")), "foo\nbar")
+  expect_condition(signal(c("foo", "bar"), "quux"), "quux", regex = "foo\nbar")
 })
 
 
@@ -34,8 +37,8 @@ context("handlers") # ------------------------------------------------
 
 test_that("with_handlers() establishes inplace and exiting handlers", {
   handlers <- list(
-    error = exiting(function(c) "caught error"),
-    message = exiting(function(c) "caught message"),
+    error = function(c) "caught error",
+    message = function(c) "caught message",
     warning = calling(function(c) "warning"),
     foobar = calling(function(c) cat("foobar"))
   )
@@ -88,7 +91,7 @@ test_that("cnd_signal() and signal() returns NULL invisibly", {
 
 test_that("signal() accepts character vectors of classes (#195)", {
   expect <- calling(function(cnd) {
-    expect_identical(class(cnd), c("foo", "bar", "rlang_condition", "condition"))
+    expect_identical(class(cnd), c("foo", "bar", "condition"))
   })
   with_handlers(signal("", c("foo", "bar")), foo = expect)
 })
@@ -146,7 +149,7 @@ test_that("can muffle conditions", {
 })
 
 test_that("conditions have correct subclasses", {
-  expect_true(inherits_all(catch_cnd(signal("", "foo")), c("foo", "rlang_condition", "condition")))
+  expect_true(inherits_all(catch_cnd(signal("", "foo")), c("foo", "condition", "condition")))
   expect_true(inherits_all(catch_cnd(inform("", "foo")), c("foo", "message", "condition")))
   expect_true(inherits_all(catch_cnd(warn("", "foo")), c("foo", "warning", "condition")))
   expect_true(inherits_all(catch_cnd(abort("", "foo")), c("foo", "rlang_error", "error", "condition")))
@@ -308,6 +311,7 @@ test_that("on_error option can be tweaked", {
 
     cat_line("", "", "", ">>> Default (not interactive):", "")
     with_options(
+      rlang_backtrace_on_error = NULL,
       rlang_interactive = FALSE,
       msg()
     )
@@ -499,25 +503,36 @@ test_that("signal context is detected", {
   expect_equal(eval_top(expr), list("warning_promoted", quote(f())))
 })
 
+test_that("with_handlers() registers calling handlers first (#718)", {
+  out <- with_restarts(
+    RESTART = ~ "good",
+    with_handlers(
+      CND = calling(~ rst_jump("RESTART")),
+      CND = ~ "bad",
+      signal("", "CND")
+    )
+  )
+  expect_identical(out, "good")
+
+  out <- with_restarts(
+    RESTART = ~ "good",
+    with_handlers(
+      CND = ~ "bad",
+      CND = calling(~ rst_jump("RESTART")),
+      signal("", "CND")
+    )
+  )
+  expect_identical(out, "good")
+})
+
+test_that("can pass classed strings as error message", {
+  message <- structure("foo", class = c("glue", "character"))
+  err <- catch_cnd(abort(message))
+  expect_identical(err$message, message)
+})
+
 
 # Lifecycle ----------------------------------------------------------
-
-test_that("deprecated arguments of abort() etc still work", {
-  foo <- function() {
-    abort(msg = "foo", type = "bar", call = TRUE)
-  }
-
-  cnds <- catch_cnds(foo())
-  msgs <- pluck_conditions_msgs(cnds)
-
-  warnings_msgs <- msgs$warnings
-  expect_length(warnings_msgs, 3L)
-  expect_match(warnings_msgs[[1]], "`msg` has been renamed to `message`")
-  expect_match(warnings_msgs[[2]], "`type` has been renamed to `.subclass`")
-  expect_match(warnings_msgs[[3]], "`call` is deprecated")
-
-  expect_match(msgs$error, "foo")
-})
 
 test_that("deprecated arguments of cnd_signal() still work", {
   scoped_lifecycle_silence()

@@ -19,21 +19,29 @@ overscope_clean(overscope)
 
 \item{bottom}{The environment containing masking objects if the
 data mask is one environment deep. The bottom environment if the
-data mask comprises multiple environment.}
+data mask comprises multiple environment.
+
+If you haven't supplied \code{top}, this \strong{must} be an environment
+that you own, i.e. that you have created yourself.}
 
 \item{top}{The last environment of the data mask. If the data mask
 is only one environment deep, \code{top} should be the same as
-\code{bottom}.}
+\code{bottom}.
+
+This \strong{must} be an environment that you own, i.e. that you have
+created yourself. The parent of \code{top} will be changed by the tidy
+eval engine and should be considered undetermined. Never make
+assumption about the parent of \code{top}.}
 
 \item{enclosure}{The \code{parent} argument of \code{\link[=new_data_mask]{new_data_mask()}}.}
 
 \item{overscope}{A data mask.}
 }
 \description{
-\Sexpr[results=rd, stage=render]{rlang:::lifecycle("soft-deprecated")}
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("deprecated")}
 
-These functions have been soft-deprecated in rlang 0.2.0. Please
-use \code{\link[=as_data_mask]{as_data_mask()}} and \code{\link[=new_data_mask]{new_data_mask()}} instead. We no longer
+These functions have been deprecated in rlang 0.2.0. Please use
+\code{\link[=as_data_mask]{as_data_mask()}} and \code{\link[=new_data_mask]{new_data_mask()}} instead. We no longer
 require the mask to be cleaned up so \code{overscope_clean()} does not
 have a replacement.
 }

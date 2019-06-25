@@ -34,6 +34,11 @@ poke_type <- function(x, type) {
 sexp_address <- function(x) {
   .Call(rlang_sexp_address, x)
 }
+sexp_named <- function(x) {
+  # Don't use `substitute()` because dots might be forwarded
+  arg <- match.call(expand.dots = FALSE)$x
+  .Call(rlang_named, arg, parent.frame())
+}
 
 mark_object <- function(x) {
   invisible(.Call(rlang_mark_object, x))
@@ -71,6 +76,14 @@ errorcall <- function(call, msg) {
 
 sexp_attrib <- function(x) {
   .Call(rlang_attrib, x)
+}
+
+vec_alloc <- function(type, n) {
+  stopifnot(
+    is_string(type),
+    is_integer(n, 1)
+  )
+  .Call(rlang_vec_alloc, type, n)
 }
 
 # nocov end

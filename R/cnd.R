@@ -11,7 +11,7 @@
 #' @section Lifecycle:
 #'
 #' The `.type` and `.msg` arguments have been renamed to `.subclass`
-#' and `message`. They are defunct as of rlang 0.3.0.
+#' and `message`. They are deprecated as of rlang 0.3.0.
 #'
 #' @param .subclass The condition subclass.
 #' @param ... Named data fields stored inside the condition
@@ -45,7 +45,7 @@ cnd <- function(.subclass, ..., message = "") {
   if (missing(.subclass)) {
     abort("Bare conditions must be subclassed")
   }
-  .Call(rlang_new_condition, c(.subclass, "rlang_condition"), message, dots_list(...))
+  .Call(rlang_new_condition, .subclass, message, dots_list(...))
 }
 #' @rdname cnd
 #' @export
@@ -96,88 +96,57 @@ cnd_type <- function(cnd) {
   .Call(rlang_cnd_type, cnd)
 }
 
-#' Signal a condition
+#' Signal a condition object
 #'
-#' Signal a condition to handlers that have been established on the
-#' stack. Conditions signalled with `cnd_signal()` are assumed to be
-#' benign. Control flow can resume normally once the condition has
-#' been signalled (if no handler jumped somewhere else on the
-#' evaluation stack). On the other hand, `cnd_abort()` treats the
-#' condition as critical and will jump out of the distressed call
-#' frame (see [rst_abort()]), unless a handler can deal with the
-#' condition.
+#' @description
 #'
-#' If `.critical` is `FALSE`, this function has no side effects beyond
-#' calling handlers. In particular, execution will continue normally
-#' after signalling the condition (unless a handler jumped somewhere
-#' else via [rst_jump()] or by being [exiting()]). If `.critical` is
-#' `TRUE`, the condition is signalled via [base::stop()] and the
-#' program will terminate if no handler dealt with the condition by
-#' jumping out of the distressed call frame.
+#' The type of signal depends on the class of the condition:
 #'
-#' [calling()] handlers are called in turn when they decline to handle
-#' the condition by returning normally. However, it is sometimes
-#' useful for a calling handler to produce a side effect (signalling
-#' another condition, displaying a message, logging something, etc),
-#' prevent the condition from being passed to other handlers, and
-#' resume execution from the place where the condition was
-#' signalled. The easiest way to accomplish this is by jumping to a
-#' restart point (see [with_restarts()]) established by the signalling
-#' function. `cnd_signal()` always installs a muffle restart (see
-#' [cnd_muffle()]).
+#' * A message is signalled if the condition inherits from
+#'   `"message"`. This is equivalent to signalling with [inform()] or
+#'   [base::message()].
+#'
+#' * A warning is signalled if the condition inherits from
+#'   `"warning"`. This is equivalent to signalling with [warn()] or
+#'   [base::warning()].
+#'
+#' * An error is signalled if the condition inherits from
+#'   `"error"`. This is equivalent to signalling with [abort()] or
+#'   [base::stop()].
+#'
+#' * An interrupt is signalled if the condition inherits from
+#'   `"interrupt"`. This is equivalent to signalling with
+#'   [interrupt()].
+#'
+#' Use [cnd_type()] to determine the type of a condition.
+#'
 #'
 #' @section Lifecycle:
 #'
-#' * Modifying a condition object with `cnd_signal()` is defunct.
-#'   Consequently the `.msg` and `.call` arguments are retired and
-#'   defunct as of rlang 0.3.0.  In addition `.cnd` is renamed to
-#'   `cnd` and soft-deprecated.
+#' * `.cnd` has been renamed to `cnd` and is deprecated as of rlang 0.3.0.
 #'
-#' * The `.mufflable` argument is soft-deprecated and no longer has
-#'   any effect. Non-critical conditions are always signalled with a
-#'   muffle restart.
+#' * The `.mufflable` argument is deprecated as of rlang 0.3.0 and no
+#'   longer has any effect. Non-critical conditions are always
+#'   signalled with a muffle restart.
 #'
-#' * Creating a condition object with [cnd_signal()] is
-#'   soft-deprecated. Please use [signal()] instead.
+#' * Creating a condition object with [cnd_signal()] is deprecated as
+#'   of rlang 0.3.0. Please use [signal()] instead.
 #'
 #' @param cnd A condition object (see [cnd()]).
-#' @param .cnd,.mufflable These arguments are retired. `.cnd` has been
-#'   renamed to `cnd` and `.mufflable` no longer has any effect as
-#'   non-critical conditions are always signalled with a muffling
-#'   restart.
-#' @seealso [abort()], [warn()] and [inform()] for signalling typical
-#'   R conditions. See [with_handlers()] for establishing condition
-#'   handlers.
+#' @param .cnd,.mufflable These arguments are deprecated.
+#' @seealso [abort()], [warn()] and [inform()] for creating and
+#'   signalling structured R conditions. See [with_handlers()] for
+#'   establishing condition handlers.
 #' @export
 #' @examples
-#' # Creating a condition of type "foo"
-#' cnd <- cnd("foo")
-#'
-#' # If no handler capable of dealing with "foo" is established on the
-#' # stack, signalling the condition has no effect:
+#' # The type of signal depends on the class. If the condition
+#' # inherits from "warning", a warning is issued:
+#' cnd <- warning_cnd("my_warning_class", message = "This is a warning")
 #' cnd_signal(cnd)
 #'
-#' # To learn more about establishing condition handlers, see
-#' # documentation for with_handlers(), exiting() and calling():
-#' with_handlers(cnd_signal(cnd),
-#'   foo = calling(function(c) cat("side effect!\n"))
-#' )
-#'
-#'
-#' # By default, cnd_signal() creates a muffling restart which allows
-#' # calling handlers to prevent a condition from being passed on to
-#' # other handlers and to resume execution:
-#' undesirable_handler <- calling(function(c) cat("please don't call me\n"))
-#' muffling_handler <- calling(function(c) {
-#'   cat("muffling foo...\n")
-#'   cnd_muffle(c)
-#' })
-#'
-#' with_handlers(foo = undesirable_handler,
-#'   with_handlers(foo = muffling_handler, {
-#'     cnd_signal(cnd("foo"))
-#'     "return value"
-#'   }))
+#' # If it inherits from "error", an error is raised:
+#' cnd <- error_cnd("my_error_class", message = "This is an error")
+#' try(cnd_signal(cnd))
 cnd_signal <- function(cnd, .cnd, .mufflable) {
   validate_cnd_signal_args(cnd, .cnd, .mufflable)
   invisible(.Call(rlang_cnd_signal, cnd))
@@ -185,20 +154,20 @@ cnd_signal <- function(cnd, .cnd, .mufflable) {
 validate_cnd_signal_args <- function(cnd, .cnd, .mufflable,
                                      env = parent.frame()) {
   if (is_character(cnd)) {
-    signal_soft_deprecated(paste_line(
-      "Creating a condition with `cnd_signal()` is soft-deprecated as of rlang 0.3.0.",
+    warn_deprecated(paste_line(
+      "Creating a condition with `cnd_signal()` is deprecated as of rlang 0.3.0.",
       "Please use `signal()` instead."
     ))
     env$cnd <- cnd(cnd)
   }
   if (!missing(.cnd)) {
-    signal_soft_deprecated(paste_line(
-      "The `.cnd` argument is soft-deprecated as of rlang 0.3.0.",
+    warn_deprecated(paste_line(
+      "The `.cnd` argument is deprecated as of rlang 0.3.0.",
       "Please use `cnd` instead."
     ))
     if (is_character(.cnd)) {
-      signal_soft_deprecated(paste_line(
-        "Creating a condition with `cnd_signal()` is soft-deprecated as of rlang 0.3.0.",
+      warn_deprecated(paste_line(
+        "Creating a condition with `cnd_signal()` is deprecated as of rlang 0.3.0.",
         "Please use `signal()` instead."
       ))
       .cnd <- cnd(.cnd)
@@ -206,29 +175,11 @@ validate_cnd_signal_args <- function(cnd, .cnd, .mufflable,
     env$cnd <- .cnd
   }
   if (!missing(.mufflable)) {
-    signal_soft_deprecated(
-      "`.mufflable` is soft-deprecated as of rlang 0.3.0 and no longer has any effect"
+    warn_deprecated(
+      "`.mufflable` is deprecated as of rlang 0.3.0 and no longer has any effect"
     )
   }
 }
-
-cnd_call <- function(call) {
-  if (is_null(call) || is_false(call)) {
-    return(NULL)
-  }
-  if (is_call(call)) {
-    return(call)
-  }
-
-  if (is_true(call)) {
-    call <- 1L
-  } else if (!is_scalar_integerish(call, finite = TRUE)) {
-    stop("`call` must be a scalar logical or number", call. = FALSE)
-  }
-
-  sys.call(sys.parent(call + 1L))
-}
-
 
 #' Signal an error, warning, or message
 #'
@@ -296,10 +247,10 @@ cnd_call <- function(call) {
 #' @param .subclass Subclass of the condition. This allows your users
 #'   to selectively handle the conditions signalled by your functions.
 #' @param ... Additional data to be stored in the condition object.
-#' @param call Deprecated as of rlang 0.3.0. Storing the full
+#' @param call Defunct as of rlang 0.4.0. Storing the full
 #'   backtrace is now preferred to storing a simple call.
 #' @param msg,type These arguments were renamed to `message` and
-#'   `.type` and are deprecated as of rlang 0.3.0.
+#'   `.subclass` and are defunct as of rlang 0.4.0.
 #'
 #' @seealso [with_abort()] to convert all errors to rlang errors.
 #' @examples
@@ -378,6 +329,12 @@ abort <- function(message, .subclass = NULL,
     trace <- trace_trim_context(trace, context)
   }
 
+  # Only collapse lengthy vectors because `paste0()` removes the class
+  # of glue strings
+  if (length(message) > 1) {
+    message <- paste0(message, collapse = "\n")
+  }
+
   cnd <- error_cnd(.subclass,
     ...,
     message = message,
@@ -436,6 +393,7 @@ find_capture_context <- function(n = 3L) {
 warn <- function(message, .subclass = NULL, ..., call = NULL, msg, type) {
   validate_signal_args(msg, type, call)
 
+  message <- paste0(message, collapse = "\n")
   cnd <- warning_cnd(.subclass, ..., message = message)
   warning(cnd)
 }
@@ -444,6 +402,7 @@ warn <- function(message, .subclass = NULL, ..., call = NULL, msg, type) {
 inform <- function(message, .subclass = NULL, ..., call = NULL, msg, type) {
   validate_signal_args(msg, type, call)
 
+  message <- paste0(message, collapse = "\n")
   message <- paste0(message, "\n")
   cnd <- message_cnd(.subclass, ..., message = message)
   message(cnd)
@@ -451,20 +410,19 @@ inform <- function(message, .subclass = NULL, ..., call = NULL, msg, type) {
 #' @rdname abort
 #' @export
 signal <- function(message, .subclass, ...) {
+  message <- paste0(message, collapse = "\n")
   cnd <- cnd(.subclass, ..., message = message)
   cnd_signal(cnd)
 }
-validate_signal_args <- function(msg, type, call, env = parent.frame()) {
+validate_signal_args <- function(msg, type, call) {
   if (!missing(msg)) {
-    warn_deprecated("`msg` has been renamed to `message` and is deprecated as of rlang 0.3.0")
-    env$message <- msg
+    stop_defunct("`msg` has been renamed to `message` and is deprecated as of rlang 0.3.0")
   }
   if (!missing(type)) {
-    warn_deprecated("`type` has been renamed to `.subclass` and is deprecated as of rlang 0.3.0")
-    env$.subclass <- type
+    stop_defunct("`type` has been renamed to `.subclass` and is deprecated as of rlang 0.3.0")
   }
   if (!is_null(call)) {
-    warn_deprecated("`call` is deprecated as of rlang 0.3.0")
+    stop_defunct("`call` is deprecated as of rlang 0.3.0")
   }
 }
 #' @rdname abort
@@ -544,11 +502,9 @@ cnd_muffle <- function(cnd) {
   switch(cnd_type(cnd),
     message = invokeRestart("muffleMessage"),
     warning = invokeRestart("muffleWarning"),
-    interrupt = invokeRestart("resume")
-  )
-  if (inherits(cnd, "rlang_condition")) {
+    interrupt = invokeRestart("resume"),
     invokeRestart("rlang_muffle")
-  }
+  )
 
   abort("Can't find a muffling restart")
 }
@@ -946,11 +902,11 @@ entrace_handle_top <- function(trace) {
       msg <- cnd$message
     }
   } else {
-    msg <- NULL
+    msg <- geterrmessage()
   }
 
   # Save a fake rlang error containing the backtrace
-  err <- error_cnd(message = msg, trace = trace, parent = cnd)
+  err <- error_cnd(message = msg, error = cnd, trace = trace, parent = cnd)
   last_error_env$cnd <- err
 
   # Print backtrace for current error
@@ -964,7 +920,7 @@ entrace_handle_top <- function(trace) {
 
 add_backtrace <- function() {
   # Warnings don't go through when error is being handled
-  msg <- "Warning: `add_backtrace()` is now exported as `enframe()` as of rlang 0.3.1"
+  msg <- "Warning: `add_backtrace()` is now exported as `entrace()` as of rlang 0.3.1"
   cat_line(msg, file = stderr())
   entrace(bottom = sys.frame(-1))
 }

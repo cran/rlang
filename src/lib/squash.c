@@ -1,6 +1,19 @@
 #include "rlang.h"
 #include "export.h"
 
+// Initialised at load time
+static bool (*rlang_is_splice_box)(sexp*) = NULL;
+static sexp* (*rlang_unbox)(sexp*) = NULL;
+
+// The vector to splice might be boxed in a sentinel wrapper
+static sexp* maybe_unbox(sexp* x, bool (*is_spliceable)(sexp*)) {
+  if (is_spliceable(x) && rlang_is_splice_box(x)) {
+    return r_vec_coerce(rlang_unbox(x), r_type_list);
+  } else {
+    return x;
+  }
+}
+
 
 typedef struct {
   r_ssize size;
@@ -35,10 +48,12 @@ static r_ssize atom_squash(enum r_type kind, squash_info_t info,
 
   for (r_ssize i = 0; i != n_outer; ++i) {
     inner = VECTOR_ELT(outer, i);
-    n_inner = r_vec_length(inner);
+    n_inner = r_vec_length(maybe_unbox(inner, is_spliceable));
 
     if (depth != 0 && is_spliceable(inner)) {
+      inner = PROTECT(maybe_unbox(inner, is_spliceable));
       count = atom_squash(kind, info, inner, out, count, is_spliceable, depth - 1);
+      UNPROTECT(1);
     } else if (n_inner) {
       r_vec_poke_coerce_n(out, count, inner, 0, n_inner);
 
@@ -77,7 +92,9 @@ static r_ssize list_squash(squash_info_t info, sexp* outer,
     inner = VECTOR_ELT(outer, i);
 
     if (depth != 0 && is_spliceable(inner)) {
+      inner = PROTECT(maybe_unbox(inner, is_spliceable));
       count = list_squash(info, inner, out, count, is_spliceable, depth - 1);
+      UNPROTECT(1);
     } else {
       SET_VECTOR_ELT(out, count, inner);
 
@@ -140,17 +157,17 @@ static void update_info_inner(squash_info_t* info, sexp* outer, r_ssize i, sexp*
 static void squash_info(squash_info_t* info, sexp* outer,
                         bool (*is_spliceable)(sexp*), int depth) {
   sexp* inner;
-  r_ssize n_inner;
   r_ssize n_outer = r_length(outer);
 
   for (r_ssize i = 0; i != n_outer; ++i) {
     inner = VECTOR_ELT(outer, i);
-    n_inner = info->recursive ? 1 : r_vec_length(inner);
 
     if (depth != 0 && is_spliceable(inner)) {
       update_info_outer(info, outer, i);
+      inner = PROTECT(maybe_unbox(inner, is_spliceable));
       squash_info(info, inner, is_spliceable, depth - 1);
-    } else if (n_inner) {
+      UNPROTECT(1);
+    } else if (info->recursive || r_vec_length(inner)) {
       update_info_inner(info, outer, i, inner);
     }
   }
@@ -184,20 +201,12 @@ static sexp* squash(enum r_type kind, sexp* dots, bool (*is_spliceable)(sexp*), 
 
 typedef bool (*is_spliceable_t)(sexp*);
 
-bool r_is_spliced_bare(sexp* x) {
-  if (r_typeof(x) != r_type_list) {
-    return false;
-  }
+static bool is_spliced_bare(sexp* x) {
   if (!r_is_object(x)) {
-    return true;
+    return r_typeof(x) == r_type_list;
+  } else {
+    return rlang_is_splice_box(x);
   }
-  return r_inherits(x, "spliced");
-}
-bool r_is_spliced(sexp* x) {
-  if (r_typeof(x) != r_type_list) {
-    return false;
-  }
-  return r_inherits(x, "spliced");
 }
 
 static is_spliceable_t predicate_pointer(sexp* x) {
@@ -234,10 +243,10 @@ static is_spliceable_t predicate_internal(sexp* x) {
   }
 
   if (x == is_spliced_clo) {
-    return &r_is_spliced;
+    return rlang_is_splice_box;
   }
   if (x == is_spliceable_clo) {
-    return &r_is_spliced_bare;
+    return &is_spliced_bare;
   }
   return NULL;
 }
@@ -303,4 +312,10 @@ sexp* rlang_squash(sexp* dots, sexp* type, sexp* pred, sexp* depth_) {
     is_spliceable = predicate_pointer(pred);
     return r_squash_if(dots, kind, is_spliceable, depth);
   }
+}
+
+
+void r_init_library_squash() {
+  rlang_is_splice_box = (bool (*)(sexp*)) r_peek_c_callable("rlang", "rlang_is_splice_box");
+  rlang_unbox = (sexp* (*)(sexp*)) r_peek_c_callable("rlang", "rlang_unbox");
 }

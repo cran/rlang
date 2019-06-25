@@ -1,16 +1,92 @@
 context("retired")
 
-scoped_options(lifecycle_disable_warnings = TRUE)
+scoped_lifecycle_silence()
+
+
+# Deprecated in rlang 0.4.0 ------------------------------------------
+
+test_that("type_of() returns correct type", {
+  expect_identical(type_of("foo"), "string")
+  expect_identical(type_of(letters), "character")
+  expect_identical(type_of(base::`$`), "primitive")
+  expect_identical(type_of(base::list), "primitive")
+  expect_identical(type_of(base::eval), "closure")
+  expect_identical(type_of(~foo), "formula")
+  expect_identical(type_of(quo(foo)), "formula")
+  expect_identical(type_of(quote(a := b)), "definition")
+  expect_identical(type_of(quote(foo())), "language")
+})
+
+test_that("Unicode escapes are always converted to UTF8 characters in as_list()", {
+  with_non_utf8_locale({
+    env <- child_env(empty_env())
+    env_bind(env, !! get_alien_lang_string() := NULL)
+    list <- as_list(env)
+    expect_identical(names(list), get_alien_lang_string())
+  })
+})
+
+test_that("no method dispatch", {
+  as.logical.foo <- function(x) "wrong"
+  expect_identical(as_integer(structure(TRUE, class = "foo")), 1L)
+
+  as.list.foo <- function(x) "wrong"
+  expect_identical(as_list(structure(1:10, class = "foo")), as.list(1:10))
+})
+
+test_that("input is left intact", {
+  x <- structure(TRUE, class = "foo")
+  y <- as_integer(x)
+  expect_identical(x, structure(TRUE, class = "foo"))
+})
+
+test_that("as_list() zaps attributes", {
+  expect_identical(as_list(structure(list(), class = "foo")), list())
+})
+
+test_that("as_list() only coerces vector or dictionary types", {
+  expect_identical(as_list(1:3), list(1L, 2L, 3L))
+  expect_error(as_list(quote(symbol)), "a symbol to a list")
+})
+
+test_that("as_list() bypasses environment method and leaves input intact", {
+  as.list.foo <- function(x) "wrong"
+  x <- structure(child_env(NULL), class = "foo")
+  y <- as_list(x)
+
+  expect_is(x, "foo")
+  expect_identical(y, set_names(list(), character(0)))
+})
+
+test_that("as_integer() and as_logical() require integerish input", {
+  expect_error(as_integer(1.5), "a fractional double vector to an integer vector")
+  expect_error(as_logical(1.5), "a fractional double vector to a logical vector")
+})
+
+test_that("names are preserved", {
+  nms <- as.character(1:3)
+  x <- set_names(1:3, nms)
+  expect_identical(names(as_double(x)), nms)
+  expect_identical(names(as_list(x)), nms)
+})
+
+test_that("as_character() support logical NA", {
+  expect_identical(as_character(NA), na_chr)
+  expect_identical(as_character(lgl(NA, NA)), c(na_chr, na_chr))
+})
+
+test_that("can convert strings (#138)", {
+  expect_identical(as_character("a"), "a")
+  expect_identical(as_list("a"), list("a"))
+})
+
+
+# --------------------------------------------------------------------
 
 test_that("parse_quosure() forwards to parse_quo()", {
   env <- env()
   expect_identical(parse_quosure("foo", env), parse_quo("foo", env))
   expect_identical(parse_quosures("foo; bar", env), parse_quos("foo; bar", env))
-})
-
-test_that("quo_expr() forwards to quo_squash()", {
-  quo <- quo(list(!!quo(foo)))
-  expect_identical(quo_expr(quo), quo_squash(quo))
 })
 
 test_that("lang() forwards to call2() and is_lang() to is_call()", {
@@ -103,17 +179,8 @@ test_that("is_expr() forwards to is_expression()", {
   expect_false(is_expr(1:2))
 })
 
-test_that("is_quosureish() and as_quosureish() are defunct", {
-  expect_error(is_quosureish(~foo), "defunct as of")
-  expect_error(as_quosureish(~foo), "defunct as of")
-})
-
 test_that("node() still works", {
   expect_identical(node(1, NULL), new_node(1, NULL))
-})
-
-test_that("eval_tidy_() is defunct", {
-  expect_error(eval_tidy_(), "defunct")
 })
 
 test_that("set_attrs() fails with uncopyable types", {
@@ -477,20 +544,8 @@ test_that("whole scope is purged", {
   expect_identical(names(outside), "important")
 })
 
-test_that("names() and length() still work on data pronouns", {
-  pronoun <- as_data_pronoun(mtcars)
-  expect_true(all(names(pronoun) %in% names(mtcars)))
-  expect_length(pronoun, length(mtcars))
-})
-
 test_that("pattern match on string encoding", {
-  expect_true(is_character(letters, encoding = "unknown"))
-  expect_false(is_character(letters, encoding = "UTF-8"))
-
-  chr <- chr(c("foo", "fo\uE9"))
-  expect_false(is_character(chr, encoding = "UTF-8"))
-  expect_false(is_character(chr, encoding = "unknown"))
-  expect_true(is_character(chr, encoding = c("unknown", "UTF-8")))
+  expect_defunct(is_character(letters, encoding = "unknown"))
 })
 
 test_that("vector _along() ctors pick up names", {
@@ -513,4 +568,27 @@ test_that("vector _along() ctors pick up names", {
   expect_identical(new_character_along(x, toupper), c(A = na_chr, B = na_chr))
   expect_identical(new_raw_along(x, toupper), set_names(raw(2), c("A", "B")))
   expect_identical(new_list_along(x, toupper), list(A = NULL, B = NULL))
+})
+
+test_that("vector is modified", {
+  x <- c(1, b = 2, c = 3, 4)
+  out <- modify(x, 5, b = 20, splice(list(6, c = "30")))
+  expect_equal(out, list(1, b = 20, c = "30", 4, 5, 6))
+})
+
+test_that("invoke() buries arguments", {
+  expect_identical(invoke(call_inspect, 1:2, 3L), quote(.fn(`1`, `2`, `3`)))
+  expect_identical(invoke("call_inspect", 1:2, 3L), quote(call_inspect(`1`, `2`, `3`)))
+  expect_identical(invoke(call_inspect, 1:2, 3L, .bury = c("foo", "bar")), quote(foo(`bar1`, `bar2`, `bar3`)))
+  expect_identical(invoke(call_inspect, 1:2, 3L, .bury = NULL), as.call(list(call_inspect, 1L, 2L, 3L)))
+})
+
+test_that("invoke() can be called without arguments", {
+  expect_identical(invoke("list"), list())
+  expect_identical(invoke(list), list())
+})
+
+test_that("quo_expr() still works", {
+  x <- quo(foo(!!quo(bar), !!local(quo(baz))))
+  expect_identical(quo_expr(x), quo_squash(x))
 })

@@ -9,6 +9,9 @@ test_that("new_function equivalent to regular function", {
   f2 <- new_function(alist(x = a + b, y =), quote({x + y}))
 
   expect_equal(f1, f2)
+
+  env <- current_env()
+  expect_true(is_reference(fn_env(f2), env))
 })
 
 test_that("prim_name() extracts names", {
@@ -158,13 +161,13 @@ test_that("fn_fmls<- and fn_fmls_names<- change formals", {
   expect_identical(fn_fmls(fn), pairlist(b = 1))
 })
 
-test_that("fn_fmls<- and fn_fmls_names<- handle primitive functions", {
-  fn_fmls(`+`) <- list(a = 1, b = 2)
-  expect_true(is_closure(`+`))
-  expect_identical(fn_fmls(`+`), pairlist(a = 1, b = 2))
-
-  fn_fmls_names(`+`) <- c("A", "B")
-  expect_identical(fn_fmls(`+`), pairlist(A = 1, B = 2))
+test_that("fn_ functions requires closures", {
+  msg <- "must be an R function, not a primitive function"
+  expect_error(fn_fmls(`+`), msg)
+  expect_error(fn_fmls_names(`+`), msg)
+  expect_error(fn_fmls_syms(`+`), msg)
+  expect_error(fn_fmls(`+`) <- list(a = 1, b = 2), msg)
+  expect_error(fn_fmls_names(`+`) <- c("A", "B"), msg)
 })
 
 test_that("assignment methods preserve attributes", {
@@ -248,7 +251,7 @@ test_that("fn_body() always returns a `{` block", {
 
 test_that("as_function() adds a class to lambda functions", {
   out <- as_function(~foo)
-  expect_is(out, "rlang_lambda_function")
+  expect_is(out, c("rlang_lambda_function", "function"))
   expect_output(print(out), "<lambda>")
 })
 

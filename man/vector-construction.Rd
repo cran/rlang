@@ -19,19 +19,17 @@ dbl(...)
 
 cpl(...)
 
-chr(..., .encoding = NULL)
+chr(...)
 
 bytes(...)
 }
 \arguments{
 \item{...}{Components of the new vector. Bare lists and explicitly
 spliced lists are spliced.}
-
-\item{.encoding}{If non-null, passed to \code{\link[=set_chr_encoding]{set_chr_encoding()}} to add
-an encoding mark. This is only declarative, no encoding
-conversion is performed.}
 }
 \description{
+\Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+
 The atomic vector constructors are equivalent to \code{\link[=c]{c()}} but:
 \itemize{
 \item They allow you to be more explicit about the output
@@ -43,6 +41,9 @@ the rules described in \link{vector-coercion}.
 \section{Life cycle}{
 
 \itemize{
+\item All the abbreviated constructors such as \code{lgl()} will probably be
+moved to the vctrs package at some point. This is why they are
+marked as questioning.
 \item Automatic splicing is soft-deprecated and will trigger a warning
 in a future version. Please splice explicitly with \code{!!!}.
 }

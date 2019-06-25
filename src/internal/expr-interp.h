@@ -5,10 +5,8 @@
 
 
 #define UQ_N 2
-#define UQE_N 1
 #define UQS_N 2
 
-static const char* uqe_names[UQE_N] = { "UQE" };
 static const char* uqs_names[UQS_N] = { "UQS", "!!!"};
 
 
@@ -31,11 +29,11 @@ static inline bool is_splice_call(sexp* node) {
 enum expansion_op {
   OP_EXPAND_NONE,
   OP_EXPAND_UQ,
-  OP_EXPAND_UQE,
   OP_EXPAND_UQS,
   OP_EXPAND_UQN,
   OP_EXPAND_FIXUP,
-  OP_EXPAND_DOT_DATA
+  OP_EXPAND_DOT_DATA,
+  OP_EXPAND_CURLY
 };
 
 struct expansion_info {
@@ -56,11 +54,10 @@ static inline struct expansion_info init_expansion_info() {
   return info;
 }
 
-struct expansion_info which_bang_op(sexp* x);
+struct expansion_info which_uq_op(sexp* x);
 struct expansion_info which_expansion_op(sexp* x, bool unquote_names);
 struct expansion_info is_big_bang_op(sexp* x);
 
-sexp* big_bang(sexp* operand, sexp* env, sexp* node, sexp* next);
 sexp* big_bang_coerce(sexp* expr);
 
 sexp* rlang_interp(sexp* x, sexp* env);

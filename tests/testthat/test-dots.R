@@ -41,7 +41,7 @@ test_that("can take forced dots with `allowForced = FALSE`", {
     force(..1)
     captureDots()
   }
-  expect_identical(fn(letters), list(list(expr = letters, env = empty_env())))
+  expect_identical(fn(a = letters), pairlist(a = list(expr = letters, env = empty_env())))
 })
 
 test_that("captured dots are only named if names were supplied", {
@@ -242,7 +242,7 @@ test_that("`.homonyms` = 'error' fails with homonyms", {
   expect_error(list_error(1, a = 2, a = 3), "multiple arguments named `a` at positions 2 and 3")
 
   expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `a` at positions 2 and 8")
-  expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `b` at positions 3, 5 and 6")
+  expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `b` at positions 3, 5, and 6")
 })
 
 test_that("`.homonyms` works with spliced arguments", {
@@ -254,4 +254,18 @@ test_that("`.homonyms` works with spliced arguments", {
 
   myquos <- function(...) enquos(..., .homonyms = "first")
   expect_identical(myquos(!!!args), quos_list(a = quo(1), b = quo(2), quo(5), quo(6)))
+})
+
+test_that("can mix `!!!` and splice boxes", {
+  expect_identical(list2(1L, !!!(2:3), splice(list(4L))), as.list(1:4))
+})
+
+test_that("list2() and dots_values() support splice boxes", {
+  expect_identical(list2(1, splice(c("foo", "bar")), 3), list(1, "foo", "bar", 3))
+  expect_identical(dots_values(1, splice(c("foo", "bar")), 3), list(1, splice(list("foo", "bar")), 3))
+})
+
+test_that("dots_values() doesn't splice", {
+  expect_identical_(dots_values(!!!c(1:3)), list(splice(as.list(1:3))))
+  expect_identical_(dots_values(!!!list("foo", "bar")), list(splice(list("foo", "bar"))))
 })

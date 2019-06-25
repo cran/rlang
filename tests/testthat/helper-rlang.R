@@ -9,8 +9,3 @@ zap_srcref_attributes <- function(x) {
   attr(x, "wholeSrcref") <- NULL
   x
 }
-
-expect_known_output <- function(...) {
-  skip_on_cran()
-  testthat::expect_known_output(...)
-}

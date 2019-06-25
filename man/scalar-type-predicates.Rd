@@ -12,6 +12,7 @@
 \alias{is_scalar_raw}
 \alias{is_string}
 \alias{is_scalar_bytes}
+\alias{is_bool}
 \title{Scalar type predicates}
 \usage{
 is_scalar_list(x)
@@ -30,19 +31,28 @@ is_scalar_logical(x)
 
 is_scalar_raw(x)
 
-is_string(x, encoding = NULL)
+is_string(x, string = NULL)
 
 is_scalar_bytes(x)
+
+is_bool(x)
 }
 \arguments{
 \item{x}{object to be tested.}
 
-\item{encoding}{Expected encoding of a string or character
-vector. One of \code{UTF-8}, \code{latin1}, or \code{unknown}.}
+\item{encoding}{Defunct as of rlang 0.4.0.}
+
+\item{string}{A string to compare to \code{x}. If a character vector,
+returns \code{TRUE} if at least one element is equal to \code{x}.}
 }
 \description{
 These predicates check for a given type and whether the vector is
 "scalar", that is, of length 1.
+
+In addition to the length check, \code{is_string()} and \code{is_bool()}
+return \code{FALSE} if their input is missing. This is useful for
+type-checking arguments, when your function expects a single string
+or a single \code{TRUE} or \code{FALSE}.
 }
 \seealso{
 \link{type-predicates}, \link{bare-type-predicates}

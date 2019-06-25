@@ -15,7 +15,7 @@ new_data_mask(bottom, top = bottom, parent = NULL)
 \arguments{
 \item{data}{A data frame or named vector of masking data.}
 
-\item{parent}{Soft-deprecated. This argument no longer has any effect.
+\item{parent}{Deprecated. This argument no longer has any effect.
 The parent of the data mask is determined from either:
 \itemize{
 \item The \code{env} argument of \code{eval_tidy()}
@@ -24,11 +24,19 @@ The parent of the data mask is determined from either:
 
 \item{bottom}{The environment containing masking objects if the
 data mask is one environment deep. The bottom environment if the
-data mask comprises multiple environment.}
+data mask comprises multiple environment.
+
+If you haven't supplied \code{top}, this \strong{must} be an environment
+that you own, i.e. that you have created yourself.}
 
 \item{top}{The last environment of the data mask. If the data mask
 is only one environment deep, \code{top} should be the same as
-\code{bottom}.}
+\code{bottom}.
+
+This \strong{must} be an environment that you own, i.e. that you have
+created yourself. The parent of \code{top} will be changed by the tidy
+eval engine and should be considered undetermined. Never make
+assumption about the parent of \code{top}.}
 }
 \value{
 A data mask that you can supply to \code{\link[=eval_tidy]{eval_tidy()}}.
@@ -131,17 +139,15 @@ bottom and top environment of the data mask.
 \section{Life cycle}{
 
 
-\strong{rlang 0.3.0}
-
-Passing environments to \code{as_data_mask()} is soft-deprecated. Please
-build a data mask with \code{new_data_mask()}.
-
-The \code{parent} argument no longer has any effect. The parent of the
-data mask is determined from either:
+The \code{parent} argument no longer has any effect and is defunct as of
+rlang 0.4.0. The parent of the data mask is determined from either:
 \itemize{
 \item The \code{env} argument of \code{eval_tidy()}
 \item Quosure environments when applicable
 }
+
+Passing environments to \code{as_data_mask()} is deprecated as of rlang
+0.3.0. Please use \code{new_data_mask()} instead.
 
 \strong{rlang 0.2.0}
 
@@ -153,7 +159,7 @@ environments). We say that objects from user data mask objects
 in the current environment.
 
 Following this change in terminology, \code{as_overscope()} and
-\code{new_overscope()} were soft-deprecated in rlang 0.2.0 in favour of
+\code{new_overscope()} were deprecated in rlang 0.2.0 in favour of
 \code{as_data_mask()} and \code{new_data_mask()}.
 }
 

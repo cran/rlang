@@ -23,9 +23,8 @@ test_that("signal_soft_deprecated() warns when called from global env", {
 })
 
 test_that("signal_soft_deprecated() warns when called from package being tested", {
-  old <- Sys.getenv("NOT_CRAN")
-  on.exit(Sys.setenv("NOT_CRAN" = old))
   Sys.setenv("NOT_CRAN" = "true")
+  on.exit(Sys.setenv("NOT_CRAN" = ""))
   retired <- function() signal_soft_deprecated("warns from package being tested")
   expect_warning(retired(), "warns from")
 })
@@ -85,13 +84,13 @@ test_that("can disable lifecycle warnings", {
 
 test_that("can promote lifecycle warnings to errors", {
   scoped_lifecycle_errors()
-  expect_error(signal_soft_deprecated("foo"), "foo")
-  expect_error(warn_deprecated("foo"), "foo")
+  expect_defunct(signal_soft_deprecated("foo"), "foo")
+  expect_defunct(warn_deprecated("foo"), "foo")
 })
 
 test_that("can enable warnings and errors with `with_` helpers", {
   expect_warning(with_lifecycle_warnings(signal_soft_deprecated("foo")), "foo")
-  expect_error(with_lifecycle_errors(signal_soft_deprecated("foo")), "foo")
+  expect_defunct(with_lifecycle_errors(signal_soft_deprecated("foo")), "foo")
   expect_no_warning(with_lifecycle_warnings(with_lifecycle_silence(warn_deprecated("foo"))))
 })
 
@@ -111,12 +110,17 @@ test_that("once-per-session note is not displayed on repeated warnings", {
 })
 
 test_that("inputs are type checked", {
-  expect_error(signal_soft_deprecated(1), "is_string")
-  expect_error(signal_soft_deprecated("foo", 1), "is_string")
+  expect_error(signal_soft_deprecated(1), "is_character")
   expect_error(signal_soft_deprecated("foo", "bar", 1), "is_environment")
-  expect_error(warn_deprecated(1), "is_string")
-  expect_error(warn_deprecated("foo", 1), "is_string")
-  expect_error(stop_defunct(1), "is_string")
+  expect_error(warn_deprecated(1), "is_character")
+  expect_error(stop_defunct(1), "is_character")
+})
+
+test_that("lifecycle signallers support character vectors", {
+  scoped_lifecycle_errors()
+  expect_defunct(signal_soft_deprecated(c("foo", "bar")), "foo\nbar")
+  expect_defunct(warn_deprecated(c("foo", "bar")), "foo\nbar")
+  expect_defunct(stop_defunct(c("foo", "bar")), "foo\nbar")
 })
 
 test_that("the topenv of the empty env is not the global env", {

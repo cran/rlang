@@ -301,16 +301,14 @@ print.rlang_fake_data_pronoun <- function(...) cat_line("<pronoun>")
 #'
 #' @section Life cycle:
 #'
-#' **rlang 0.3.0**
-#'
-#' Passing environments to `as_data_mask()` is soft-deprecated. Please
-#' build a data mask with `new_data_mask()`.
-#'
-#' The `parent` argument no longer has any effect. The parent of the
-#' data mask is determined from either:
+#' The `parent` argument no longer has any effect and is defunct as of
+#' rlang 0.4.0. The parent of the data mask is determined from either:
 #'
 #'   * The `env` argument of `eval_tidy()`
 #'   * Quosure environments when applicable
+#'
+#' Passing environments to `as_data_mask()` is deprecated as of rlang
+#' 0.3.0. Please use `new_data_mask()` instead.
 #'
 #' **rlang 0.2.0**
 #'
@@ -322,11 +320,11 @@ print.rlang_fake_data_pronoun <- function(...) cat_line("<pronoun>")
 #' in the current environment.
 #'
 #' Following this change in terminology, `as_overscope()` and
-#' `new_overscope()` were soft-deprecated in rlang 0.2.0 in favour of
+#' `new_overscope()` were deprecated in rlang 0.2.0 in favour of
 #' `as_data_mask()` and `new_data_mask()`.
 #'
 #' @param data A data frame or named vector of masking data.
-#' @param parent Soft-deprecated. This argument no longer has any effect.
+#' @param parent Deprecated. This argument no longer has any effect.
 #'   The parent of the data mask is determined from either:
 #'   * The `env` argument of `eval_tidy()`
 #'   * Quosure environments when applicable
@@ -399,7 +397,7 @@ print.rlang_fake_data_pronoun <- function(...) cat_line("<pronoun>")
 #' eval_tidy(quote(c(.data$a, .data$b, .data$c)), data = mask)
 as_data_mask <- function(data, parent = NULL) {
   if (!is_null(parent)) {
-    warn_deprecated(paste_line(
+    stop_defunct(paste_line(
       "The `parent` argument of `as_data_mask()` is deprecated.",
       "The parent of the data mask is determined from either:",
       "",
@@ -419,13 +417,21 @@ as_data_pronoun <- function(data) {
 #' @param bottom The environment containing masking objects if the
 #'   data mask is one environment deep. The bottom environment if the
 #'   data mask comprises multiple environment.
+#'
+#'   If you haven't supplied `top`, this __must__ be an environment
+#'   that you own, i.e. that you have created yourself.
 #' @param top The last environment of the data mask. If the data mask
 #'   is only one environment deep, `top` should be the same as
 #'   `bottom`.
+#'
+#'   This __must__ be an environment that you own, i.e. that you have
+#'   created yourself. The parent of `top` will be changed by the tidy
+#'   eval engine and should be considered undetermined. Never make
+#'   assumption about the parent of `top`.
 #' @export
 new_data_mask <- function(bottom, top = bottom, parent = NULL) {
   if (!is_null(parent)) {
-    warn_deprecated(paste_line(
+    stop_defunct(paste_line(
       "The `parent` argument of `new_data_mask()` is deprecated.",
       "The parent of the data mask is determined from either:",
       "",
@@ -442,18 +448,33 @@ new_data_mask <- function(bottom, top = bottom, parent = NULL) {
 }
 #' @export
 `[[.rlang_data_pronoun` <- function(x, i, ...) {
-  if (!is_string(i)) {
-    abort("Must subset the data pronoun with a string")
-  }
   data_pronoun_get(x, i)
 }
 data_pronoun_get <- function(x, nm) {
+  if (!is_string(nm)) {
+    abort("Must subset the data pronoun with a string")
+  }
   mask <- .subset2(x, 1)
   .Call(rlang_data_pronoun_get, mask, sym(nm))
 }
 abort_data_pronoun <- function(nm) {
   msg <- sprintf("Column `%s` not found in `.data`", as_string(nm))
-  abort(msg, "rlang_data_pronoun_not_found")
+  abort(msg, "rlang_error_data_pronoun_not_found")
+}
+
+#' @export
+`$.rlang_ctxt_pronoun` <- function(x, nm) {
+  ctxt_pronoun_get(x, nm)
+}
+#' @export
+`[[.rlang_ctxt_pronoun` <- function(x, i, ...) {
+  ctxt_pronoun_get(x, i)
+}
+ctxt_pronoun_get <- function(x, nm) {
+  if (!is_string(nm)) {
+    abort("Must subset the context pronoun with a string")
+  }
+  eval_bare(sym(nm), x)
 }
 
 #' @export
@@ -464,28 +485,35 @@ abort_data_pronoun <- function(nm) {
 `[[<-.rlang_data_pronoun` <- function(x, i, value) {
   abort("Can't modify the data pronoun")
 }
+#' @export
+`$<-.rlang_ctxt_pronoun` <- function(x, i, value) {
+  abort("Can't modify the context pronoun")
+}
+#' @export
+`[[<-.rlang_ctxt_pronoun` <- function(x, i, value) {
+  abort("Can't modify the context pronoun")
+}
 
 #' @export
 `[.rlang_data_pronoun` <- function(x, i, ...) {
-  abort("`[` is not supported by .data pronoun, use `[[` or $ instead")
+  abort("`[` is not supported by .data pronoun, use `[[` or $ instead.")
 }
 #' @export
 names.rlang_data_pronoun <- function(x) {
-  warn_deprecated("Taking the `names()` of the `.data` pronoun is deprecated")
-  env <- .subset2(x, 1)
-  if (is_data_mask(env)) {
-    env <- env_parent(env)
-  }
-  env_names(env)
+  abort("Can't take the `names()` of the `.data` pronoun")
 }
 #' @export
 length.rlang_data_pronoun <- function(x) {
-  warn_deprecated("Taking the `length()` of the `.data` pronoun is deprecated")
-  env <- .subset2(x, 1)
-  if (is_data_mask(env)) {
-    env <- env_parent(env)
-  }
-  env_length(env)
+  abort("Can't take the `length()` of the `.data` pronoun")
+}
+
+#' @export
+names.rlang_ctxt_pronoun <- function(x) {
+  abort("Can't take the `names()` of the context pronoun")
+}
+#' @export
+length.rlang_ctxt_pronoun <- function(x) {
+  abort("Can't take the `length()` of the context pronoun")
 }
 
 #' @export

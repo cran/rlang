@@ -40,8 +40,8 @@ test_that("pronouns resolve ambiguity looks first in `data`", {
 })
 
 test_that("pronouns complain about missing values", {
-  expect_error(eval_tidy(quo(.data$x), list()), "Column `x` not found in `.data`")
-  expect_error(eval_tidy(quo(.data$x), data.frame()), "Column `x` not found in `.data`")
+  expect_data_pronoun_error(eval_tidy(quo(.data$x), list()), "Column `x` not found in `.data`")
+  expect_data_pronoun_error(eval_tidy(quo(.data$x), data.frame()), "Column `x` not found in `.data`")
 })
 
 test_that("nested quosures look in their own env", {
@@ -244,7 +244,7 @@ test_that("as_data_pronoun() creates pronoun", {
   expect_reference(env_parent(data_env), empty_env())
   expect_true(all(env_names(data_env) %in% names(mtcars)))
 
-  expect_error(data$foobar, "Column `foobar` not found in `.data`")
+  expect_data_pronoun_error(data$foobar, "Column `foobar` not found in `.data`")
   expect_identical(data[["cyl"]], mtcars$cyl)
 })
 
@@ -354,24 +354,22 @@ test_that(".data pronoun walks the ancestry of environments", {
   expect_equal(.data$a, 3)
   expect_equal(.data$b, 2)
   expect_equal(.data$c, 1)
-  expect_error(.data$d, "Column `d` not found in `.data`")
-  expect_error(.data$e, "Column `e` not found in `.data`")
-  expect_error(.data$.data, "Column `.data` not found in `.data`")
-  expect_error(.data$.env, "Column `.env` not found in `.data`")
-  expect_error(.data$.top_env, "Column `.top_env` not found in `.data`")
+  expect_data_pronoun_error(.data$d, "Column `d` not found in `.data`")
+  expect_data_pronoun_error(.data$e, "Column `e` not found in `.data`")
+  expect_data_pronoun_error(.data$.data, "Column `.data` not found in `.data`")
+  expect_data_pronoun_error(.data$.env, "Column `.env` not found in `.data`")
+  expect_data_pronoun_error(.data$.top_env, "Column `.top_env` not found in `.data`")
 
   expect_equal(.data[["a"]], 3)
   expect_equal(.data[["b"]], 2)
   expect_equal(.data[["c"]], 1)
-  expect_error(.data[["d"]], "Column `d` not found in `.data`")
-  expect_error(.data[["e"]], "Column `e` not found in `.data`")
-  expect_error(.data[[".data"]], "Column `.data` not found in `.data`")
-  expect_error(.data[[".env"]], "Column `.env` not found in `.data`")
-  expect_error(.data[[".top_env"]], "Column `.top_env` not found in `.data`")
+  expect_data_pronoun_error(.data[["d"]], "Column `d` not found in `.data`")
+  expect_data_pronoun_error(.data[["e"]], "Column `e` not found in `.data`")
+  expect_data_pronoun_error(.data[[".data"]], "Column `.data` not found in `.data`")
+  expect_data_pronoun_error(.data[[".env"]], "Column `.env` not found in `.data`")
+  expect_data_pronoun_error(.data[[".top_env"]], "Column `.top_env` not found in `.data`")
 
   expect_error(.data["a"])
-  expect_warning(names(.data), "deprecated")
-  expect_warning(length(.data), "deprecated")
 })
 
 test_that("can inspect the exported pronoun", {
@@ -409,15 +407,46 @@ test_that("can evaluate quosures created in the data mask without infloop", {
   expect_identical(eval_bare(quo, quo_get_env(quo)), "foo")
 })
 
+test_that("`.env` pronoun is constructed", {
+  pronoun <- eval_tidy(quote(.env), mtcars)
+  expect_is(pronoun, "rlang_ctxt_pronoun")
+  expect_reference(env_parent(pronoun), current_env())
+})
+
+test_that("the `.env` pronoun is not an environment", {
+  pronoun <- eval_tidy(quote(.env), mtcars)
+  expect_error(length(pronoun), "Can't take the")
+
+  skip_if(getRversion() < "3.2")
+  expect_error(names(pronoun), "Can't take the")
+})
+
+test_that("subsetting `.env` evaluates", {
+  expect_error(eval_tidy(quote(.env[["cyl"]]), mtcars, env()), "not found")
+  cyl <- "foo"
+  expect_identical(eval_tidy(quote(.env$cyl), mtcars, env()), "foo")
+  expect_identical(eval_tidy(quote(.env[["cyl"]]), mtcars, env()), "foo")
+})
+
+test_that("mask inherits from `env` after evaluation", {
+  flag <- env(empty_env())
+  mask <- new_data_mask(env())
+  eval_tidy(NULL, mask, flag)
+  expect_true(env_inherits(mask, flag))
+})
+
+test_that("can't take the names() and length() of the `.data` pronoun", {
+  pronoun <- as_data_pronoun(mtcars)
+  expect_error(names(pronoun), "Can't take")
+  expect_error(length(pronoun), "Can't take")
+})
+
 
 # Lifecycle ----------------------------------------------------------
 
-test_that("as_data_mask() and new_data_mask() warn once when passed a parent", {
-  expect_warning(as_data_mask(mtcars, env()), "deprecated")
-  expect_no_warning(as_data_mask(mtcars, env()))
-
-  expect_warning(new_data_mask(NULL, NULL, parent = env()), "deprecated")
-  expect_no_warning(new_data_mask(NULL, NULL, parent = env()))
+test_that("as_data_mask() and new_data_mask() are deprecated", {
+  expect_defunct(as_data_mask(mtcars, env()))
+  expect_defunct(new_data_mask(NULL, NULL, parent = env()))
 })
 
 test_that("supplying environment as data is deprecated", {

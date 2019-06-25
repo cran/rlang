@@ -14,7 +14,7 @@ extern sexp* r_f_lhs(sexp*);
 extern sexp* r_f_rhs(sexp*);
 extern sexp* r_new_condition(sexp*, sexp*, sexp*);
 extern sexp* r_env_clone(sexp*, sexp*);
-extern sexp* rlang_env_unbind(sexp*, sexp*);
+extern sexp* rlang_env_unbind(sexp*, sexp*, sexp*);
 extern sexp* rlang_env_poke_parent(sexp*, sexp*);
 extern sexp* rlang_env_frame(sexp* env);
 extern sexp* rlang_env_hash_table(sexp* env);
@@ -33,7 +33,6 @@ extern sexp* rlang_node_poke_caar(sexp*, sexp*);
 extern sexp* rlang_node_poke_cadr(sexp*, sexp*);
 extern sexp* rlang_node_poke_cdar(sexp*, sexp*);
 extern sexp* rlang_node_poke_cddr(sexp*, sexp*);
-extern sexp* rlang_new_node_(sexp*, sexp*);
 extern sexp* rlang_duplicate(sexp*, sexp*);
 extern sexp* r_node_tree_clone(sexp*);
 extern sexp* rlang_node_tag(sexp*);
@@ -55,17 +54,18 @@ extern sexp* rlang_capturedots(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_new_call_node(sexp*, sexp*);
 extern sexp* rlang_cnd_signal(sexp*);
 extern sexp* rlang_r_string(sexp*);
-extern sexp* rlang_exprs_interp(sexp*, sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_quos_interp(sexp*, sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_dots_values(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_dots_list(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_dots_flat_list(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_exprs_interp(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_quos_interp(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_dots_list(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_dots_flat_list(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_dots_pairlist(sexp*, sexp*, sexp*, sexp*, sexp*, sexp*, sexp*);
 extern sexp* r_new_formula(sexp*, sexp*, sexp*);
 extern sexp* rlang_new_quosure(sexp*, sexp*);
 extern sexp* rlang_enexpr(sexp*, sexp*);
 extern sexp* rlang_ensym(sexp*, sexp*);
 extern sexp* rlang_enquo(sexp*, sexp*);
 extern sexp* rlang_get_expression(sexp*, sexp*);
+extern sexp* rlang_vec_alloc(sexp*, sexp*);
 extern sexp* rlang_vec_coerce(sexp*, sexp*);
 extern sexp* rlang_mark_object(sexp*);
 extern sexp* rlang_promise_expr(sexp*, sexp*);
@@ -110,6 +110,17 @@ extern sexp* rlang_cnd_type(sexp*);
 extern sexp* rlang_env_inherits(sexp*, sexp*);
 extern sexp* rlang_eval_top(sexp*, sexp*);
 extern sexp* rlang_attrib(sexp*);
+extern sexp* rlang_named(sexp*, sexp*);
+extern sexp* r_node_list_reverse(sexp*);
+extern sexp* rlang_new_splice_box(sexp*);
+extern sexp* rlang_is_splice_box(sexp*);
+extern sexp* rlang_unbox(sexp*);
+extern sexp* rlang_new_function(sexp*, sexp*, sexp*);
+extern sexp* rlang_is_string(sexp*, sexp*);
+extern sexp* rlang_new_weakref(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_wref_key(sexp*);
+extern sexp* rlang_wref_value(sexp*);
+extern sexp* rlang_is_weakref(sexp*);
 
 // Library initialisation defined below
 sexp* rlang_library_load();
@@ -168,7 +179,7 @@ static const r_callable r_callables[] = {
   {"rlang_node_poke_cadr",              (r_fn_ptr) &rlang_node_poke_cadr, 2},
   {"rlang_node_poke_cdar",              (r_fn_ptr) &rlang_node_poke_cdar, 2},
   {"rlang_node_poke_cddr",              (r_fn_ptr) &rlang_node_poke_cddr, 2},
-  {"rlang_new_node",                    (r_fn_ptr) &rlang_new_node_, 2},
+  {"rlang_new_node",                    (r_fn_ptr) &r_new_node, 2},
   {"rlang_nms_are_duplicated",          (r_fn_ptr) &rlang_test_nms_are_duplicated, 2},
   {"rlang_env_clone",                   (r_fn_ptr) &r_env_clone, 2},
   {"rlang_env_unbind",                  (r_fn_ptr) &rlang_env_unbind, 3},
@@ -211,15 +222,16 @@ static const r_callable r_callables[] = {
   {"rlang_r_string",                    (r_fn_ptr) &rlang_r_string, 1},
   {"rlang_exprs_interp",                (r_fn_ptr) &rlang_exprs_interp, 6},
   {"rlang_quos_interp",                 (r_fn_ptr) &rlang_quos_interp, 6},
-  {"rlang_dots_values",                 (r_fn_ptr) &rlang_dots_values, 7},
   {"rlang_dots_list",                   (r_fn_ptr) &rlang_dots_list, 7},
   {"rlang_dots_flat_list",              (r_fn_ptr) &rlang_dots_flat_list, 7},
+  {"rlang_dots_pairlist",               (r_fn_ptr) &rlang_dots_pairlist, 7},
   {"rlang_new_formula",                 (r_fn_ptr) &r_new_formula, 3},
   {"rlang_new_quosure",                 (r_fn_ptr) &rlang_new_quosure, 2},
   {"rlang_enexpr",                      (r_fn_ptr) &rlang_enexpr, 2},
   {"rlang_ensym",                       (r_fn_ptr) &rlang_ensym, 2},
   {"rlang_enquo",                       (r_fn_ptr) &rlang_enquo, 2},
   {"rlang_get_expression",              (r_fn_ptr) &rlang_get_expression, 2},
+  {"rlang_vec_alloc",                   (r_fn_ptr) &rlang_vec_alloc, 2},
   {"rlang_vec_coerce",                  (r_fn_ptr) &rlang_vec_coerce, 2},
   {"rlang_quo_is_symbol",               (r_fn_ptr) &rlang_quo_is_symbol, 1},
   {"rlang_quo_is_call",                 (r_fn_ptr) &rlang_quo_is_call, 1},
@@ -259,8 +271,38 @@ static const r_callable r_callables[] = {
   {"rlang_env_inherits",                (r_fn_ptr) &rlang_env_inherits, 2},
   {"rlang_eval_top",                    (r_fn_ptr) &rlang_eval_top, 2},
   {"rlang_attrib",                      (r_fn_ptr) &rlang_attrib, 1},
+  {"rlang_named",                       (r_fn_ptr) &rlang_named, 2},
+  {"rlang_node_list_reverse",           (r_fn_ptr) &r_node_list_reverse, 1},
+  {"rlang_new_splice_box",              (r_fn_ptr) &rlang_new_splice_box, 1},
+  {"rlang_is_splice_box",               (r_fn_ptr) &rlang_is_splice_box, 1},
+  {"rlang_new_function",                (r_fn_ptr) &rlang_new_function, 3},
+  {"rlang_is_string",                   (r_fn_ptr) &rlang_is_string, 2},
+  {"rlang_new_weakref",                 (r_fn_ptr) &rlang_new_weakref, 4},
+  {"rlang_wref_key",                    (r_fn_ptr) &rlang_wref_key, 1},
+  {"rlang_wref_value",                  (r_fn_ptr) &rlang_wref_value, 1},
+  {"rlang_is_weakref",                  (r_fn_ptr) &rlang_is_weakref, 1},
   {NULL, NULL, 0}
 };
+
+
+extern sexp* rlang_is_missing(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_call2_external(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext2_dots_values(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_exec(sexp*, sexp*, sexp*, sexp*);
+
+
+static const r_external externals[] = {
+  {"rlang_is_missing",                  (r_fn_ptr) &rlang_is_missing, 1},
+  {"rlang_call2_external",              (r_fn_ptr) &rlang_call2_external, 2},
+  {"rlang_ext2_dots_values",            (r_fn_ptr) &rlang_ext2_dots_values, 6},
+  {"rlang_exec",                        (r_fn_ptr) &rlang_exec, 2},
+  {NULL, NULL, 0}
+};
+
+
+extern bool is_splice_box(sexp*);
+extern sexp* rlang_env_dots_values(sexp*);
+extern sexp* rlang_env_dots_list(sexp*);
 
 void R_init_rlang(r_dll_info* dll) {
   r_register_c_callable("rlang", "rlang_squash_if", (r_fn_ptr) &r_squash_if);
@@ -281,6 +323,12 @@ void R_init_rlang(r_dll_info* dll) {
   // eval_tidy() is stable
   r_register_c_callable("rlang", "rlang_eval_tidy", (r_fn_ptr) &rlang_eval_tidy);
 
+  // Maturing
+  r_register_c_callable("rlang", "rlang_is_splice_box", (r_fn_ptr) &is_splice_box);
+  r_register_c_callable("rlang", "rlang_unbox", (r_fn_ptr) &rlang_unbox);
+  r_register_c_callable("rlang", "rlang_env_dots_values", (r_fn_ptr) &rlang_env_dots_values);
+  r_register_c_callable("rlang", "rlang_env_dots_list", (r_fn_ptr) &rlang_env_dots_list);
+
   // Experimental method for exporting C function pointers as actual R objects
   rlang_register_pointer("rlang", "rlang_test_is_spliceable", (r_fn_ptr) &rlang_is_clevel_spliceable);
 
@@ -288,7 +336,7 @@ void R_init_rlang(r_dll_info* dll) {
   r_register_c_callable("rlang", "rlang_as_data_mask", (r_fn_ptr) &rlang_as_data_mask_compat);
   r_register_c_callable("rlang", "rlang_new_data_mask", (r_fn_ptr) &rlang_new_data_mask_compat);
 
-  r_register_r_callables(dll, r_callables, NULL);
+  r_register_r_callables(dll, r_callables, externals);
 }
 
 
