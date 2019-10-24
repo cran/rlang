@@ -141,6 +141,7 @@ pairlist2 <- function(...) {
 #' is not legal to manually set language heads to strings.
 #'
 #' @param x An object to test.
+#' @keywords internal
 #' @export
 #' @examples
 #' # Symbolic objects and functions are callable:
@@ -289,6 +290,15 @@ is_call <- function(x, name = NULL, n = NULL, ns = NULL) {
   }
 
   TRUE
+}
+
+# Until `is_call()` is fixed
+is_call2 <- function(x, ...) {
+  if (is_quosure(x)) {
+    FALSE
+  } else {
+    rlang::is_call(x, ...)
+  }
 }
 
 #' How does a call print at the console?

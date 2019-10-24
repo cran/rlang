@@ -71,6 +71,31 @@ sexp* rlang_env_inherits(sexp* env, sexp* ancestor) {
   return r_lgl(r_env_inherits(env, ancestor, r_empty_env));
 }
 
+sexp* rlang_env_bind_list(sexp* env, sexp* names, sexp* data) {
+  if (r_typeof(env) != r_type_environment) {
+    r_abort("Internal error: `env` must be an environment.");
+  }
+  if (r_typeof(names) != r_type_character) {
+    r_abort("Internal error: `names` must be a character vector.");
+  }
+  if (r_typeof(data) != r_type_list) {
+    r_abort("Internal error: `data` must be a list.");
+  }
+
+  r_ssize n = r_length(data);
+  if (n != r_length(names)) {
+    r_abort("Internal error: `data` and `names` must have the same length.");
+  }
+
+  sexp** namesp = r_chr_deref(names);
+
+  for (r_ssize i = 0; i < n; ++i) {
+    Rf_defineVar(Rf_installChar(namesp[i]), r_list_get(data, i), env);
+  }
+
+  return r_null;
+}
+
 
 // eval.c
 
@@ -327,6 +352,10 @@ sexp* rlang_named(sexp* x, sexp* env) {
 
   UNPROTECT(n_protect);
   return Rf_ScalarInteger(NAMED(x));
+}
+
+sexp* rlang_find_var(sexp* env, sexp* sym) {
+  return Rf_findVar(sym, env);
 }
 
 

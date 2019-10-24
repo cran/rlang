@@ -79,7 +79,7 @@ cpl <- function(...) {
 #' @export
 #' @export
 chr <- function(...) {
-  out <- .Call(rlang_squash, dots_values(...), "character", is_spliced_bare, 1L)
+  .Call(rlang_squash, dots_values(...), "character", is_spliced_bare, 1L)
 }
 #' @rdname vector-construction
 #' @export
@@ -151,6 +151,7 @@ list3 <- function(...) {
 #' These functions are likely to be replaced by a vctrs equivalent in
 #' the future. They are in the questioning lifecycle stage.
 #'
+#' @keywords internal
 #' @examples
 #' new_list(10)
 #' new_logical(10)

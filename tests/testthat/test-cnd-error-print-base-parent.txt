@@ -1,5 +1,1 @@
-<error>
-class:   `bar`
-<error: parent>
-message: foo
-class:   `simpleError`
+<error/bar>

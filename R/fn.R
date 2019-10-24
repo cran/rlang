@@ -45,6 +45,7 @@ is_prim_eval <- function(x) identical(x, prim_eval)
 
 #' Name of a primitive function
 #' @param prim A primitive function such as [base::c()].
+#' @keywords internal
 #' @export
 prim_name <- function(prim) {
   stopifnot(is_primitive(prim))
@@ -224,15 +225,13 @@ fn_body_node <- function(fn) {
 #' partial matching, etc). One practical consequence of the special
 #' way in which primitives are passed arguments is that they
 #' technically do not have formal arguments, and [formals()] will
-#' return `NULL` if called on a primitive function. See [fn_fmls()]
-#' for a function that returns a representation of formal arguments
-#' for primitive functions. Finally, primitive functions can either
-#' take arguments lazily, like R closures do, or evaluate them eagerly
-#' before being passed on to the C code. The former kind of primitives
-#' are called "special" in R terminology, while the latter is referred
-#' to as "builtin". `is_primitive_eager()` and `is_primitive_lazy()`
-#' allow you to check whether a primitive function evaluates arguments
-#' eagerly or lazily.
+#' return `NULL` if called on a primitive function. Finally, primitive 
+#' functions can either take arguments lazily, like R closures do, 
+#' or evaluate them eagerly before being passed on to the C code. 
+#' The former kind of primitives are called "special" in R terminology, 
+#' while the latter is referred to as "builtin". `is_primitive_eager()` 
+#' and `is_primitive_lazy()` allow you to check whether a primitive 
+#' function evaluates arguments eagerly or lazily.
 #'
 #' You will also encounter the distinction between primitive and
 #' internal functions in technical documentation. Like primitive
@@ -371,7 +370,9 @@ fn_env <- function(fn) {
 #'
 #' * `as_closure()` first passes its argument to `as_function()`. If
 #'   the result is a primitive function, it regularises it to a proper
-#'   [closure] (see [is_function()] about primitive functions).
+#'   [closure] (see [is_function()] about primitive functions). Some
+#'   special control flow primitives like `if`, `for`, or `break`
+#'   can't be coerced to a closure.
 #'
 #' @param x A function or formula.
 #'
@@ -380,9 +381,13 @@ fn_env <- function(fn) {
 #'   If a **formula**, e.g. `~ .x + 2`, it is converted to a function
 #'   with up to two arguments: `.x` (single argument) or `.x` and `.y`
 #'   (two arguments). The `.` placeholder can be used instead of `.x`.
-#'   This allows you to create very compact anonymous functions with up
+#'   This allows you to create very compact anonymous functions (lambdas) with up
 #'   to two inputs. Functions created from formulas have a special
 #'   class. Use `is_lambda()` to test for it.
+#'
+#'   Lambdas currently do not support [quasiquotation],
+#'   due to the way the arguments are handled internally.
+#'
 #' @param env Environment in which to fetch the function in case `x`
 #'   is a string.
 #' @export
@@ -408,6 +413,15 @@ fn_env <- function(fn) {
 #' # functions created with the formula syntax:
 #' as_closure(`+`)
 #' as_closure(`~`)
+#'
+#' # Use a regular function for tidy evaluation, also when calling functions
+#' # that use tidy evaluation:
+#' ## Bad:
+#' e <- as_function(~ as_label(ensym(.x)))
+#' ## Good:
+#' e <- as_function(function(x) as_label(ensym(x)))
+#'
+#' e(y)
 as_function <- function(x, env = caller_env()) {
   if (is_function(x)) {
     return(x)

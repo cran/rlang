@@ -5,6 +5,8 @@
 #' evaluation, the call stack in R is actually a tree, which the
 #' `summary()` method of this object will reveal.
 #'
+#' `trace_length()` returns the number of frames in a backtrace.
+#'
 #' @param top The first frame environment to be included in the
 #'   backtrace. This becomes the top of the backtrace tree and
 #'   represents the oldest call in the backtrace.
@@ -86,9 +88,9 @@ trace_back <- function(top = NULL, bottom = NULL) {
   calls <- map2(calls, seq_along(calls), maybe_add_namespace)
 
   parents <- normalise_parents(parents)
-  envs <- map(frames, env_label)
+  ids <- map_chr(frames, env_label)
 
-  trace <- new_trace(calls, parents, envs)
+  trace <- new_trace(calls, parents, ids)
   trace <- trace_trim_env(trace, top)
 
   trace
@@ -128,7 +130,7 @@ call_fix_car <- function(call) {
 
 # Assumes magrittr 1.5
 add_pipe_pointer <- function(calls, frames) {
-  pipe_begs <- which(map_lgl(calls, is_call, "%>%"))
+  pipe_begs <- which(map_lgl(calls, is_call2, "%>%"))
   pipe_kinds <- map_int(pipe_begs, pipe_call_kind, calls)
 
   pipe_calls <- map2(pipe_begs, pipe_kinds, function(beg, kind) {
@@ -181,6 +183,10 @@ pipe_call_kind <- function(beg, calls) {
 }
 
 maybe_add_namespace <- function(call, fn) {
+  if (is_quosure(call)) {
+    call <- quo_get_expr(call)
+  }
+
   if (call_print_fine_type(call) != "call") {
     return(call)
   }
@@ -224,7 +230,7 @@ normalise_parents <- function(parents) {
   parents
 }
 
-new_trace <- function(calls, parents, envs, indices = NULL) {
+new_trace <- function(calls, parents, ids, indices = NULL) {
   indices <- indices %||% seq_along(calls)
 
   n <- length(calls)
@@ -238,7 +244,7 @@ new_trace <- function(calls, parents, envs, indices = NULL) {
     list(
       calls = calls,
       parents = parents,
-      envs = envs,
+      ids = ids,
       indices = indices
     ),
     class = "rlang_trace"
@@ -258,10 +264,10 @@ c.rlang_trace <- function(...) {
 
   calls <- flatten(map(traces, `[[`, "calls"))
   parents <- flatten_int(map(traces, `[[`, "parents"))
-  envs <- flatten(map(traces, `[[`, "envs"))
+  ids <- flatten_chr(map(traces, `[[`, "ids"))
   indices <- flatten_int(map(traces, `[[`, "indices"))
 
-  new_trace(calls, parents, envs, indices)
+  new_trace(calls, parents, ids, indices)
 }
 
 #' @export
@@ -411,8 +417,11 @@ summary.rlang_trace <- function(object,
   invisible(object)
 }
 
-trace_length <- function(x) {
-  length(x$calls)
+#' @rdname trace_back
+#' @param trace A backtrace created by `trace_back()`.
+#' @export
+trace_length <- function(trace) {
+  length(trace$calls)
 }
 
 trace_subset <- function(x, i) {
@@ -432,7 +441,7 @@ trace_subset <- function(x, i) {
   new_trace(
     calls = x$calls[i],
     parents = parents,
-    envs = x$envs[i],
+    ids = x$ids[i],
     indices = x$indices[i]
   )
 }
@@ -498,15 +507,15 @@ trace_trim_env <- function(x, to = NULL) {
     return(x)
   }
 
-  is_top <- x$envs == env_label(to)
+  is_top <- x$ids == env_label(to)
   if (!any(is_top)) {
     return(x)
   }
 
   start <- last(which(is_top)) + 1
-  end <- length(x$envs)
+  end <- length(x$ids)
 
-  trace_subset(x, start:end)
+  trace_subset(x, seq2(start, end))
 }
 
 set_trace_skipped <- function(trace, id, n) {
@@ -543,7 +552,7 @@ n_collapsed <- function(trace, id) {
 }
 
 is_eval_call <- function(call) {
-  is_call(call, c("eval", "evalq"), ns = c("", "base"))
+  is_call2(call, c("eval", "evalq"), ns = c("", "base"))
 }
 
 pipe_collect_calls <- function(pipe, env) {
@@ -554,7 +563,7 @@ pipe_collect_calls <- function(pipe, env) {
 
   calls <- new_node(last_call, NULL)
 
-  while (is_call(node_car(node), "%>%")) {
+  while (is_call2(node_car(node), "%>%")) {
     node <- node_cdar(node)
     call <- pipe_add_dot(node_cadr(node))
     call <- maybe_add_namespace(call, env)
@@ -562,7 +571,7 @@ pipe_collect_calls <- function(pipe, env) {
   }
 
   first_call <- node_car(node)
-  if (is_call(first_call)) {
+  if (is_call2(first_call)) {
     # The first call doesn't need a dot
     first_call <- maybe_add_namespace(first_call, env)
     calls <- new_node(first_call, calls)
@@ -574,7 +583,7 @@ pipe_collect_calls <- function(pipe, env) {
   list(calls = as.list(calls), leading = leading)
 }
 pipe_add_dot <- function(call) {
-  if (!is_call(call)) {
+  if (!is_call2(call)) {
     return(call2(call, dot_sym))
   }
 
@@ -622,8 +631,8 @@ trail_uncollapse_pipe <- function(trace) {
     parent <- trace$parents[[idx]]
     pipe_parents <- seq(parent, parent + pointer - 1L)
 
-    # Assign the pipe frame as dummy envs for uncollapsed frames
-    pipe_envs <- rep(trace$envs[idx], pointer)
+    # Assign the pipe frame as dummy ids for uncollapsed frames
+    pipe_ids <- rep(trace$ids[idx], pointer)
 
     # Add the number of uncollapsed frames to children's
     # ancestry. This assumes a backtrace branch.
@@ -631,7 +640,7 @@ trail_uncollapse_pipe <- function(trace) {
 
     trace$calls <- c(trace_before$calls, pipe_calls, trace_after$calls)
     trace$parents <- c(trace_before$parents, pipe_parents, trace_after$parents)
-    trace$envs <- c(trace_before$envs, pipe_envs, trace$envs)
+    trace$ids <- c(trace_before$ids, pipe_ids, trace$ids)
   }
 
   trace
@@ -674,7 +683,7 @@ trace_simplify_branch <- function(trace) {
 
 # Bypass calls with inlined functions
 is_uninformative_call <- function(call) {
-  if (!is_call(call)) {
+  if (!is_call2(call)) {
     return(FALSE)
   }
 
@@ -686,9 +695,9 @@ is_uninformative_call <- function(call) {
   }
 
   # If a call, might be wrapped in parentheses
-  while (is_call(fn, "(")) {
+  while (is_call2(fn, "(")) {
     fn <- fn[[2]]
-    if (is_call(fn, "function")) {
+    if (is_call2(fn, "function")) {
       return(TRUE)
     }
   }
@@ -740,30 +749,6 @@ trace_simplify_collapse <- function(trace) {
 }
 
 
-#' Last `abort()` error
-#'
-#' @description
-#'
-#' * `last_error()` returns the last error thrown with [abort()]. The
-#'   error is printed with a backtrace in simplified form.
-#'
-#' * `last_trace()` is a shortcut to return the backtrace stored in
-#'   the last error. This backtrace is printed in full form.
-#'
-#' @export
-last_error <- function() {
-  if (is_null(last_error_env$cnd)) {
-    abort("Can't show last error because no error was recorded yet")
-  }
-  last_error_env$cnd
-}
-#' @rdname last_error
-#' @export
-last_trace <- function() {
-  last_error()$trace
-}
-
-
 # Printing ----------------------------------------------------------------
 
 trace_as_tree <- function(x, dir = getwd(), srcrefs = NULL) {
@@ -798,7 +783,7 @@ trace_call_text <- function(call, collapse) {
     return(as_label(call))
   }
 
-  if (is_call(call, "%>%")) {
+  if (is_call2(call, "%>%")) {
     call <- call
   } else if (length(call) > 1L) {
     call <- call2(node_car(call), quote(...))
@@ -851,24 +836,4 @@ trace_root <- function() {
   } else {
     "x"
   }
-}
-
-# Misc --------------------------------------------------------------------
-
-reprex_callstack <- function() {
-  path <- tempfile(fileext = ".rds")
-
-  code <- expr({
-    f <- function() g()
-    g <- function() h()
-    h <- function() rlang::trace_back(globalenv())
-
-    x <- try(identity(f()))
-    saveRDS(x, !!path)
-  })
-
-  reprex <- getExportedValue("reprex", "reprex")
-  reprex(input = expr_deparse(code), outfile = NULL, show = FALSE)
-
-  readRDS(path)
 }

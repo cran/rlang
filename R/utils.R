@@ -224,3 +224,13 @@ pad_spaces <- function(x, left = TRUE) {
     paste0(x, spaces(pads))
   }
 }
+
+info <- function() {
+  i <- if (is_installed("cli")) cli::symbol$info else "i"
+  blue(i)
+}
+cross <- function() {
+  x <- if (is_installed("cli")) cli::symbol$cross else "x"
+  red(x)
+}
+
