@@ -10,8 +10,8 @@ call2(.fn, ..., .ns = NULL)
 \item{.fn}{Function to call. Must be a callable object: a string,
 symbol, call, or a function.}
 
-\item{...}{Arguments to the call either in or out of a list. These dots
-support \link[=tidy-dots]{tidy dots} features. Empty arguments are preserved.}
+\item{...}{<\link[=dyn-dots]{dynamic}> Arguments for the function
+call. Empty arguments are preserved.}
 
 \item{.ns}{Namespace with which to prefix \code{.fn}. Must be a string
 or symbol.}
@@ -22,7 +22,7 @@ Quoted function calls are one of the two types of
 calling a function, possibly with arguments. There are two ways of
 creating a quoted call:
 \itemize{
-\item By \link[=quotation]{quoting} it. Quoting prevents functions from being
+\item By \link[=nse-defuse]{quoting} it. Quoting prevents functions from being
 called. Instead, you get the description of the function call as
 an R object. That is, a quoted function call.
 \item By constructing it with \code{\link[base:call]{base::call()}}, \code{\link[base:as.call]{base::as.call()}}, or

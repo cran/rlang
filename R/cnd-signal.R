@@ -91,41 +91,72 @@ validate_cnd_signal_args <- function(cnd, .cnd, .mufflable,
 
 #' @rdname abort
 #' @export
-warn <- function(message, .subclass = NULL, ..., call = NULL, msg, type) {
-  validate_signal_args(msg, type, call)
+warn <- function(message, class = NULL, ..., call, msg, type, .subclass) {
+  validate_signal_args(msg, type, call, .subclass)
 
   message <- collapse_cnd_message(message)
-  cnd <- warning_cnd(.subclass, ..., message = message)
+  cnd <- warning_cnd(class, ..., message = message)
   warning(cnd)
 }
 #' @rdname abort
+#' @param file Where the message is printed. This should be a
+#'   connection or character string which will be passed to [cat()].
+#'
+#'   By default, `inform()` prints to standard output in interactive
+#'   sessions and standard error otherwise. This way IDEs can treat
+#'   messages distinctly from warnings and errors, and R scripts can
+#'   still filter out the messages easily by redirecting `stderr`.
 #' @export
-inform <- function(message, .subclass = NULL, ..., call = NULL, msg, type) {
-  validate_signal_args(msg, type, call)
+inform <- function(message,
+                   class = NULL,
+                   ...,
+                   file = NULL,
+                   call,
+                   msg,
+                   type,
+                   .subclass) {
+  validate_signal_args(msg, type, call, .subclass)
 
   message <- collapse_cnd_message(message)
-  message <- paste0(message, "\n")
-  cnd <- message_cnd(.subclass, ..., message = message)
-  message(cnd)
+  cnd <- message_cnd(class, ..., message = message)
+
+  withRestarts(muffleMessage = function() NULL, {
+    signalCondition(cnd)
+
+    file <- file %||% if (is_interactive()) stdout() else stderr()
+    cat_line(message, file = file)
+  })
 }
 #' @rdname abort
 #' @export
-signal <- function(message, .subclass, ...) {
+signal <- function(message, class, ..., .subclass) {
+  if (!missing(.subclass)) {
+    deprecate_subclass(.subclass)
+  }
   message <- collapse_cnd_message(message)
-  cnd <- cnd(.subclass, ..., message = message)
+  cnd <- cnd(class, ..., message = message)
   cnd_signal(cnd)
 }
-validate_signal_args <- function(msg, type, call) {
+
+validate_signal_args <- function(msg, type, call, subclass, env = caller_env()) {
   if (!missing(msg)) {
     stop_defunct("`msg` has been renamed to `message` and is deprecated as of rlang 0.3.0")
   }
   if (!missing(type)) {
     stop_defunct("`type` has been renamed to `.subclass` and is deprecated as of rlang 0.3.0")
   }
-  if (!is_null(call)) {
+  if (!missing(call)) {
     stop_defunct("`call` is deprecated as of rlang 0.3.0")
   }
+  if (!missing(subclass)) {
+    deprecate_subclass(subclass, env = env)
+  }
 }
+# Allow until next major version
+deprecate_subclass <- function(subclass, env = caller_env()) {
+  env_bind(env, class = subclass)
+}
+
 #' @rdname abort
 #' @export
 interrupt <- function() {

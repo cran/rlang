@@ -1,12 +1,14 @@
 > # Interactive
 > cat_line(interactive)
 Error: dispatched!
-Call `rlang::last_error()` to see a backtrace.
+Run `rlang::last_error()` to see where the error occurred.
 Execution halted
 
 > # Non-interactive
 > cat_line(non_interactive)
 Error: dispatched!
+<error/foobar_error>
+dispatched!
 Backtrace:
     █
  1. └─global::f()

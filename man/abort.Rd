@@ -8,14 +8,15 @@
 \alias{interrupt}
 \title{Signal an error, warning, or message}
 \usage{
-abort(message = "", .subclass = NULL, ..., trace = NULL,
-  call = NULL, parent = NULL, msg, type)
+abort(message = "", class = NULL, ..., trace = NULL, call,
+  parent = NULL, msg, type, .subclass)
 
-warn(message, .subclass = NULL, ..., call = NULL, msg, type)
+warn(message, class = NULL, ..., call, msg, type, .subclass)
 
-inform(message, .subclass = NULL, ..., call = NULL, msg, type)
+inform(message, class = NULL, ..., file = NULL, call, msg, type,
+  .subclass)
 
-signal(message, .subclass, ...)
+signal(message, class, ..., .subclass)
 
 interrupt()
 }
@@ -26,7 +27,7 @@ Experimental: Can also be a named character vector, in which case
 the message is assembled as a list of bullets. See
 \code{\link[=cnd_message]{cnd_message()}} to learn how names control the bulleted output.}
 
-\item{.subclass}{Subclass of the condition. This allows your users
+\item{class}{Subclass of the condition. This allows your users
 to selectively handle the conditions signalled by your functions.}
 
 \item{...}{Additional data to be stored in the condition object.}
@@ -40,6 +41,19 @@ backtrace is now preferred to storing a simple call.}
 
 \item{msg, type}{These arguments were renamed to \code{message} and
 \code{.subclass} and are defunct as of rlang 0.4.0.}
+
+\item{.subclass}{This argument was renamed to \code{class} in rlang
+0.4.2.  It will be deprecated in the next major version. This is
+for consistency with our conventions for class constructors
+documented in \url{https://adv-r.hadley.nz/s3.html#s3-subclassing}.}
+
+\item{file}{Where the message is printed. This should be a
+connection or character string which will be passed to \code{\link[=cat]{cat()}}.
+
+By default, \code{inform()} prints to standard output in interactive
+sessions and standard error otherwise. This way IDEs can treat
+messages distinctly from warnings and errors, and R scripts can
+still filter out the messages easily by redirecting \code{stderr}.}
 }
 \description{
 These functions are equivalent to base functions \code{\link[base:stop]{base::stop()}},

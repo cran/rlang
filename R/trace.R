@@ -185,6 +185,9 @@ pipe_call_kind <- function(beg, calls) {
 maybe_add_namespace <- function(call, fn) {
   if (is_quosure(call)) {
     call <- quo_get_expr(call)
+    if (!is_call(call)) {
+      return(call)
+    }
   }
 
   if (call_print_fine_type(call) != "call") {
@@ -213,7 +216,11 @@ maybe_add_namespace <- function(call, fn) {
     op <- "::"
   } else if (is_namespace(top)) {
     prefix <- ns_env_name(top)
-    op <- if (nm %in% ns_exports(top)) "::" else ":::"
+    if (ns_exports_has(top, nm)) {
+      op <- "::"
+    } else {
+      op <- ":::"
+    }
   } else {
     return(call)
   }
