@@ -39,18 +39,9 @@ format.rlang_error <- function(x,
   # Allow overwriting default display via condition field
   simplify <- x$rlang$internal$print_simplify %||% simplify
 
-  class <- class(x)[[1]]
-  if (class != "error") {
-    class <- paste0("error/", class)
-  }
+  header <- rlang_error_header(x, child)
 
-  if (is_null(child)) {
-    header <- bold(sprintf("<%s>", class))
-  } else {
-    header <- bold(sprintf("<parent: %s>", class))
-  }
-
-  message <- conditionMessage(x)
+  message <- strip_trailing_newline(conditionMessage(x))
   if (!nzchar(message)) {
     message <- NULL
   }
@@ -63,20 +54,11 @@ format.rlang_error <- function(x,
   trace <- x$trace
   simplify <- arg_match(simplify, c("collapse", "branch", "none"))
 
-  if (!is_null(trace)) {
+  if (!is_null(trace) && trace_length(trace)) {
     out <- paste_line(out, bold("Backtrace:"))
 
     if (!is_null(child)) {
-      # Trim common portions of backtrace
-      child_trace <- child$trace
-      common <- map_lgl(trace$ids, `%in%`, child_trace$ids)
-      trace <- trace_subset(trace, which(!common))
-
-      # Trim catching context if any
-      calls <- trace$calls
-      if (length(calls) && is_call(calls[[1]], c("tryCatch", "with_handlers", "catch_cnd"))) {
-        trace <- trace_subset_across(trace, -1, 1)
-      }
+      trace <- trace_trim_common(trace, child$trace)
     }
 
     trace_lines <- format(trace, ..., simplify = simplify)
@@ -105,4 +87,17 @@ format.rlang_error <- function(x,
 #' @export
 summary.rlang_error <- function(object, ...) {
   print(object, simplify = "none", fields = TRUE)
+}
+
+rlang_error_header <- function(cnd, child = NULL) {
+  class <- class(cnd)[[1]]
+  if (class != "error") {
+    class <- paste0("error/", class)
+  }
+
+  if (is_null(child)) {
+    bold(sprintf("<%s>", class))
+  } else {
+    bold(sprintf("<parent: %s>", class))
+  }
 }

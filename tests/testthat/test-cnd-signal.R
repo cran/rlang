@@ -73,6 +73,25 @@ test_that("cnd_signal() creates a backtrace if needed", {
   expect_known_output(file = test_path("test-cnd-signal-trace.txt"), print(err))
 })
 
+test_that("`inform()` appends newline to message", {
+  expect_identical(
+    catch_cnd(inform("foo"))$message,
+    "foo\n"
+  )
+})
+
+test_that("condition signallers can be called without arguments", {
+  # For pragmatic reasons we don't require a class because we now use
+  # `inform()` in places where `cat()` would be more appropriate
+  expect_message(inform(), "", fixed = TRUE)
+  expect_warning(warn(class = "foo"), "", fixed = TRUE)
+  expect_error(abort(class = "foo"), "", fixed = TRUE, class = "foo")
+})
+
+test_that("`inform()` returns invisibly", {
+  expect_invisible(inform("foo"))
+})
+
 
 # Lifecycle ----------------------------------------------------------
 

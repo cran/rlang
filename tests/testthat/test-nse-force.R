@@ -535,6 +535,25 @@ test_that("it is still possible to use .data[[ in list2()", {
   expect_identical_(list2(.data$cyl), list(mtcars$cyl))
 })
 
+test_that("can defuse-and-label and interpolate with glue", {
+  skip_if_not_installed("glue")
+
+  env_bind_lazy(current_env(), var = letters)
+  suffix <- "foo"
+
+  expect_identical(glue_first_pass("{{var}}_{suffix}"), glue::glue("letters_{{suffix}}"))
+  expect_identical(glue_unquote("{{var}}_{suffix}"), glue::glue("letters_foo"))
+
+  expect_identical(exprs("{{var}}_{suffix}" := 1), exprs(letters_foo = 1))
+})
+
+test_that("unquoted strings are not interpolated with glue", {
+  expect_identical_(
+    list2(!!"{foo}" := 1),
+    list(`{foo}` = 1)
+  )
+})
+
 
 # Lifecycle ----------------------------------------------------------
 

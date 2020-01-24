@@ -62,9 +62,10 @@
 #' @inheritParams cnd
 #' @param message The message to display.
 #'
-#'   Experimental: Can also be a named character vector, in which case
-#'   the message is assembled as a list of bullets. See
-#'   [cnd_message()] to learn how names control the bulleted output.
+#'   If not supplied, it is expected that the message is generated
+#'   lazily through [conditionMessage()][cnd_message]. In that case,
+#'   `class` must be supplied. Only `inform()` allows empty messages
+#'   as it is occasionally useful to build user output incrementally.
 #' @param class Subclass of the condition. This allows your users
 #'   to selectively handle the conditions signalled by your functions.
 #' @param ... Additional data to be stored in the condition object.
@@ -132,7 +133,7 @@
 #'
 #' }
 #' @export
-abort <- function(message = "",
+abort <- function(message = NULL,
                   class = NULL,
                   ...,
                   trace = NULL,
@@ -141,9 +142,9 @@ abort <- function(message = "",
                   msg, type, .subclass) {
   validate_signal_args(msg, type, call, .subclass)
 
-  if (is_null(trace) && is_null(peek_option("rlang__disable_trace_capture"))) {
+  if (is_null(trace) && is_null(peek_option("rlang:::disable_trace_capture"))) {
     # Prevents infloops when rlang throws during trace capture
-    local_options("rlang__disable_trace_capture" = TRUE)
+    local_options("rlang:::disable_trace_capture" = TRUE)
 
     trace <- trace_back()
 
@@ -155,6 +156,7 @@ abort <- function(message = "",
     trace <- trace_trim_context(trace, context)
   }
 
+  message <- validate_signal_message(message, class)
   message <- collapse_cnd_message(message)
 
   cnd <- error_cnd(class,
@@ -167,7 +169,7 @@ abort <- function(message = "",
 }
 
 signal_abort <- function(cnd) {
-  if (is_true(peek_option("rlang_force_unhandled_error"))) {
+  if (is_true(peek_option("rlang:::force_unhandled_error"))) {
     # Fall back with the full rlang error
     fallback <- cnd
   } else {
@@ -266,8 +268,16 @@ find_capture_context <- function(n = 3L) {
 #' # stop("foo")
 NULL
 
+# Whenever the backtrace-on-error format is changed, the version in
+# `inst/backtrace-ver` and in `tests/testthat/helper-rlang.R` must be
+# bumped. This way `devtools::test()` will skip the tests that require
+# the dev version to be installed locally.
 format_onerror_backtrace <- function(cnd) {
   trace <- cnd$trace
+  if (is_null(trace) || !trace_length(trace)) {
+    return(NULL)
+  }
+
   show_trace <- show_trace_p()
 
   opts <- c("none", "reminder", "branch", "collapse", "full")
@@ -279,6 +289,14 @@ format_onerror_backtrace <- function(cnd) {
 
   if (show_trace == "none") {
     return(NULL)
+  }
+  if (show_trace == "reminder") {
+    if (is_interactive()) {
+      reminder <- silver("Run `rlang::last_error()` to see where the error occurred.")
+    } else {
+      reminder <- NULL
+    }
+    return(reminder)
   }
 
   if (show_trace == "branch") {
@@ -293,31 +311,25 @@ format_onerror_backtrace <- function(cnd) {
     show_trace
   )
 
-  if (simplify == "none") {
-    # Show full backtrace including for parent errors
-    return(format(cnd, simplify = "none"))
-  }
-
-  backtrace_lines <- format(trace, simplify = simplify, max_frames = max_frames)
-
-  # Backtraces of size 0 and 1 are uninteresting
-  if (length(backtrace_lines) <= 1L) {
-    return(NULL)
-  }
-
-  if (show_trace == "reminder") {
-    if (is_interactive()) {
-      reminder <- silver("Run `rlang::last_error()` to see where the error occurred.")
-    } else {
-      reminder <- NULL
-    }
-    return(reminder)
-  }
-
-  paste_line(
+  out <- paste_line(
     "Backtrace:",
-    backtrace_lines
+    format(trace, simplify = simplify, max_frames = max_frames)
   )
+
+  if (simplify == "none") {
+    # Show parent backtraces
+    while (!is_null(cnd <- cnd$parent)) {
+      trace <- trace_trim_common(cnd$trace, trace)
+      out <- paste_line(
+        out,
+        rlang_error_header(cnd, child = TRUE),
+        "Backtrace:",
+        format(trace, simplify = simplify, max_frames = max_frames)
+      )
+    }
+  }
+
+  out
 }
 
 show_trace_p <- function() {

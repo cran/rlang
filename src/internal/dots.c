@@ -83,6 +83,55 @@ struct dots_capture_info init_capture_info(enum dots_capture_type type,
 }
 
 
+static bool has_glue = false;
+sexp* rlang_glue_is_there() {
+  has_glue = true;
+  return r_null;
+}
+
+static bool has_curly(const char* str) {
+  for (char c = *str; c != '\0'; ++str, c = *str) {
+    if (c == '{') {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void require_glue() {
+  sexp* call = KEEP(r_parse("is_installed('glue')"));
+  sexp* out = KEEP(r_eval(call, rlang_ns_env));
+
+  if (!r_is_scalar_logical(out)) {
+    r_abort("Internal error: Expected scalar logical from `requireNamespace()`.");
+  }
+  if (!r_lgl_get(out, 0)) {
+    r_abort("Can't use `{` symbols in LHS of `:=` if glue is not installed.");
+  }
+
+  FREE(2);
+}
+
+// Initialised at load time
+static sexp* glue_unquote_fn = NULL;
+
+static sexp* glue_unquote(sexp* lhs, sexp* env) {
+  if (r_typeof(lhs) != r_type_character ||
+      r_length(lhs) != 1 ||
+      !has_curly(r_chr_get_c_string(lhs, 0))) {
+    return lhs;
+  }
+
+  if (!has_glue) {
+    require_glue();
+  }
+
+  sexp* glue_unquote_call = KEEP(r_call2(glue_unquote_fn, lhs));
+  lhs = r_eval(glue_unquote_call, env);
+  FREE(1);
+  return lhs;
+}
+
 static sexp* def_unquote_name(sexp* expr, sexp* env) {
   int n_kept = 0;
   sexp* lhs = r_node_cadr(expr);
@@ -91,6 +140,7 @@ static sexp* def_unquote_name(sexp* expr, sexp* env) {
 
   switch (info.op) {
   case OP_EXPAND_NONE:
+    lhs = KEEP_N(glue_unquote(lhs, env), n_kept);
     break;
   case OP_EXPAND_UQ:
     lhs = KEEP_N(r_eval(info.operand, env), n_kept);
@@ -912,7 +962,9 @@ sexp* rlang_dots_pairlist(sexp* frame_env,
                                true);
 }
 
-void rlang_init_dots() {
+void rlang_init_dots(sexp* ns) {
+  glue_unquote_fn = r_eval(r_sym("glue_unquote"), ns);
+
   auto_name_call = r_parse("rlang:::quos_auto_name(x)");
   r_mark_precious(auto_name_call);
 

@@ -289,7 +289,7 @@ format.rlang_trace <- function(x,
   switch(arg_match(simplify),
     none = trace_format(x, max_frames, dir, srcrefs),
     collapse = trace_format_collapse(x, max_frames, dir, srcrefs),
-    branch = trace_format_trail(x, max_frames, dir, srcrefs)
+    branch = trace_format_branch(x, max_frames, dir, srcrefs)
   )
 }
 
@@ -309,9 +309,9 @@ trace_format_collapse <- function(trace, max_frames, dir, srcrefs) {
   trace <- trace_simplify_collapse(trace)
   trace_format(trace, max_frames, dir, srcrefs)
 }
-trace_format_trail <- function(trace, max_frames, dir, srcrefs) {
+trace_format_branch <- function(trace, max_frames, dir, srcrefs) {
   trace <- trace_simplify_branch(trace)
-  trace <- trail_uncollapse_pipe(trace)
+  trace <- branch_uncollapse_pipe(trace)
   tree <- trace_as_tree(trace, dir = dir, srcrefs = srcrefs)
 
   branch <- tree[-1, ][["call"]]
@@ -329,7 +329,7 @@ format_collapsed <- function(what, n) {
 
   paste0(what, n_text)
 }
-format_collapsed_trail <- function(what, n, style = NULL) {
+format_collapsed_branch <- function(what, n, style = NULL) {
   style <- style %||% cli_box_chars()
   what <- sprintf(" %s %s", style$h, what)
   format_collapsed(what, n)
@@ -371,7 +371,7 @@ cli_branch <- function(lines, max = NULL, style = NULL, indices = NULL) {
   if (numbered) {
     collapsed_line <- paste0(spaces(padding), "...")
   } else {
-    collapsed_line <- format_collapsed_trail("...", n_collapsed, style = style)
+    collapsed_line <- format_collapsed_branch("...", n_collapsed, style = style)
   }
 
   if (max == 1L) {
@@ -611,7 +611,7 @@ has_pipe_pointer <- function(x) {
 }
 
 # Assumes a backtrace branch with collapsed pipe
-trail_uncollapse_pipe <- function(trace) {
+branch_uncollapse_pipe <- function(trace) {
   while (idx <- detect_index(trace$calls, has_pipe_pointer)) {
     trace_before <- trace_subset(trace, seq2(1L, idx - 1L))
     trace_after <- trace_subset(trace, seq2(idx + 2L, trace_length(trace)))
@@ -641,13 +641,24 @@ trail_uncollapse_pipe <- function(trace) {
     # Assign the pipe frame as dummy ids for uncollapsed frames
     pipe_ids <- rep(trace$ids[idx], pointer)
 
+    # This assigns the same frame number to all pipe calls that have
+    # already returned
+    n_collapsed <- attr(pipe, "collapsed")
+    pipe_indices <- rep(idx, length(pipe_calls) - 1L)
+    pipe_indices <- c(pipe_indices, idx + n_collapsed + 1L)
+
     # Add the number of uncollapsed frames to children's
     # ancestry. This assumes a backtrace branch.
     trace_after$parents <- trace_after$parents + pointer
 
     trace$calls <- c(trace_before$calls, pipe_calls, trace_after$calls)
     trace$parents <- c(trace_before$parents, pipe_parents, trace_after$parents)
-    trace$ids <- c(trace_before$ids, pipe_ids, trace$ids)
+    trace$ids <- c(trace_before$ids, pipe_ids, trace_after$ids)
+    trace$indices <- c(trace_before$indices, pipe_indices, trace_after$indices)
+  }
+
+  if (length(unique(lengths(trace))) != 1L) {
+    abort("Internal error: Trace data is not square.")
   }
 
   trace
@@ -755,6 +766,21 @@ trace_simplify_collapse <- function(trace) {
   trace_subset(trace, rev(path))
 }
 
+# Typically the full trace is held by the child error and the partial
+# trace by the parent
+trace_trim_common <- function(full, partial) {
+  common <- map_lgl(full$ids, `%in%`, partial$ids)
+  out <- trace_subset(full, which(!common))
+
+  # Trim catching context if any
+  calls <- out$calls
+  if (length(calls) && is_call(calls[[1]], c("tryCatch", "with_handlers", "catch_cnd"))) {
+    out <- trace_subset_across(out, -1, 1)
+  }
+
+  out
+}
+
 
 # Printing ----------------------------------------------------------------
 
@@ -820,7 +846,7 @@ src_loc <- function(srcref, dir = getwd()) {
   if (identical(file, "") || identical(file, "<text>")) {
     return("")
   }
-  if (!file.exists(file) && is_null(peek_option("rlang_trace__force_dangling_srcrefs"))) {
+  if (!file.exists(file) && is_null(peek_option("rlang:::trace_force_dangling_srcrefs"))) {
     return("")
   }
 

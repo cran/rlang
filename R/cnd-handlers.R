@@ -26,7 +26,6 @@
 #' Handlers are exiting by default, use [calling()] to create a
 #' calling handler.
 #'
-#' @inheritParams with_restarts
 #' @param .expr An expression to execute in a context where new
 #'   handlers are established. The underscored version takes a quoted
 #'   expression or a quoted formula.
@@ -198,7 +197,7 @@ restarting <- function(.restart, ..., .fields = NULL) {
 #' @examples
 #' catch_cnd(10)
 #' catch_cnd(abort("an error"))
-#' catch_cnd(cnd_signal("my_condition", .msg = "a condition"))
+#' catch_cnd(signal("my_condition", message = "a condition"))
 catch_cnd <- function(expr, classes = "condition") {
   stopifnot(is_character(classes))
   handlers <- rep_named(classes, list(identity))
