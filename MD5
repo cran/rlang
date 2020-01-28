@@ -1,6 +1,6 @@
-2bf4bafc8afe9f875417fe55e5ac2424 *DESCRIPTION
+c516aa9a18ed37a248f60d0177987273 *DESCRIPTION
 26d4053b540b9e641ae2f5155a52722a *NAMESPACE
-ff238b98e02c04167c7b3ae3672d076d *NEWS.md
+f8a284f1b67fe17940374e513c6b4999 *NEWS.md
 5af4924cec25d6004eaea90286452f11 *R/arg.R
 1c165414df71d30e95d1ab364ec57700 *R/attr.R
 5fab52d11771fd139f56d0a99feeb47c *R/call.R
@@ -55,7 +55,7 @@ c385c983f67b71461d7b0951db6a9c5d *R/vec-squash.R
 7abd99704c8a9dec7e55651158cc2853 *R/vec.R
 5835c34bf4379eb86b6257fd9dce56d7 *R/weakref.R
 292e379abe2774db729d8879e2f4283a *README.md
-294df7a85993fc615db927f234a04504 *build/rlang.pdf
+f109462257dcc47cdf36acc73db95860 *build/rlang.pdf
 c9e47dbb0e1927076ed7b2e1ec157be7 *inst/backtrace-ver
 45c5d0d5c255447ab7f9f6feb8d1b89f *man/abort.Rd
 80bd3cb98f7beaafd3a5760a7deb8647 *man/are_na.Rd
@@ -378,7 +378,7 @@ eabdd1c5fc2c3aee314ce3130b502491 *tests/testthat/test-cnd-message.R
 bb98a7205ffbb4d7ce2de38e8cea69b0 *tests/testthat/test-cnd-signal.R
 e28f232aeaa0e9f129cc42f243208708 *tests/testthat/test-cnd.R
 7df45679d1c8565b82a09b385506d148 *tests/testthat/test-compat.R
-8c4fd9a615b943c5e8e869df9ce60aff *tests/testthat/test-deparse.R
+450f3ed8a58eac4d34294e41791fbc33 *tests/testthat/test-deparse.R
 058cfb36cb8329b88fb5d6bd62baa17d *tests/testthat/test-dots.R
 441d927b3b0e857c429652c3840e4e8d *tests/testthat/test-encoding.R
 d603df0226f00192fe1d10389cf7ef1d *tests/testthat/test-env-binding.R
