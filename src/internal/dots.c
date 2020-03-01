@@ -9,6 +9,7 @@ sexp* rlang_ns_get(const char* name);
 // Initialised at load time
 static sexp* empty_spliced_arg = NULL;
 static sexp* splice_box_attrib = NULL;
+static sexp* quosures_attrib = NULL;
 
 sexp* rlang_new_splice_box(sexp* x) {
   sexp* out = KEEP(r_new_vector(r_type_list, 1));
@@ -518,7 +519,7 @@ static bool should_auto_name(sexp* named) {
 static sexp* auto_name_call = NULL;
 
 static sexp* maybe_auto_name(sexp* x, sexp* named) {
-  sexp* names = r_vec_names(x);
+  sexp* names = r_names(x);
 
   if (should_auto_name(named) && (names == r_null || r_chr_has(names, ""))) {
     x = r_eval_with_x(auto_name_call, r_base_env, x);
@@ -536,7 +537,7 @@ static bool any_name(sexp* x, bool splice) {
     sexp* elt = r_node_car(x);
 
     if (splice && is_splice_box(elt)) {
-      if (r_vec_names(rlang_unbox(elt)) != r_null) {
+      if (r_names(rlang_unbox(elt)) != r_null) {
         return true;
       }
     }
@@ -577,7 +578,7 @@ sexp* dots_as_list(sexp* dots, struct dots_capture_info* capture_info) {
       check_named_splice(dots);
 
       elt = rlang_unbox(elt);
-      sexp* nms = r_vec_names(elt);
+      sexp* nms = r_names(elt);
 
       r_ssize n = r_length(elt);
       for (r_ssize i = 0; i < n; ++i) {
@@ -701,7 +702,7 @@ static sexp* dots_capture(struct dots_capture_info* capture_info, sexp* frame_en
 sexp* rlang_unescape_character(sexp*);
 
 static sexp* dots_finalise(struct dots_capture_info* capture_info, sexp* dots) {
-  sexp* nms = r_vec_names(dots);
+  sexp* nms = r_names(dots);
 
   if (nms != r_null) {
     // Serialised unicode points might arise when unquoting lists
@@ -772,9 +773,12 @@ sexp* rlang_quos_interp(sexp* frame_env,
   dots = KEEP(dots_as_list(dots, &capture_info));
   dots = KEEP(dots_finalise(&capture_info, dots));
 
-  r_push_class(dots, "quosures");
+  sexp* attrib = KEEP(r_new_node(r_names(dots), quosures_attrib));
+  r_node_poke_tag(attrib, r_names_sym);
+  r_poke_attributes(dots, attrib);
+  r_mark_object(dots);
 
-  FREE(3);
+  FREE(4);
   return dots;
 }
 
@@ -989,6 +993,19 @@ void rlang_init_dots(sexp* ns) {
     empty_spliced_arg = rlang_new_splice_box(list);
     r_mark_precious(empty_spliced_arg);
     r_mark_shared(empty_spliced_arg);
+    FREE(1);
+  }
+
+  {
+    sexp* quosures_class = KEEP(r_new_vector(r_type_character, 2));
+    r_chr_poke(quosures_class, 0, r_string("quosures"));
+    r_chr_poke(quosures_class, 1, r_string("list"));
+
+    quosures_attrib = r_pairlist(quosures_class);
+    r_mark_precious(quosures_attrib);
+    r_mark_shared(quosures_attrib);
+
+    r_node_poke_tag(quosures_attrib, r_class_sym);
     FREE(1);
   }
 }

@@ -20,6 +20,10 @@ extern sexp* r_x_sym;
 extern sexp* r_y_sym;
 extern sexp* r_z_sym;
 
+extern sexp* r_dot_x_sym;
+extern sexp* r_dot_y_sym;
+extern sexp* r_dot_fn_sym;
+
 
 sexp* r_new_symbol(sexp* x, int* err);
 
@@ -32,6 +36,10 @@ static inline sexp* r_sym_get_string(sexp* sym) {
 }
 static inline const char* r_sym_get_c_string(sexp* sym) {
   return CHAR(PRINTNAME(sym));
+}
+
+static inline sexp* r_sym_as_character(sexp* x) {
+  return Rf_ScalarString(PRINTNAME(x));
 }
 
 bool r_is_symbol(sexp* sym, const char* string);

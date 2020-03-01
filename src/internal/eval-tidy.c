@@ -78,7 +78,7 @@ static void check_unique_names(sexp* x) {
     return ;
   }
 
-  sexp* names = r_vec_names(x);
+  sexp* names = r_names(x);
   if (names == r_null) {
     r_abort("`data` must be uniquely named but does not have names");
   }
@@ -209,13 +209,17 @@ static sexp* mask_find(sexp* env, sexp* sym) {
     // to a simple environment whose ancestry shouldn't be looked up.
     top_env = env;
   }
-  KEEP(top_env); // Help rchk
+  int n_kept = 0;
+  KEEP_N(top_env, n_kept); // Help rchk
 
   sexp* cur = env;
   do {
     sexp* obj = r_env_find(cur, sym);
+    if (TYPEOF(obj) == PROMSXP) {
+      obj = KEEP_N(r_eval(obj, r_empty_env), n_kept);
+    }
     if (obj != r_unbound_sym && !r_is_function(obj)) {
-      FREE(1);
+      FREE(n_kept);
       return obj;
     }
 
@@ -226,7 +230,7 @@ static sexp* mask_find(sexp* env, sexp* sym) {
     }
   } while (cur != r_empty_env);
 
-  FREE(1);
+  FREE(n_kept);
   return r_unbound_sym;
 }
 sexp* rlang_data_pronoun_get(sexp* pronoun, sexp* sym) {
@@ -296,7 +300,7 @@ sexp* rlang_as_data_mask(sexp* data) {
   case r_type_list: {
     check_unique_names(data);
 
-    sexp* names = r_vec_names(data);
+    sexp* names = r_names(data);
     bottom = KEEP_N(r_new_environment(r_empty_env, 0), n_protect);
 
     if (names != r_null) {

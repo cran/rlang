@@ -1,6 +1,10 @@
 #include <Rinternals.h>
 #include <R_ext/Rdynload.h>
 
+// Compile with `-fvisibility=hidden -DHAVE_VISIBILITY_ATTRIBUTE` if you link to this library
+#include <R_ext/Visibility.h>
+#define export attribute_visible extern
+
 #include <rlang.h>
 
 // Callable from other packages
@@ -39,6 +43,12 @@ extern sexp* rlang_node_tag(sexp*);
 extern sexp* rlang_node_poke_tag(sexp*, sexp*);
 extern sexp* rlang_eval(sexp*, sexp*);
 extern sexp* rlang_interp(sexp*, sexp*);
+extern sexp* rlang_is_function(sexp*);
+extern sexp* rlang_is_closure(sexp*);
+extern sexp* rlang_is_primitive(sexp*);
+extern sexp* rlang_is_primitive_eager(sexp*);
+extern sexp* rlang_is_primitive_lazy(sexp*);
+extern sexp* rlang_is_formula(sexp*, sexp*, sexp*);
 extern sexp* rlang_is_formulaish(sexp*, sexp*, sexp*);
 extern sexp* rlang_is_reference(sexp*, sexp*);
 extern sexp* rlang_sexp_address(sexp*);
@@ -46,7 +56,7 @@ extern sexp* rlang_length(sexp*);
 extern sexp* rlang_true_length(sexp* x);
 extern sexp* rlang_squash(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_symbol(sexp*);
-extern sexp* rlang_symbol_to_character(sexp*);
+extern sexp* rlang_sym_as_character(sexp*);
 extern sexp* rlang_tilde_eval(sexp*, sexp*, sexp*);
 extern sexp* rlang_unescape_character(sexp*);
 extern sexp* rlang_capturearginfo(sexp*, sexp*, sexp*, sexp*);
@@ -124,6 +134,9 @@ extern sexp* rlang_is_weakref(sexp*);
 extern sexp* rlang_find_var(sexp*, sexp*);
 extern sexp* rlang_env_bind_list(sexp*, sexp*, sexp*);
 extern sexp* rlang_glue_is_there();
+extern sexp* rlang_linked_version();
+extern sexp* rlang_names2(sexp*, sexp*);
+extern sexp* rlang_set_names(sexp*, sexp*, sexp*, sexp*);
 
 // Library initialisation defined below
 sexp* rlang_library_load(sexp*);
@@ -162,6 +175,12 @@ static const r_callable r_callables[] = {
   {"rlang_node_tree_clone",             (r_fn_ptr) &r_node_tree_clone, 1},
   {"rlang_eval",                        (r_fn_ptr) &rlang_eval, 2},
   {"rlang_interp",                      (r_fn_ptr) &rlang_interp, 2},
+  {"rlang_is_function",                 (r_fn_ptr) &rlang_is_function, 1},
+  {"rlang_is_closure",                  (r_fn_ptr) &rlang_is_closure, 1},
+  {"rlang_is_primitive",                (r_fn_ptr) &rlang_is_primitive, 1},
+  {"rlang_is_primitive_eager",          (r_fn_ptr) &rlang_is_primitive_eager, 1},
+  {"rlang_is_primitive_lazy",           (r_fn_ptr) &rlang_is_primitive_lazy, 1},
+  {"rlang_is_formula",                  (r_fn_ptr) &rlang_is_formula, 3},
   {"rlang_is_formulaish",               (r_fn_ptr) &rlang_is_formulaish, 3},
   {"rlang_is_null",                     (r_fn_ptr) &rlang_is_null, 1},
   {"rlang_is_reference",                (r_fn_ptr) &rlang_is_reference, 2},
@@ -200,7 +219,7 @@ static const r_callable r_callables[] = {
   {"rlang_squash",                      (r_fn_ptr) &rlang_squash, 4},
   {"rlang_sexp_address",                (r_fn_ptr) &rlang_sexp_address, 1},
   {"rlang_symbol",                      (r_fn_ptr) &rlang_symbol, 1},
-  {"rlang_symbol_to_character",         (r_fn_ptr) &rlang_symbol_to_character, 1},
+  {"rlang_sym_as_character",            (r_fn_ptr) &rlang_sym_as_character, 1},
   {"rlang_tilde_eval",                  (r_fn_ptr) &rlang_tilde_eval, 3},
   {"rlang_unescape_character",          (r_fn_ptr) &rlang_unescape_character, 1},
   {"rlang_new_call",                    (r_fn_ptr) &rlang_new_call_node, 2},
@@ -287,6 +306,9 @@ static const r_callable r_callables[] = {
   {"rlang_find_var",                    (r_fn_ptr) &rlang_find_var, 2},
   {"rlang_env_bind_list",               (r_fn_ptr) &rlang_env_bind_list, 3},
   {"rlang_glue_is_there",               (r_fn_ptr) &rlang_glue_is_there, 0},
+  {"rlang_linked_version",              (r_fn_ptr) &rlang_linked_version, 0},
+  {"rlang_names2",                      (r_fn_ptr) &rlang_names2, 2},
+  {"rlang_set_names",                   (r_fn_ptr) &rlang_set_names, 4},
   {NULL, NULL, 0}
 };
 
@@ -310,7 +332,7 @@ extern bool is_splice_box(sexp*);
 extern sexp* rlang_env_dots_values(sexp*);
 extern sexp* rlang_env_dots_list(sexp*);
 
-void R_init_rlang(r_dll_info* dll) {
+export void R_init_rlang(r_dll_info* dll) {
   r_register_c_callable("rlang", "rlang_squash_if", (r_fn_ptr) &r_squash_if);
 
   // The quosure functions are stable
@@ -334,6 +356,7 @@ void R_init_rlang(r_dll_info* dll) {
   r_register_c_callable("rlang", "rlang_unbox", (r_fn_ptr) &rlang_unbox);
   r_register_c_callable("rlang", "rlang_env_dots_values", (r_fn_ptr) &rlang_env_dots_values);
   r_register_c_callable("rlang", "rlang_env_dots_list", (r_fn_ptr) &rlang_env_dots_list);
+  r_register_c_callable("rlang", "rlang_sym_as_character", (r_fn_ptr) &rlang_sym_as_character);
 
   // Experimental method for exporting C function pointers as actual R objects
   rlang_register_pointer("rlang", "rlang_test_is_spliceable", (r_fn_ptr) &rlang_is_clevel_spliceable);

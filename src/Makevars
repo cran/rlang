@@ -1,4 +1,5 @@
 PKG_CPPFLAGS = -I./lib/
+PKG_CFLAGS = $(C_VISIBILITY)
 
 lib-files = \
         lib/rlang.h \
@@ -29,6 +30,7 @@ lib-files = \
 
 internal-files = \
         internal/arg.c \
+        internal/attr.c \
         internal/dots.c \
         internal/call.c \
         internal/env.c \
