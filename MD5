@@ -1,6 +1,6 @@
-cabfcf41986a68cc79ebd2a0a73a0b0b *DESCRIPTION
+ab0bfbfbf51f719e713cbb4fc9bd5c4e *DESCRIPTION
 0bc81a2f738fd4b1aa865671c99130bb *NAMESPACE
-f49008e5b57c6416670a8115e1f0ffb8 *NEWS.md
+37f1587ec1a9951a5ab86d6c0baf2afb *NEWS.md
 8e8414e23438d48b2d447e6a0c635cdb *R/arg.R
 70ee33ddfe9dc7ab1f237dbcfbd4f0d7 *R/attr.R
 5fab52d11771fd139f56d0a99feeb47c *R/call.R
@@ -21,9 +21,9 @@ c2454266d642fd2f2eb2c582662d5531 *R/compat-linked-version.R
 6ff61ce96b8a0aca5f241ef7aaab4a68 *R/compat-purrr.R
 4de02456d59484fb66db37255e5b1b4f *R/compat-register.R
 6bf20ae75a526fd067b4656b22540ebd *R/deparse.R
-242aaf55932a9915668173a2b0aa3984 *R/dots.R
+d57a0fc1115511cf3dd790cda9041bc8 *R/dots.R
 b5d57bebaf1566cb4ebb1c588a300627 *R/env-binding.R
-b3b0c2050ae6947464d14514bf3295b1 *R/env-special.R
+ef9517f0a8fad0680bd013b07d69ec36 *R/env-special.R
 46f13081ed0377d60cd9e87e123ecc1b *R/env.R
 380f9343c0a5731cd3114e4842c8a6ac *R/eval-tidy.R
 01ea3d1fb018d218fb64596038f789d9 *R/eval.R
@@ -58,7 +58,7 @@ c385c983f67b71461d7b0951db6a9c5d *R/vec-squash.R
 7abd99704c8a9dec7e55651158cc2853 *R/vec.R
 5835c34bf4379eb86b6257fd9dce56d7 *R/weakref.R
 292e379abe2774db729d8879e2f4283a *README.md
-9990cf33f904d0a11e0886cedceee302 *build/rlang.pdf
+d36594559d9a1c5e1b6c6031becfb52c *build/rlang.pdf
 c9e47dbb0e1927076ed7b2e1ec157be7 *inst/backtrace-ver
 45c5d0d5c255447ab7f9f6feb8d1b89f *man/abort.Rd
 80bd3cb98f7beaafd3a5760a7deb8647 *man/are_na.Rd
@@ -85,7 +85,7 @@ ac2d36604312134191c74e134ccae3cb *man/call_args.Rd
 0dd6834ec3aecc42710a1c526b2680ee *man/call_modify.Rd
 5fbeb53f45cb69a49691185d4db8ca85 *man/call_name.Rd
 1fc2c135723e034860164fce0e97c254 *man/call_standardise.Rd
-e44ce9514dac75c51c716bc5a8ecc716 *man/caller_env.Rd
+3ca5414304fe088774a2c936b299d118 *man/caller_env.Rd
 7278cee1831a1973aab715678a475201 *man/caller_fn.Rd
 296ed78ac6c8afe2f4b7135b423f730b *man/caller_frame.Rd
 fbb49d5cbc765200fef6ff0dfb754a5e *man/catch_cnd.Rd
@@ -261,7 +261,7 @@ f7a1a1964b43d4e7d125368bbe537939 *src/export/init.c
 9e6d3d6b8492df1769ec6ff9ca7cdc81 *src/internal/arg.c
 0ab53e3105cb868369f70a4a168509e1 *src/internal/attr.c
 fd538226905ccf738d831d00fa8bac31 *src/internal/call.c
-addbedd12b71e6969d20a5a4345928aa *src/internal/dots.c
+39249d22b183b2f98635c074c109256d *src/internal/dots.c
 3f13fd0791f56ee38ecdd013b0312ddb *src/internal/dots.h
 2bb7535872e5586ea45cf9cd9dc5cc9b *src/internal/env-binding.c
 89d1c417dfdf35daf96afd2f105bfa9e *src/internal/env.c
@@ -272,8 +272,8 @@ d94334212a74d3d56e347d85675e5ea5 *src/internal/expr-interp-rotate.h
 d620afd094ad1bcae2bf72ba582c7ae2 *src/internal/expr-interp.c
 5987fd35349209dcf117087ef83833a2 *src/internal/expr-interp.h
 8637d965924f4c9e8a55298733efb534 *src/internal/fn.c
-c678da4094ac2f861a04cb752c21d5de *src/internal/internal.c
-45ca29661f3ba2faab693101f4710a2f *src/internal/internal.h
+a565685a253f6b05df113c9294715325 *src/internal/internal.c
+9b1ae81631f4e551e67909ae3c449f62 *src/internal/internal.h
 c64b24338b05ab8e00fe42e0f86842e0 *src/internal/quo.c
 eede28d66f0412d290e3b00fe17745b1 *src/internal/quo.h
 4ee2e4830a1ac533bd007b669c8c8e01 *src/internal/utils.c
@@ -330,7 +330,7 @@ c686c77faeb522d5425eebae89ae024d *src/lib/vec-lgl.h
 34d002f2db38814a4d86a22725e58532 *src/lib/vec.c
 a5620e19282921953300f25c6b9ce7cd *src/lib/vec.h
 f62bfc377df0fd1681959ba55ea4d5a6 *src/lib/weakref.c
-acd031cdf7ace57ccaf56f6d7be5b6d5 *src/version.c
+92c431909946b37197b1217ac6463522 *src/version.c
 69397c1a0491ea4760de06ef3fb71424 *tests/sink.R
 689f0fa1b25df0719206586844edb2d0 *tests/testthat.R
 ba141ebe66e9cbf68456c4894d8f811d *tests/testthat/fixtures/Makefile
@@ -400,9 +400,9 @@ fc481fb91e65da643e012883f3c2cddf *tests/testthat/test-expr.R
 0ad90b0dcc07e46220199b22e370fb88 *tests/testthat/test-fn.R
 1bc98da29fef967ac23d58c02a076bec *tests/testthat/test-formula.R
 33560dafbd5f796f2423bdb9079787a4 *tests/testthat/test-lifecycle.R
-1a2bb3f4b4774212c1a99adbc56e30cd *tests/testthat/test-node.R
+144d6e49fcde43909d489a88ec903a78 *tests/testthat/test-node.R
 a3515d2e5e7c75e93c7094eb168968ca *tests/testthat/test-nse-defuse.R
-c5c7d1047619892515161d9db7f778c4 *tests/testthat/test-nse-force.R
+d5e6cd355910b3543c6d0efd9d4c8bde *tests/testthat/test-nse-force.R
 fa414041373218367a6bf79b1797c52e *tests/testthat/test-operators-replace-na.txt
 a02a4815c9decf986ca015bbf846f44b *tests/testthat/test-operators.R
 43106a9fc423e928a2e11c829ddfc6d5 *tests/testthat/test-parse.R

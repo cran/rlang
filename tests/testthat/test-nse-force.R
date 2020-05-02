@@ -341,40 +341,115 @@ test_that("!!! succeeds with vectors, pairlists and language objects", {
   expect_identical_(list2(!!!bytes(0)), list(bytes(0)))
 })
 
-test_that("!!! calls as.list()", {
+test_that("!!! calls `[[`", {
   as_quos_list <- function(x, env = empty_env()) {
     new_quosures(map(x, new_quosure, env = env))
   }
-  exp <- as.list(mtcars)
+
+  exp <- map(seq_along(mtcars), function(i) mtcars[[i]])
+  names(exp) <- names(mtcars)
   expect_identical_(exprs(!!!mtcars), exp)
   expect_identical_(quos(!!!mtcars), as_quos_list(exp))
   expect_identical_(expr(foo(!!!mtcars)), do.call(call, c(list("foo"), exp)))
   expect_identical_(list2(!!!mtcars), as.list(mtcars))
 
   fct <- factor(c("a", "b"))
-  exp <- set_names(as.list(fct), c("", ""))
+  fct <- set_names(fct, c("x", "y"))
+  exp <- set_names(list(fct[[1]], fct[[2]]), names(fct))
   expect_identical_(exprs(!!!fct), exp)
   expect_identical_(quos(!!!fct), as_quos_list(exp))
   expect_identical_(expr(foo(!!!fct)), do.call(call, c(list("foo"), exp)))
-  expect_identical_(list2(!!!fct), as.list(fct))
+  expect_identical_(list2(!!!fct), exp)
 })
 
-test_that("!!! calls methods::as()", {
+test_that("!!! errors on scalar S4 objects without a `[[` method", {
+  .Person <- methods::setClass("Person", slots = c(name = "character", species = "character"))
+  fievel <- .Person(name = "Fievel", species = "mouse")
+  expect_error_(list2(!!!fievel))
+})
+
+test_that("!!! works with scalar S4 objects with a `[[` method defined", {
+  .Person2 <- methods::setClass("Person2", slots = c(name = "character", species = "character"))
+  fievel <- .Person2(name = "Fievel", species = "mouse")
+
+  methods::setMethod("[[", methods::signature(x = "Person2"),
+    function(x, i, ...) .Person2(name = x@name, species = x@species)
+  )
+
+  expect_identical_(list2(!!!fievel), list(fievel))
+})
+
+test_that("!!! works with all vector S4 objects", {
+  .Counts <- methods::setClass("Counts", contains = "numeric", slots = c(name = "character"))
+  fievel <- .Counts(c(1, 2), name = "Fievel")
+  expect_identical_(list2(!!!fievel), list(1, 2))
+})
+
+test_that("!!! calls `[[` with vector S4 objects", {
   as_quos_list <- function(x, env = empty_env()) {
     new_quosures(map(x, new_quosure, env = env))
   }
+  foo <- function(x, y) {
+    list(x, y)
+  }
 
-  .Person <- setClass("Person", slots = c(name = "character", species = "character"))
-  fievel <- .Person(name = "Fievel", species = "mouse")
-  methods::setAs("Person", "list", function(from, to) list(name = from@name, species = from@species))
+  .Belongings <- methods::setClass("Belongings", contains = "list", slots = c(name = "character"))
+  fievel <- .Belongings(list(1, "x"), name = "Fievel")
 
-  exp <- list(name = "Fievel", species = "mouse")
-  expect_identical_(exprs(!!!fievel), exp)
-  expect_identical_(quos(!!!fievel), as_quos_list(exp))
-  expect_identical_(expr(foo(!!!fievel)), quote(foo(name = "Fievel", species = "mouse")))
+  methods::setMethod("[[", methods::signature(x = "Belongings"),
+    function(x, i, ...) .Belongings(x@.Data[[i]], name = x@name)
+  )
+
+  exp <- list(
+    .Belongings(list(1), name = "Fievel"),
+    .Belongings(list("x"), name = "Fievel")
+  )
+
+  exp_named <- set_names(exp, c("", ""))
+
   expect_identical_(list2(!!!fievel), exp)
+  expect_identical_(eval_bare(expr(foo(!!!fievel))), exp)
+  expect_identical_(exprs(!!!fievel), exp_named)
+  expect_identical_(quos(!!!fievel), as_quos_list(exp_named))
 })
 
+test_that("!!! doesn't shorten S3 lists containing `NULL`", {
+  x <- structure(list(NULL), class = "foobar")
+  y <- structure(list(a = NULL, b = 1), class = "foobar")
+
+  expect_identical_(list2(!!!x), list(NULL))
+  expect_identical_(list2(!!!y), list(a = NULL, b = 1))
+})
+
+test_that("!!! goes through `[[` for record S3 types", {
+  x <- structure(list(x = c(1, 2, 3), y = c(3, 2, 1)), class = "rcrd")
+
+  local_methods(
+    `[[.rcrd` = function(x, i, ...) {
+      structure(lapply(unclass(x), "[[", i), class = "rcrd")
+    },
+    names.rcrd = function(x) {
+      names(x$x)
+    },
+    `names<-.rcrd` = function(x, value) {
+      names(x$x) <- value
+      x
+    },
+    length.rcrd = function(x) {
+      length(x$x)
+    }
+  )
+
+  x_named <- set_names(x, c("a", "b", "c"))
+
+  expect <- list(
+    a = structure(list(x = 1, y = 3), class = "rcrd"),
+    b = structure(list(x = 2, y = 2), class = "rcrd"),
+    c = structure(list(x = 3, y = 1), class = "rcrd")
+  )
+
+  expect_identical_(list2(!!!x_named), expect)
+})
 
 # bang ---------------------------------------------------------------
 
