@@ -23,8 +23,30 @@ static inline r_byte_t* r_raw_deref(sexp* x) {
 static inline sexp** r_chr_deref(sexp* x) {
   return STRING_PTR(x);
 }
-static inline sexp** r_list_deref(sexp* x) {
-  return VECTOR_PTR(x);
+
+static inline
+const int* r_int_deref_const(sexp* x) {
+  return (const int*) INTEGER(x);
+}
+static inline
+const int* r_lgl_deref_const(sexp* x) {
+  return (const int*) LOGICAL(x);
+}
+static inline
+const double* r_dbl_deref_const(sexp* x) {
+  return (const double*) REAL(x);
+}
+static inline
+const r_complex_t* r_cpl_deref_const(sexp* x) {
+  return (const r_complex_t*) COMPLEX(x);
+}
+static inline
+const r_byte_t* r_raw_deref_const(sexp* x) {
+  return (const r_byte_t*) RAW(x);
+}
+static inline
+sexp* const * r_chr_deref_const(sexp* x) {
+  return (sexp* const *) STRING_PTR(x);
 }
 
 static inline void r_vec_get_check(sexp*x, r_ssize i, const char* fn) {
@@ -91,13 +113,6 @@ bool r_is_character(sexp* x, r_ssize n);
 bool r_is_raw(sexp* x, r_ssize n);
 
 
-static inline bool r_is_scalar_character(sexp* x) {
-  return r_typeof(x) == r_type_character && r_length(x) == 1;
-}
-static inline bool r_is_scalar_logical(sexp* x) {
-  return r_typeof(x) == r_type_logical && r_length(x) == 1;
-}
-
 static inline sexp* r_int(int x) {
   return Rf_ScalarInteger(x);
 }
@@ -142,6 +157,8 @@ static inline sexp* r_vec_are_duplicated(sexp* x) {
 }
 
 bool r_vec_find_first_identical_any(sexp* x, sexp* y, r_ssize* index);
+
+extern sexp* r_shared_empty_list;
 
 
 #endif

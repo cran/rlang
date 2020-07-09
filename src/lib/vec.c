@@ -47,27 +47,27 @@ bool r_is_finite(sexp* x) {
 
   switch(r_typeof(x)) {
   case r_type_integer: {
-    int* ptr = r_int_deref(x);
-    for (r_ssize i = 0; i < n; ++i, ++ptr) {
-      if (*ptr == NA_INTEGER) {
+    const int* p_x = r_int_deref_const(x);
+    for (r_ssize i = 0; i < n; ++i) {
+      if (p_x[i] == NA_INTEGER) {
         return false;
       }
     }
     break;
   }
   case r_type_double: {
-    double* ptr = r_dbl_deref(x);
-    for (r_ssize i = 0; i < n; ++i, ++ptr) {
-      if (!isfinite(*ptr)) {
+    const double* p_x = r_dbl_deref_const(x);
+    for (r_ssize i = 0; i < n; ++i) {
+      if (!isfinite(p_x[i])) {
         return false;
       }
     }
     break;
   }
   case r_type_complex: {
-    r_complex_t* ptr = r_cpl_deref(x);
-    for (r_ssize i = 0; i < n; ++i, ++ptr) {
-      if (!isfinite(ptr->r) || !isfinite(ptr->i)) {
+    const r_complex_t* p_x = r_cpl_deref_const(x);
+    for (r_ssize i = 0; i < n; ++i) {
+      if (!isfinite(p_x[i].r) || !isfinite(p_x[i].i)) {
         return false;
       }
     }
@@ -111,11 +111,11 @@ bool r_is_integerish(sexp* x, r_ssize n, int finite) {
   }
 
   r_ssize actual_n = r_length(x);
-  double* ptr = r_dbl_deref(x);
+  const double* p_x = r_dbl_deref_const(x);
   bool actual_finite = true;
 
-  for (r_ssize i = 0; i < actual_n; ++i, ++ptr) {
-    double elt = *ptr;
+  for (r_ssize i = 0; i < actual_n; ++i) {
+    double elt = p_x[i];
 
     if (!isfinite(elt)) {
       actual_finite = false;
@@ -316,4 +316,12 @@ void r_vec_poke_coerce_n(sexp* x, r_ssize offset,
 void r_vec_poke_coerce_range(sexp* x, r_ssize offset,
                              sexp* y, r_ssize from, r_ssize to) {
   r_vec_poke_coerce_n(x, offset, y, from, to - from + 1);
+}
+
+sexp* r_shared_empty_list = NULL;
+
+void r_init_library_vec() {
+  r_shared_empty_list = r_new_vector(r_type_list, 0);
+  r_mark_shared(r_shared_empty_list);
+  r_mark_precious(r_shared_empty_list);
 }

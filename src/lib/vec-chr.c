@@ -114,12 +114,12 @@ sexp* r_nms_are_duplicated(sexp* nms, bool from_last) {
   sexp* dups = KEEP(Rf_duplicated(nms, from_last));
 
   r_ssize n = r_length(dups);
-  int* dups_ptr = r_lgl_deref(dups);
-  sexp** nms_ptr = r_chr_deref(nms);
+  int* p_dups = r_lgl_deref(dups);
+  sexp* const * p_nms = r_chr_deref_const(nms);
 
-  for (r_ssize i = 0; i < n; ++i, ++dups_ptr, ++nms_ptr) {
-    if (*nms_ptr == r_empty_str || *nms_ptr == r_missing_str) {
-      *dups_ptr = false;
+  for (r_ssize i = 0; i < n; ++i) {
+    if (p_nms[i] == r_empty_str || p_nms[i] == r_missing_str) {
+      p_dups[i] = false;
     }
   }
 
@@ -133,6 +133,7 @@ sexp* r_empty_str = NULL;
 
 void r_init_library_vec_chr() {
   r_shared_empty_chr = r_chr("");
+  r_mark_shared(r_shared_empty_chr);
   r_mark_precious(r_shared_empty_chr);
 
   r_empty_str = r_chr_get(r_shared_empty_chr, 0);

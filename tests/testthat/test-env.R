@@ -161,16 +161,16 @@ test_that("as_environment() converts character vectors", {
 })
 
 test_that("child_env() requires named elements", {
-  expect_error(child_env(env(), 1), "all arguments must be named")
+  expect_error(child_env(env(), 1), "some elements are not named")
 })
 
 test_that("env() requires named elements", {
   expect_error(env(env(), 1), "Expected 0 or 1 unnamed arguments")
 })
 
-test_that("env() and child_env() requires uniquely named elements", {
-  expect_error(env(a = 1, a = 2), "some arguments have the same name")
-  expect_error(child_env(env(), a = 1, a = 2), "some arguments have the same name")
+test_that("env() doesn't require uniquely named elements", {
+  env <- env(a = 1, a = 2)
+  expect_identical(env$a, 2)
 })
 
 test_that("env_clone() clones an environment", {
@@ -438,6 +438,21 @@ test_that("env_name() requires an environment", {
   expect_error(env_name("base"), "must be an environment")
 })
 
+test_that("env_unbind() removes objects", {
+  env <- env(a = 1L)
+  env_unbind(env, "a")
+  expect_false(env_has(env, "a"))
+
+  env <- env(a = 1L)
+  child <- child_env(env)
+
+  env_unbind(child, "a")
+  expect_true(env_has(child, "a", inherit = TRUE))
+
+  env_unbind(child, "a", inherit = TRUE)
+  expect_false(env_has(env, "a"))
+})
+
 
 #  Lifecycle ---------------------------------------------------------
 
@@ -460,7 +475,7 @@ test_that("env API warns with non-environments", {
   expect_warning(with_bindings(NULL, a = 1, .env = ~foo), "deprecated")
   expect_warning(env_poke(~foo, "a", NULL), "deprecated")
   expect_warning(env_has(~foo, "a"), "deprecated")
-  expect_warning(env_get(~foo, "a"), "deprecated")
+  expect_warning(env_get(~foo, "f"), "deprecated")
   expect_warning(env_names(~foo), "deprecated")
   expect_warning(env_bind_lazy(~foo, foo = list()), "deprecated")
   expect_warning(env_bind_active(~foo, a = function() "foo"), "deprecated")

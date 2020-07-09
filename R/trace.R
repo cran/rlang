@@ -613,6 +613,8 @@ has_pipe_pointer <- function(x) {
 
 # Assumes a backtrace branch with collapsed pipe
 branch_uncollapse_pipe <- function(trace) {
+  orig <- trace
+
   while (idx <- detect_index(trace$calls, has_pipe_pointer)) {
     trace_before <- trace_subset(trace, seq2(1L, idx - 1L))
     trace_after <- trace_subset(trace, seq2(idx + 2L, trace_length(trace)))
@@ -644,7 +646,7 @@ branch_uncollapse_pipe <- function(trace) {
 
     # This assigns the same frame number to all pipe calls that have
     # already returned
-    n_collapsed <- attr(pipe, "collapsed")
+    n_collapsed <- attr(pipe, "collapsed") %||% 0L
     pipe_indices <- rep(idx, length(pipe_calls) - 1L)
     pipe_indices <- c(pipe_indices, idx + n_collapsed + 1L)
 
@@ -659,7 +661,8 @@ branch_uncollapse_pipe <- function(trace) {
   }
 
   if (length(unique(lengths(trace))) != 1L) {
-    abort("Internal error: Trace data is not square.")
+    warn("Internal error: Trace data is not square.")
+    return(orig)
   }
 
   trace
@@ -870,4 +873,112 @@ trace_root <- function() {
   } else {
     "x"
   }
+}
+
+#' Trace functions from a set of packages
+#'
+#' @param pkgs One or more package names whose functions should be traced.
+#' @param max_level Maximum nesting level of call stack.
+#' @param regexp Regular expression passed to [base::grepl()] to
+#'   select which functions should be traced. Can be a single string
+#'   or a vector as long as `pkgs`.
+#' @param ... These dots are for future extensions and should be empty.
+#'
+#' @author Iñaki Ucar (ORCID: 0000-0001-6403-5550)
+#' @noRd
+trace_pkgs <- function(pkgs, max_level = Inf, ..., regexp = NULL) {
+  check_dots_empty(...)
+
+  # Avoids namespace loading issues
+  lapply(pkgs, requireNamespace, quietly = TRUE)
+
+  trace_level <- 0
+
+  # Create a thunk because `trace()` sloppily transforms functions into calls
+  tracer <- call2(function() {
+    trace_level <<- trace_level + 1
+
+    if (trace_level > max_level) {
+      return()
+    }
+
+    # Work around sys.foo() weirdness
+    get_fn <- call2(function(fn = sys.function(sys.parent())) fn)
+    fn <- eval(get_fn, envir = parent.frame())
+
+    try(silent = TRUE, {
+      call <- evalq(base::match.call(), envir = parent.frame())
+      call <- call_add_namespace(call, fn)
+
+      indent <- paste0(rep(" ", (trace_level - 1) * 2), collapse = "")
+      line <- paste0(indent, as_label(call))
+      cat(line, "\n")
+    })
+  })
+
+  exit <- call2(function() {
+    trace_level <<- trace_level - 1
+  })
+
+  if (length(regexp) == 1) {
+    regexp <- rep_along(pkgs, regexp)
+  }
+
+  for (i in seq_along(pkgs)) {
+    pkg <- pkgs[[i]]
+    ns <- ns_env(pkg)
+    ns_fns <- names(keep(is.function, as.list(ns)))
+
+    if (!is_null(regexp)) {
+      ns_fns <- ns_fns[grepl(regexp[[i]], ns_fns)]
+    }
+
+    suppressMessages(trace(
+      ns_fns,
+      tracer = tracer,
+      exit = exit,
+      print = FALSE,
+      where = ns
+    ))
+
+    message(sprintf(
+      "Tracing %d functions in %s.",
+      length(ns_fns),
+      pkg
+    ))
+  }
+}
+
+call_add_namespace <- function(call, fn) {
+  if (!is.call(call) || !is.symbol(call[[1]])) {
+    return(call)
+  }
+
+  sym <- call[[1]]
+  nm <- as_string(sym)
+
+  if (nm %in% c("::", ":::")) {
+    return(call)
+  }
+
+  env <- environment(fn)
+  top <- topenv(env)
+
+  if (is_reference(env, globalenv())) {
+    prefix <- "global"
+    op <- "::"
+  } else if (is_namespace(top)) {
+    prefix <- ns_env_name(top)
+    if (ns_exports_has(top, nm)) {
+      op <- "::"
+    } else {
+      op <- ":::"
+    }
+  } else {
+    return(call)
+  }
+
+  namespaced_sym <- call(op, as.symbol(prefix), sym)
+  call[[1]] <- namespaced_sym
+  call
 }

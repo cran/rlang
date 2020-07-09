@@ -5,6 +5,12 @@
 #include "utils.h"
 
 sexp* rlang_ns_get(const char* name);
+static bool should_auto_name(sexp* named);
+
+static sexp* as_label_call = NULL;
+static sexp* r_as_label(sexp* x) {
+  return r_eval_with_x(as_label_call, rlang_ns_env, x);
+}
 
 // Initialised at load time
 static sexp* empty_spliced_arg = NULL;
@@ -103,7 +109,7 @@ static void require_glue() {
   sexp* call = KEEP(r_parse("is_installed('glue')"));
   sexp* out = KEEP(r_eval(call, rlang_ns_env));
 
-  if (!r_is_scalar_logical(out)) {
+  if (!r_is_bool(out)) {
     r_abort("Internal error: Expected scalar logical from `requireNamespace()`.");
   }
   if (!r_lgl_get(out, 0)) {
@@ -239,7 +245,7 @@ sexp* big_bang_coerce_pairlist(sexp* x, bool deep) {
   switch (r_typeof(x)) {
   case r_type_null:
   case r_type_pairlist:
-    x = r_duplicate(x, true);
+    x = r_clone(x);
     break;
   case r_type_logical:
   case r_type_integer:
@@ -286,7 +292,7 @@ static sexp* dots_big_bang_value(struct dots_capture_info* capture_info,
 
   if (quosured) {
     if (r_is_shared(value)) {
-      sexp* tmp = r_duplicate(value, true);
+      sexp* tmp = r_clone(value);
       FREE(1);
       value = KEEP(tmp);
     }
@@ -332,6 +338,12 @@ static sexp* dots_unquote(sexp* dots, struct dots_capture_info* capture_info) {
   r_ssize n = r_length(dots);
   bool unquote_names = capture_info->unquote_names;
 
+  // In the case of `dots_list()` we auto-name inputs eagerly while we
+  // still have access to the defused expression
+  bool needs_autoname =
+    capture_info->type == DOTS_VALUE &&
+    should_auto_name(capture_info->named);
+
   sexp* node = dots;
   for (r_ssize i = 0; node != r_null; ++i, node = r_node_cdr(node)) {
     sexp* elt = r_node_car(node);
@@ -339,7 +351,8 @@ static sexp* dots_unquote(sexp* dots, struct dots_capture_info* capture_info) {
     sexp* env = dot_get_env(elt);
 
     // Unquoting rearranges expressions
-    expr = KEEP(r_duplicate(expr, false));
+    // FIXME: Only duplicate the call tree, not the leaves
+    expr = KEEP(r_copy(expr));
 
     if (unquote_names && r_is_call(expr, ":=")) {
       if (r_node_tag(node) != r_null) {
@@ -413,7 +426,9 @@ static sexp* dots_unquote(sexp* dots, struct dots_capture_info* capture_info) {
     }
     case OP_VALUE_NONE:
     case OP_VALUE_FIXUP:
-    case OP_VALUE_DOT_DATA:
+    case OP_VALUE_DOT_DATA: {
+      sexp* orig = expr;
+
       if (expr == r_missing_sym) {
         if (!capture_info->preserve_empty) {
           r_abort("Argument %d is empty", i + 1);
@@ -424,22 +439,31 @@ static sexp* dots_unquote(sexp* dots, struct dots_capture_info* capture_info) {
         // evaluated), for instance by lapply() or map().
         expr = r_eval(expr, env);
       }
+
+      r_keep_t i;
+      KEEP_HERE(expr, &i);
+
       if (is_splice_box(expr)) {
         // Coerce contents of splice boxes to ensure uniform type
-        KEEP(expr);
         expr = rlang_unbox(expr);
         expr = dots_big_bang_value(capture_info, expr, env, false);
-        FREE(1);
+        KEEP_AT(expr, i);
       } else {
+        if (needs_autoname && r_node_tag(node) == r_null) {
+          sexp* label = KEEP(r_as_label(orig));
+          r_node_poke_tag(node, r_chr_as_symbol(label));
+          FREE(1);
+        }
         capture_info->count += 1;
       }
+
+      FREE(1);
       break;
+    }
     case OP_VALUE_UQ:
       r_abort("Can't use `!!` in a non-quoting function");
     case OP_VALUE_UQS: {
-      expr = KEEP(r_eval(info.operand, env));
       expr = dots_big_bang(capture_info, info.operand, env, false);
-      FREE(1);
       break;
     }
     case OP_VALUE_CURLY:
@@ -661,13 +685,13 @@ static sexp* dots_keep(sexp* dots, sexp* nms, bool first) {
   sexp* out_nms = KEEP(r_new_vector(r_type_character, out_n));
   r_push_names(out, out_nms);
 
-  sexp** nms_ptr = r_chr_deref(nms);
-  int* dups_ptr = r_lgl_deref(dups);
+  sexp* const * p_nms = r_chr_deref_const(nms);
+  const int* p_dups = r_lgl_deref_const(dups);
 
-  for (r_ssize i = 0, out_i = 0; i < n; ++i, ++nms_ptr, ++dups_ptr) {
-    if (!*dups_ptr) {
+  for (r_ssize i = 0, out_i = 0; i < n; ++i) {
+    if (!p_dups[i]) {
       r_list_poke(out, out_i, r_list_get(dots, i));
-      r_chr_poke(out_nms, out_i, *nms_ptr);
+      r_chr_poke(out_nms, out_i, p_nms[i]);
       ++out_i;
     }
   }
@@ -704,6 +728,13 @@ sexp* rlang_unescape_character(sexp*);
 static sexp* dots_finalise(struct dots_capture_info* capture_info, sexp* dots) {
   sexp* nms = r_names(dots);
 
+  if (capture_info->type == DOTS_VALUE && should_auto_name(capture_info->named)) {
+    if (nms == r_null) {
+      nms = r_new_vector(r_type_character, r_length(dots));
+    }
+  }
+  KEEP(nms);
+
   if (nms != r_null) {
     // Serialised unicode points might arise when unquoting lists
     // because of the conversion to pairlist
@@ -722,6 +753,7 @@ static sexp* dots_finalise(struct dots_capture_info* capture_info, sexp* dots) {
     FREE(2);
   }
 
+  FREE(1);
   return dots;
 }
 
@@ -1008,4 +1040,7 @@ void rlang_init_dots(sexp* ns) {
     r_node_poke_tag(quosures_attrib, r_class_sym);
     FREE(1);
   }
+
+  as_label_call = r_parse("as_label(x)");
+  r_mark_precious(as_label_call);
 }

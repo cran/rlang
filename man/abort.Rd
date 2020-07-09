@@ -13,23 +13,26 @@ abort(
   class = NULL,
   ...,
   trace = NULL,
-  call,
   parent = NULL,
-  msg,
-  type,
   .subclass
 )
 
-warn(message = NULL, class = NULL, ..., call, msg, type, .subclass)
+warn(
+  message = NULL,
+  class = NULL,
+  ...,
+  .frequency = c("always", "regularly", "once"),
+  .frequency_id = NULL,
+  .subclass
+)
 
 inform(
   message = NULL,
   class = NULL,
   ...,
-  file = NULL,
-  call,
-  msg,
-  type,
+  .file = NULL,
+  .frequency = c("always", "regularly", "once"),
+  .frequency_id = NULL,
   .subclass
 )
 
@@ -52,20 +55,24 @@ to selectively handle the conditions signalled by your functions.}
 
 \item{trace}{A \code{trace} object created by \code{\link[=trace_back]{trace_back()}}.}
 
-\item{call}{Defunct as of rlang 0.4.0. Storing the full
-backtrace is now preferred to storing a simple call.}
-
 \item{parent}{A parent condition object created by \code{\link[=abort]{abort()}}.}
-
-\item{msg, type}{These arguments were renamed to \code{message} and
-\code{.subclass} and are defunct as of rlang 0.4.0.}
 
 \item{.subclass}{This argument was renamed to \code{class} in rlang
 0.4.2.  It will be deprecated in the next major version. This is
 for consistency with our conventions for class constructors
 documented in \url{https://adv-r.hadley.nz/s3.html#s3-subclassing}.}
 
-\item{file}{Where the message is printed. This should be a
+\item{.frequency}{How frequently should the warning or message be
+displayed? By default (\code{"always"}) it is displayed at each
+time. If \code{"regularly"}, it is displayed once every 8 hours. If
+\code{"once"}, it is displayed once per session.}
+
+\item{.frequency_id}{A unique identifier for the warning or
+message. This is used when \code{.frequency} is supplied to recognise
+recurring conditions. This argument must be supplied if
+\code{.frequency} is not set to \code{"always"}.}
+
+\item{.file}{Where the message is printed. This should be a
 connection or character string which will be passed to \code{\link[=cat]{cat()}}.
 
 By default, \code{inform()} prints to standard output in interactive
@@ -75,10 +82,10 @@ still filter out the messages easily by redirecting \code{stderr}.}
 }
 \description{
 These functions are equivalent to base functions \code{\link[base:stop]{base::stop()}},
-\code{\link[base:warning]{base::warning()}} and \code{\link[base:message]{base::message()}}, but make it easy to supply
+\code{\link[base:warning]{base::warning()}}, and \code{\link[base:message]{base::message()}}, but make it easy to supply
 condition metadata:
 \itemize{
-\item Supply \code{.subclass} to create a classed condition. Typed
+\item Supply \code{class} to create a classed condition. Typed
 conditions can be captured or handled selectively, allowing for
 finer-grained error handling.
 \item Supply metadata with named \code{...} arguments. This data will be
@@ -118,23 +125,11 @@ backtrace.
 
 Signalling a condition with \code{inform()} or \code{warn()} causes a message
 to be displayed in the console. These messages can be muffled with
-\code{\link[base:suppressMessages]{base::suppressMessages()}} or \code{\link[base:suppressWarnings]{base::suppressWarnings()}}.
+\code{\link[base:message]{base::suppressMessages()}} or \code{\link[base:warning]{base::suppressWarnings()}}.
 
 On recent R versions (>= R 3.5.0), interrupts are typically
 signalled with a \code{"resume"} restart. This is however not
 guaranteed.
-}
-
-\section{Lifecycle}{
-
-
-These functions were changed in rlang 0.3.0 to take condition
-metadata with \code{...}. Consequently:
-\itemize{
-\item All arguments were renamed to be prefixed with a dot, except for
-\code{type} which was renamed to \code{.subclass}.
-\item \code{.call} (previously \code{call}) can no longer be passed positionally.
-}
 }
 
 \examples{
@@ -168,17 +163,20 @@ tryCatch(
   }
 )
 
-# If you call low-level APIs it is good practice to catch technical
-# errors and rethrow them with a more meaningful message. Pass on
-# the caught error as `parent` to get a nice decomposition of
-# errors and backtraces:
+# If you call low-level APIs it is good practice to handle
+# technical errors and rethrow them with a more meaningful
+# message. Always prefer doing this from `withCallinghandlers()`
+# rather than `tryCatch()` because the former preserves the stack
+# on error and makes it possible for users to use `recover()`.
 file <- "http://foo.bar/baz"
-tryCatch(
+try(withCallinghandlers(
   download(file),
   error = function(err) {
     msg <- sprintf("Can't download `\%s`", file)
     abort(msg, parent = err)
-})
+}))
+# Note how we supplied the parent error to `abort()` as `parent` to
+# get a decomposition of error messages across error contexts.
 
 # Unhandled errors are saved automatically by `abort()` and can be
 # retrieved with `last_error()`. The error prints with a simplified

@@ -9,6 +9,10 @@ cnd_muffle(cnd)
 \arguments{
 \item{cnd}{A condition to muffle.}
 }
+\value{
+If \code{cnd} is mufflable, \code{cnd_muffle()} jumps to the muffle
+restart and doesn't return. Otherwise, it returns \code{FALSE}.
+}
 \description{
 Unlike \code{\link[=exiting]{exiting()}} handlers, \code{\link[=calling]{calling()}} handlers must be explicit
 that they have handled a condition to stop it from propagating to
@@ -25,10 +29,10 @@ correct restart for you. It is compatible with the following
 conditions:
 \itemize{
 \item \code{warning} and \code{message} conditions. In this case \code{cnd_muffle()}
-is equivalent to \code{\link[base:suppressMessages]{base::suppressMessages()}} and
-\code{\link[base:suppressWarnings]{base::suppressWarnings()}}.
+is equivalent to \code{\link[base:message]{base::suppressMessages()}} and
+\code{\link[base:warning]{base::suppressWarnings()}}.
 \item Bare conditions signalled with \code{signal()} or \code{\link[=cnd_signal]{cnd_signal()}}. Note
-that conditions signalled with \code{\link[base:signalCondition]{base::signalCondition()}} are not
+that conditions signalled with \code{\link[base:conditions]{base::signalCondition()}} are not
 mufflable.
 \item Interrupts are sometimes signalled with a \code{resume} restart on
 recent R versions. When this is the case, you can muffle the
@@ -41,7 +45,7 @@ you will cause a new error to be signalled.
 \itemize{
 \item Errors are not mufflable since they are signalled in critical
 situations where execution cannot continue safely.
-\item Conditions captured with \code{\link[base:tryCatch]{base::tryCatch()}}, \code{\link[=with_handlers]{with_handlers()}} or
+\item Conditions captured with \code{\link[base:conditions]{base::tryCatch()}}, \code{\link[=with_handlers]{with_handlers()}} or
 \code{\link[=catch_cnd]{catch_cnd()}} are no longer mufflable. Muffling restarts \emph{must}
 be called from a \link{calling} handler.
 }

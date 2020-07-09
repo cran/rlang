@@ -143,7 +143,7 @@ static sexp* tilde_fn = NULL;
 static sexp* restore_mask_fn = NULL;
 
 static void on_exit_restore_lexical_env(sexp* mask, sexp* old, sexp* frame) {
-  sexp* fn = KEEP(r_duplicate(restore_mask_fn, true));
+  sexp* fn = KEEP(r_clone(restore_mask_fn));
 
   sexp* env = KEEP(r_new_environment(r_base_env, 2));
   r_env_poke(env, mask_sym, mask);
@@ -210,14 +210,17 @@ static sexp* mask_find(sexp* env, sexp* sym) {
     top_env = env;
   }
   int n_kept = 0;
-  KEEP_N(top_env, n_kept); // Help rchk
+  KEEP_N(top_env, n_kept);
 
   sexp* cur = env;
   do {
     sexp* obj = r_env_find(cur, sym);
     if (TYPEOF(obj) == PROMSXP) {
-      obj = KEEP_N(r_eval(obj, r_empty_env), n_kept);
+      KEEP(obj);
+      obj = r_eval(obj, r_empty_env);
+      FREE(1);
     }
+
     if (obj != r_unbound_sym && !r_is_function(obj)) {
       FREE(n_kept);
       return obj;
@@ -445,14 +448,14 @@ sexp* rlang_data_mask_clean(sexp* mask) {
   }
 
   // At this level we only want to remove our own stuff
-  r_env_unbind_all(mask, data_mask_objects_names, false);
+  r_env_unbind_strings(mask, data_mask_objects_names);
 
   // Remove everything in the other levels
   sexp* env = bottom;
   sexp* parent = r_env_parent(top);
   while (env != parent) {
     sexp* nms = KEEP(r_env_names(env));
-    r_env_unbind_names(env, nms, false);
+    r_env_unbind_names(env, nms);
     FREE(1);
     env = r_env_parent(env);
   }

@@ -1,4 +1,4 @@
-# nocov start --- compat-lifecycle --- 2019-11-15 Fri 15:55
+# nocov start --- compat-lifecycle --- 2020-06-30
 
 # This file serves as a reference for currently unexported rlang
 # lifecycle functions. Please find the most recent version in rlang's
@@ -58,7 +58,7 @@
 #' @seealso [lifecycle()]
 NULL
 
-signal_soft_deprecated <- function(msg, id = msg, env = caller_env(2)) {
+signal_soft_deprecated <- function(msg, id = msg, env = rlang::caller_env(2)) {
   msg <- lifecycle_validate_message(msg)
   stopifnot(
     rlang::is_string(id),
@@ -92,7 +92,7 @@ signal_soft_deprecated <- function(msg, id = msg, env = caller_env(2)) {
   tested_package <- Sys.getenv("TESTTHAT_PKG")
   if (nzchar(tested_package) &&
         identical(Sys.getenv("NOT_CRAN"), "true") &&
-        rlang::env_name(topenv(env)) == rlang::env_name(ns_env(tested_package))) {
+        rlang::env_name(topenv(env)) == rlang::env_name(rlang::ns_env(tested_package))) {
     warn_deprecated(msg, id)
     return(invisible(NULL))
   }
@@ -134,7 +134,7 @@ deprecation_env <- new.env(parent = emptyenv())
 
 stop_defunct <- function(msg) {
   msg <- lifecycle_validate_message(msg)
-  err <- cnd(
+  err <- rlang::cnd(
     c("defunctError", "error", "condition"),
     old = NULL,
     new = NULL,
@@ -226,6 +226,7 @@ lifecycle_img <- function(stage, url) {
     stable = ,
     questioning = ,
     retired = ,
+    superseded = ,
     archived =
       sprintf(
         "\\out{<a href='%s'><img src='%s' alt='%s lifecycle'></a>}",
@@ -254,7 +255,7 @@ upcase1 <- function(x) {
 }
 
 lifecycle_validate_message <- function(msg) {
-  stopifnot(is_character(msg))
+  stopifnot(rlang::is_character(msg))
   paste0(msg, collapse = "\n")
 }
 

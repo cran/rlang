@@ -68,7 +68,7 @@ test_that("env_get_list() retrieves multiple bindings", {
   expect_identical(env_get_list(env, c("foo", "bar")), list(foo = 1L, bar =2L))
 
   baz <- 0L
-  expect_error(env_get_list(env, "baz"), "'baz' not found")
+  expect_error(env_get_list(env, "baz"), "missing")
   expect_identical(env_get_list(env, c("foo", "baz"), inherit = TRUE), list(foo = 1L, baz =0L))
 })
 
@@ -91,6 +91,20 @@ test_that("local_bindings binds temporarily", {
   expect_false(env_has(env, "baz"))
 })
 
+test_that("local_bindings() restores in correct order", {
+  foo <- "start"
+
+  local({
+    local_bindings(foo = "foo")
+    expect_identical(foo, "foo")
+
+    local_bindings(foo = "bar")
+    expect_identical(foo, "bar")
+  })
+
+  expect_identical(foo, "start")
+})
+
 test_that("with_bindings() evaluates with temporary bindings", {
   foo <- "foo"
   baz <- "baz"
@@ -98,27 +112,23 @@ test_that("with_bindings() evaluates with temporary bindings", {
   expect_identical(foo, "foo")
 })
 
-test_that("env_unbind() with `inherits = TRUE` wipes out all bindings", {
-  bindings <- list(`_foo` = "foo", `_bar` = "bar")
-  env_bind(global_env(), !!! bindings)
-  env <- child_env(global_env(), !!! bindings)
+test_that("env_unbind() with `inherits = TRUE` only removes first match", {
+  env <- env(foo = "foo")
+  child <- env(env, foo = "foo")
 
-  env_unbind(env, "_foo", inherit = TRUE)
-  expect_false(all(env_has(env, names(bindings))))
-  expect_false(all(env_has(global_env(), names(bindings))))
+  env_unbind(child, "foo", inherit = TRUE)
+  expect_false(env_has(child, "foo"))
+  expect_true(env_has(env, "foo"))
 })
 
 test_that("env_bind() requires named elements", {
-  expect_error(env_bind(env(), 1), "all arguments must be named")
-  expect_error(env_bind(env(), !!! list(1)), "all arguments must be named")
+  expect_error(env_bind(env(), 1), "some elements are not named")
+  expect_error(env_bind(env(), !!!list(1)), "some elements are not named")
 })
 
-test_that("env_bind() requires uniquely named elements", {
-  expect_error(env_bind(env(), a = 1, a = 2), "some arguments have the same name")
-})
 test_that("env_bind() works with empty unnamed lists", {
   expect_no_error(env_bind(env()))
-  expect_no_error(env_bind(env(), !!! list()))
+  expect_no_error(env_bind(env(), !!!list()))
 })
 
 test_that("env_names() unserialises unicode", {
@@ -130,10 +140,6 @@ test_that("env_has() returns a named vector", {
   expect_identical(env_has(env(a = TRUE), c("a", "b", "c")), c(a = TRUE, b = FALSE, c = FALSE))
 })
 
-test_that("env_bind_impl() fails if data is not a vector", {
-  expect_error(env_bind_impl(env(), env()), "must be a vector")
-})
-
 test_that("env_unbind() doesn't warn if binding doesn't exist (#177)", {
   expect_no_warning(env_unbind(env(), c("foo", "bar")))
 })
@@ -141,11 +147,22 @@ test_that("env_unbind() doesn't warn if binding doesn't exist (#177)", {
 test_that("env_get() and env_get_list() accept default value", {
   env <- env(a = 1)
 
-  expect_error(env_get(env, "b"), "not found")
-  expect_error(env_get_list(env, "b"), "not found")
+  expect_error(env_get(env, "b"), "missing")
+  expect_error(env_get_list(env, "b"), "missing")
 
   expect_identical(env_get(env, "b", default = "foo"), "foo")
   expect_identical(env_get_list(env, c("a", "b"), default = "foo"), list(a = 1, b = "foo"))
+})
+
+test_that("env_get() without default fails", {
+  expect_error(env_get(env(), "_foobar"), "argument .* is missing")
+
+  fn <- function(env, default) env_get(env, "_foobar", default = default)
+  expect_error(fn(env()), "argument .* is missing")
+})
+
+test_that("env_get() evaluates `default` lazily", {
+  expect_equal(env_get(env(a = 1), "a", default = stop("tilt")), 1)
 })
 
 test_that("env_bind_active() uses as_function()", {
@@ -346,6 +363,38 @@ test_that("env_get() survives native encoding", {
 
 test_that("`env_binding_are_lazy()` type-checks `env` (#923)", {
   expect_error(env_binding_are_lazy("a", "b"), "must be an environment")
+})
+
+test_that("env_poke() zaps (#1012)", {
+  env <- env(foo = 1)
+  env_poke(env, "foo", zap())
+  expect_false(env_has(env, "foo"))
+
+  env <- env(env(foo = 1))
+  env_poke(env, "foo", zap())
+  expect_false(env_has(env, "foo"))
+  expect_true(env_has(env, "foo", inherit = TRUE))
+
+  env_poke(env, "foo", zap(), inherit = TRUE)
+  expect_false(env_has(env, "foo", inherit = TRUE))
+})
+
+test_that("env_poke() doesn't warn when unrepresentable characters are serialised", {
+  with_non_utf8_locale({
+    e <- env(empty_env())
+    nm <- get_alien_lang_string()
+
+    expect_no_warning(env_poke(e, nm, NA))
+
+    nms <- env_names(e)
+    expect_equal(Encoding(nms), "UTF-8")
+  })
+})
+
+test_that("new_environment() supports non-list data", {
+  env <- new_environment(c(a = 1))
+  expect_equal(typeof(env), "environment")
+  expect_equal(env$a, 1)
 })
 
 

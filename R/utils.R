@@ -85,11 +85,13 @@ cat_line <- function(..., .trailing = TRUE, file = "") {
   cat(paste_line(..., .trailing = .trailing), file = file)
 }
 paste_line <- function(..., .trailing = FALSE) {
-  lines <- paste(chr(...), collapse = "\n")
+  text <- chr(...)
+
   if (.trailing) {
-    lines <- paste0(lines, "\n")
+    paste0(text, "\n", collapse = "")
+  } else {
+    paste(text, collapse = "\n")
   }
-  lines
 }
 
 has_crayon <- function() {
@@ -241,4 +243,30 @@ strip_trailing_newline <- function(x) {
   } else {
     x
   }
+}
+
+unstructure <- function(x) {
+  out <- x
+  attributes(out) <- NULL
+
+  dim(out) <- dim(x)
+  names(out) <- names(x)
+
+  out
+}
+
+cli_rule <- function() {
+  if (is_installed("cli")) {
+    cli::rule()
+  } else {
+    strrep("-", peek_option("width") %||% 60L)
+  }
+}
+
+split_lines <- function(x) {
+  strsplit(x, "\n", fixed = TRUE)[[1]]
+}
+
+stop_internal <- function(fn, msg) {
+  abort(sprintf("Internal error in `%s()`: %s"), fn, msg)
 }

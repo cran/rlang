@@ -57,11 +57,6 @@ static inline bool r_env_has_anywhere(sexp* env, sexp* sym) {
   return r_env_find_anywhere(env, sym) != r_unbound_sym;
 }
 
-static inline sexp* r_env_poke(sexp* env, sexp* sym, sexp* value) {
-  Rf_defineVar(sym, value, env);
-  return env;
-}
-
 sexp* r_ns_env(const char* pkg);
 sexp* r_base_ns_get(const char* name);
 
@@ -71,9 +66,40 @@ sexp* r_env_as_list(sexp* x);
 sexp* r_list_as_environment(sexp* x, sexp* parent);
 sexp* r_env_clone(sexp* env, sexp* parent);
 
-sexp* r_env_unbind_names(sexp* env, sexp* names, bool inherits);
-sexp* r_env_unbind_all(sexp* env, const char** names, bool inherits);
-sexp* r_env_unbind(sexp* env, const char* name, bool inherits);
+
+static inline
+void r_env_unbind(sexp* env, sexp* sym) {
+#if (R_VERSION < R_Version(4, 0, 0))
+  void r__env_unbind(sexp*, sexp*);
+  r__env_unbind(env, sym);
+#else
+  R_removeVarFromFrame(sym, env);
+#endif
+}
+void r_env_unbind_anywhere(sexp* env, sexp* sym);
+
+void r_env_unbind_syms(sexp* env, sexp** syms);
+void r_env_unbind_string(sexp* env, const char* name);
+void r_env_unbind_strings(sexp* env, const char** strings);
+void r_env_unbind_names(sexp* env, sexp* names);
+
+void r_env_unbind_string_anywhere(sexp* env, const char* name);
+void r_env_unbind_anywhere_names(sexp* env, sexp* names);
+void r_env_unbind_anywhere_strings(sexp* env, const char** names);
+
+static inline sexp* r_env_poke(sexp* env, sexp* sym, sexp* value) {
+  Rf_defineVar(sym, value, env);
+  return env;
+}
+void r_env_poke_lazy(sexp* env, sexp* sym, sexp* expr, sexp* eval_env);
+
+static inline
+void r_env_poke_active(sexp* env, sexp* sym, sexp* fn) {
+  if (r_env_has(env, sym)) {
+    r_env_unbind(env, sym);
+  }
+  R_MakeActiveBinding(sym, fn, env);
+}
 
 bool r_env_inherits(sexp* env, sexp* ancestor, sexp* top);
 

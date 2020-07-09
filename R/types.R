@@ -22,7 +22,6 @@
 #'   non-finite values are `NA`, `Inf`, `-Inf` and `NaN`. Setting this
 #'   to something other than `NULL` can be expensive because the whole
 #'   vector needs to be traversed and checked.
-#' @param encoding Defunct as of rlang 0.4.0.
 #' @seealso [bare-type-predicates] [scalar-type-predicates]
 #' @name type-predicates
 NULL
@@ -63,20 +62,8 @@ is_double <- function(x, n = NULL, finite = NULL) {
 }
 #' @export
 #' @rdname type-predicates
-is_character <- function(x, n = NULL, encoding = NULL) {
-  if (!is_null(encoding)) {
-    stop_defunct("The `encoding` argument is deprecated as of rlang 0.3.0.")
-  }
-  if (!.Call(rlang_is_character, x, n)) {
-    return(FALSE)
-  }
-  if (!is_null(encoding)) {
-    stopifnot(typeof(encoding) == "character")
-    if (!all(Encoding(x) %in% encoding)) {
-      return(FALSE)
-    }
-  }
-  TRUE
+is_character <- function(x, n = NULL) {
+  .Call(rlang_is_character, x, n)
 }
 #' @export
 #' @rdname type-predicates
@@ -93,10 +80,9 @@ is_raw <- function(x, n = NULL) {
 is_bytes <- is_raw
 
 #' @export
+#' @usage is_null(x)
 #' @rdname type-predicates
-is_null <- function(x) {
-  .Call(rlang_is_null, x)
-}
+is_null <- is.null
 
 #' Scalar type predicates
 #'
@@ -110,7 +96,6 @@ is_null <- function(x) {
 #' type-checking arguments, when your function expects a single string
 #' or a single `TRUE` or `FALSE`.
 #'
-#' @inheritParams type-predicates
 #' @param x object to be tested.
 #' @seealso [type-predicates], [bare-type-predicates]
 #' @name scalar-type-predicates
@@ -143,11 +128,8 @@ is_scalar_double <- function(x) {
 }
 #' @export
 #' @rdname scalar-type-predicates
-is_scalar_character <- function(x, encoding = NULL) {
-  if (!is_null(encoding)) {
-    stop_defunct("The `encoding` argument is deprecated as of rlang 0.3.0.")
-  }
-  is_character(x, encoding = encoding, n = 1L)
+is_scalar_character <- function(x) {
+  is_character(x, n = 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
@@ -227,11 +209,8 @@ is_bare_numeric <- function(x, n = NULL) {
 }
 #' @export
 #' @rdname bare-type-predicates
-is_bare_character <- function(x, n = NULL, encoding = NULL) {
-  if (!is_null(encoding)) {
-    stop_defunct("The `encoding` argument is deprecated as of rlang 0.3.0.")
-  }
-  !is.object(x) && is_character(x, n, encoding = encoding)
+is_bare_character <- function(x, n = NULL) {
+  !is.object(x) && is_character(x, n)
 }
 #' @export
 #' @rdname bare-type-predicates
@@ -478,18 +457,25 @@ rlang_type_sum <- function(x) {
   if (is_installed("pillar")) {
     pillar::type_sum(x)
   } else {
-    UseMethod("type_sum")
+    UseMethod("rlang_type_sum")
   }
 }
 
-type_sum.ordered <- function(x) "ord"
-type_sum.factor <- function(x) "fct"
-type_sum.POSIXct <- function(x) "dttm"
-type_sum.difftime <- function(x) "time"
-type_sum.Date <- function(x) "date"
-type_sum.data.frame <- function(x) class(x)[[1]]
+#' @export
+rlang_type_sum.ordered <- function(x) "ord"
+#' @export
+rlang_type_sum.factor <- function(x) "fct"
+#' @export
+rlang_type_sum.POSIXct <- function(x) "dttm"
+#' @export
+rlang_type_sum.difftime <- function(x) "time"
+#' @export
+rlang_type_sum.Date <- function(x) "date"
+#' @export
+rlang_type_sum.data.frame <- function(x) class(x)[[1]]
 
-type_sum.default <- function(x) {
+#' @export
+rlang_type_sum.default <- function(x) {
   if (!is.object(x)) {
     switch(typeof(x),
       logical = "lgl",

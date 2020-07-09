@@ -461,12 +461,16 @@ test_that(".data pronoun handles promises (#908)", {
   expect_equal(eval_tidy(expr(.data$a * 2), mask), 2)
 })
 
-# Lifecycle ----------------------------------------------------------
-
-test_that("as_data_mask() and new_data_mask() are deprecated", {
-  expect_defunct(as_data_mask(mtcars, env()))
-  expect_defunct(new_data_mask(NULL, NULL, parent = env()))
+test_that("can evaluate tilde in nested masks", {
+  tilde <- eval_tidy(quo(eval_tidy(~1)))
+  expect_identical(
+    eval_bare(tilde, f_env(tilde)),
+    tilde
+  )
 })
+
+
+# Lifecycle ----------------------------------------------------------
 
 test_that("supplying environment as data is deprecated", {
   local_options(lifecycle_verbose_soft_deprecation = TRUE)

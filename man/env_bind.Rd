@@ -38,7 +38,7 @@ specific problems.
 \code{env_bind()} is equivalent to \code{\link[base:assign]{base::assign()}}.
 \item \code{env_bind_active()} takes named \emph{functions} and creates active
 bindings in \code{.env}. This is equivalent to
-\code{\link[base:makeActiveBinding]{base::makeActiveBinding()}}. An active binding executes a
+\code{\link[base:bindenv]{base::makeActiveBinding()}}. An active binding executes a
 function each time it is evaluated. The arguments are passed to
 \code{\link[=as_function]{as_function()}} so you can supply formulas instead of functions.
 
@@ -184,4 +184,7 @@ eval_bare(quote(symbol), env)
 env_bind_active(env, foo = ~ runif(1))
 env$foo
 env$foo
+}
+\seealso{
+\code{\link[=env_poke]{env_poke()}} for binding a single element.
 }

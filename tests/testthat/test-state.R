@@ -1,9 +1,5 @@
 context("state")
 
-test_that("can't add an exit event at top-level", {
-  expect_error(local_exit(1, global_env()), "Can't add an exit event at top-level")
-})
-
 test_that("options are set temporarily", {
   local_options(foo = "foo")
   expect_identical(with_options(foo = "bar", peek_option("foo")), "bar")
@@ -27,4 +23,21 @@ test_that("is_interactive() honors rlang_interactive option, above all else", {
   local_interactive(FALSE)
   expect_false(is_interactive())
   expect_true(with_interactive(value = TRUE, is_interactive()))
+})
+
+test_that("local_options() restores options in correct order (#980)", {
+  local_options(foo = -1)
+
+  local({
+    local_options(foo = 0)
+    local_options(foo = 1)
+  })
+  expect_identical(peek_option("foo"), -1)
+
+  local({
+    on.exit("existing")
+    local_options(foo = 0)
+    local_options(foo = 1)
+  })
+  expect_identical(peek_option("foo"), -1)
 })

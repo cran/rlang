@@ -59,8 +59,9 @@ extern sexp* r_shared_false;
 #define FREE UNPROTECT
 #define KEEP_N(x, n) (++n, KEEP(x))
 
-#define KEEP_WITH_INDEX(x, i) PROTECT_WITH_INDEX(x, &i)
-#define KEEP_I REPROTECT
+#define r_keep_t PROTECT_INDEX
+#define KEEP_AT REPROTECT
+#define KEEP_HERE PROTECT_WITH_INDEX
 
 #define RLANG_ASSERT(condition) ((void)sizeof(char[1 - 2*!(condition)]))
 

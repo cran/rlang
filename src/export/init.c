@@ -13,7 +13,6 @@ extern bool rlang_is_clevel_spliceable(sexp*);
 extern bool rlang_is_quosure(sexp*);
 
 // Callable from this package
-extern sexp* rlang_is_null(sexp*);
 extern sexp* r_f_lhs(sexp*);
 extern sexp* r_f_rhs(sexp*);
 extern sexp* r_new_condition(sexp*, sexp*, sexp*);
@@ -101,7 +100,8 @@ extern sexp* rlang_as_data_mask_compat(sexp*, sexp*);
 extern sexp* rlang_data_mask_clean(sexp*);
 extern sexp* rlang_eval_tidy(sexp*, sexp*, sexp*);
 extern sexp* rlang_as_data_pronoun(sexp*);
-extern sexp* rlang_env_get(sexp*, sexp*);
+extern sexp* rlang_env_get(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_env_get_list(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_env_unlock(sexp*);
 extern sexp* rlang_interrupt();
 extern sexp* rlang_is_list(sexp*, sexp*);
@@ -137,6 +137,11 @@ extern sexp* rlang_glue_is_there();
 extern sexp* rlang_linked_version();
 extern sexp* rlang_names2(sexp*, sexp*);
 extern sexp* rlang_set_names(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_chr_get(sexp* x, sexp* i);
+extern sexp* rlang_env_has(sexp*, sexp*, sexp*);
+extern sexp* rlang_env_poke(sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_env_bind(sexp*, sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_raw_deparse_str(sexp*, sexp*, sexp*);
 
 // Library initialisation defined below
 sexp* rlang_library_load(sexp*);
@@ -182,7 +187,6 @@ static const r_callable r_callables[] = {
   {"rlang_is_primitive_lazy",           (r_fn_ptr) &rlang_is_primitive_lazy, 1},
   {"rlang_is_formula",                  (r_fn_ptr) &rlang_is_formula, 3},
   {"rlang_is_formulaish",               (r_fn_ptr) &rlang_is_formulaish, 3},
-  {"rlang_is_null",                     (r_fn_ptr) &rlang_is_null, 1},
   {"rlang_is_reference",                (r_fn_ptr) &rlang_is_reference, 2},
   {"rlang_length",                      (r_fn_ptr) &rlang_length, 1},
   {"rlang_true_length",                 (r_fn_ptr) &rlang_true_length, 1},
@@ -276,7 +280,8 @@ static const r_callable r_callables[] = {
   {"rlang_eval_tidy",                   (r_fn_ptr) &rlang_eval_tidy, 3},
   {"rlang_as_data_pronoun",             (r_fn_ptr) &rlang_as_data_pronoun, 1},
   {"rlang_env_binding_types",           (r_fn_ptr) &r_env_binding_types, 2},
-  {"rlang_env_get",                     (r_fn_ptr) &rlang_env_get, 2},
+  {"rlang_env_get",                     (r_fn_ptr) &rlang_env_get, 4},
+  {"rlang_env_get_list",                (r_fn_ptr) &rlang_env_get_list, 4},
   {"rlang_env_unlock",                  (r_fn_ptr) &rlang_env_unlock, 1},
   {"rlang_interrupt",                   (r_fn_ptr) &rlang_interrupt, 0},
   {"rlang_is_list",                     (r_fn_ptr) &rlang_is_list, 2},
@@ -309,21 +314,30 @@ static const r_callable r_callables[] = {
   {"rlang_linked_version",              (r_fn_ptr) &rlang_linked_version, 0},
   {"rlang_names2",                      (r_fn_ptr) &rlang_names2, 2},
   {"rlang_set_names",                   (r_fn_ptr) &rlang_set_names, 4},
+  {"rlang_chr_get",                     (r_fn_ptr) &rlang_chr_get, 2},
+  {"rlang_env_has",                     (r_fn_ptr) &rlang_env_has, 3},
+  {"rlang_env_poke",                    (r_fn_ptr) &rlang_env_poke, 5},
+  {"rlang_env_bind",                    (r_fn_ptr) &rlang_env_bind, 5},
+  {"rlang_raw_deparse_str",             (r_fn_ptr) &rlang_raw_deparse_str, 3},
   {NULL, NULL, 0}
 };
 
 
-extern sexp* rlang_is_missing(sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_call2_external(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext_arg_match0(sexp*);
+
+extern sexp* rlang_ext2_is_missing(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext2_call2(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_ext2_dots_values(sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_exec(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext2_exec(sexp*, sexp*, sexp*, sexp*);
 
 
 static const r_external externals[] = {
-  {"rlang_is_missing",                  (r_fn_ptr) &rlang_is_missing, 1},
-  {"rlang_call2_external",              (r_fn_ptr) &rlang_call2_external, 2},
+  {"rlang_ext_arg_match0",              (r_fn_ptr) &rlang_ext_arg_match0, 3},
+
+  {"rlang_ext2_is_missing",             (r_fn_ptr) &rlang_ext2_is_missing, 1},
+  {"rlang_ext2_call2",                  (r_fn_ptr) &rlang_ext2_call2, 2},
   {"rlang_ext2_dots_values",            (r_fn_ptr) &rlang_ext2_dots_values, 6},
-  {"rlang_exec",                        (r_fn_ptr) &rlang_exec, 2},
+  {"rlang_ext2_exec",                   (r_fn_ptr) &rlang_ext2_exec, 2},
   {NULL, NULL, 0}
 };
 

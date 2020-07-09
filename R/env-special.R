@@ -159,6 +159,8 @@ empty_env <- emptyenv
 #' @seealso [caller_frame()] and [current_frame()]
 #' @export
 #' @examples
+#' if (FALSE) {
+#'
 #' # Let's create a function that returns its current environment and
 #' # its caller environment:
 #' fn <- function() list(current = current_env(), caller = caller_env())
@@ -174,6 +176,8 @@ empty_env <- emptyenv
 #' # Now the caller environment is also a unique execution environment.
 #' # This is the exec env created by R for our call to g():
 #' g()
+#'
+#' }
 caller_env <- function(n = 1) {
   parent.frame(n + 1)
 }
@@ -264,19 +268,20 @@ is_namespace <- function(x) {
   isNamespace(x)
 }
 
-#' Is a package installed in the library?
+#' Are packages installed in any of the libraries?
 #'
-#' This checks that a package is installed with minimal side effects.
-#' If installed, the package will be loaded but not attached.
+#' This checks that packages are installed with minimal side effects.
+#' If installed, the packages will be loaded but not attached.
 #'
-#' @param pkg The name of a package.
-#' @return `TRUE` if the package is installed, `FALSE` otherwise.
+#' @param pkg The package names.
+#' @return `TRUE` if _all_ package names provided in `pkg` are installed,
+#'   `FALSE` otherwise.
 #' @export
 #' @examples
 #' is_installed("utils")
-#' is_installed("ggplot5")
+#' is_installed(c("base", "ggplot5"))
 is_installed <- function(pkg) {
-  is_true(requireNamespace(pkg, quietly = TRUE))
+  all(map_lgl(pkg, function(x) is_true(requireNamespace(x, quietly = TRUE))))
 }
 
 

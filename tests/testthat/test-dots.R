@@ -269,3 +269,42 @@ test_that("dots_values() doesn't splice", {
   expect_identical_(dots_values(!!!c(1:3)), list(splice(as.list(1:3))))
   expect_identical_(dots_values(!!!list("foo", "bar")), list(splice(list("foo", "bar"))))
 })
+
+test_that("!!! does not evaluate multiple times (#981)", {
+  foo <- function() x <<- x + 1
+
+  x <- 0
+  list2(!!!list(foo()))
+  expect_identical(x, 1)
+
+  x <- 0
+  exprs(!!!list(foo()))
+  expect_identical(x, 1)
+
+  x <- 0
+  quos(!!!list(foo()))
+  expect_identical(x, 1)
+})
+
+test_that("dots_list() optionally auto-names arguments (#957)", {
+  expect_identical(
+    dots_list(.named = TRUE),
+    named(list())
+  )
+  expect_identical(
+    dots_list(1, letters, .named = TRUE),
+    list(`1` = 1, letters = letters)
+  )
+  expect_identical(
+    dots_list(1, foo = letters, .named = TRUE),
+    list(`1` = 1, foo = letters)
+  )
+  expect_identical(
+    dots_list(!!!list(a = 1:3, 1:3), .named = TRUE),
+    list(a = 1:3, `<int>` = 1:3)
+  )
+  expect_identical(
+    dots_list(!!!list(1:3, 1:3), .named = TRUE),
+    list(`<int>` = 1:3, `<int>` = 1:3)
+  )
+})

@@ -426,7 +426,7 @@ args_deparse <- function(x, lines = new_lines(), delims = c("(", ")")) {
   while (!is_null(x)) {
     tag <- node_tag(x)
     if (!is_null(tag)) {
-      lines$push(as_string(tag))
+      sym_deparse(tag, lines = lines)
       lines$push_sticky(" = ")
       lines$make_next_sticky()
     }
@@ -467,7 +467,7 @@ call_delimited_type <- function(call) {
     return("none")
   }
 
-  op <- which_operator(call)
+  op <- call_parse_type(call)
   if (op == "") {
     return("none")
   }
@@ -577,7 +577,7 @@ op_deparse <- function(op, x, lines) {
   lines$get_lines()
 }
 call_deparser <- function(x) {
-  op <- which_operator(x)
+  op <- call_parse_type(x)
   if (op != "") {
     function(x, lines) op_deparse(op, x, lines)
   } else {

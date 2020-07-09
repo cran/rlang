@@ -3,10 +3,10 @@
 #' @description
 #'
 #' These functions are equivalent to base functions [base::stop()],
-#' [base::warning()] and [base::message()], but make it easy to supply
+#' [base::warning()], and [base::message()], but make it easy to supply
 #' condition metadata:
 #'
-#' * Supply `.subclass` to create a classed condition. Typed
+#' * Supply `class` to create a classed condition. Typed
 #'   conditions can be captured or handled selectively, allowing for
 #'   finer-grained error handling.
 #'
@@ -49,16 +49,6 @@
 #' signalled with a `"resume"` restart. This is however not
 #' guaranteed.
 #'
-#'
-#' @section Lifecycle:
-#'
-#' These functions were changed in rlang 0.3.0 to take condition
-#' metadata with `...`. Consequently:
-#'
-#' * All arguments were renamed to be prefixed with a dot, except for
-#'   `type` which was renamed to `.subclass`.
-#' * `.call` (previously `call`) can no longer be passed positionally.
-#'
 #' @inheritParams cnd
 #' @param message The message to display.
 #'
@@ -69,10 +59,6 @@
 #' @param class Subclass of the condition. This allows your users
 #'   to selectively handle the conditions signalled by your functions.
 #' @param ... Additional data to be stored in the condition object.
-#' @param call Defunct as of rlang 0.4.0. Storing the full
-#'   backtrace is now preferred to storing a simple call.
-#' @param msg,type These arguments were renamed to `message` and
-#'   `.subclass` and are defunct as of rlang 0.4.0.
 #' @param .subclass This argument was renamed to `class` in rlang
 #'   0.4.2.  It will be deprecated in the next major version. This is
 #'   for consistency with our conventions for class constructors
@@ -110,17 +96,20 @@
 #'   }
 #' )
 #'
-#' # If you call low-level APIs it is good practice to catch technical
-#' # errors and rethrow them with a more meaningful message. Pass on
-#' # the caught error as `parent` to get a nice decomposition of
-#' # errors and backtraces:
+#' # If you call low-level APIs it is good practice to handle
+#' # technical errors and rethrow them with a more meaningful
+#' # message. Always prefer doing this from `withCallinghandlers()`
+#' # rather than `tryCatch()` because the former preserves the stack
+#' # on error and makes it possible for users to use `recover()`.
 #' file <- "http://foo.bar/baz"
-#' tryCatch(
+#' try(withCallinghandlers(
 #'   download(file),
 #'   error = function(err) {
 #'     msg <- sprintf("Can't download `%s`", file)
 #'     abort(msg, parent = err)
-#' })
+#' }))
+#' # Note how we supplied the parent error to `abort()` as `parent` to
+#' # get a decomposition of error messages across error contexts.
 #'
 #' # Unhandled errors are saved automatically by `abort()` and can be
 #' # retrieved with `last_error()`. The error prints with a simplified
@@ -137,23 +126,23 @@ abort <- function(message = NULL,
                   class = NULL,
                   ...,
                   trace = NULL,
-                  call,
                   parent = NULL,
-                  msg, type, .subclass) {
-  validate_signal_args(msg, type, call, .subclass)
+                  .subclass) {
+  validate_signal_args(.subclass)
 
   if (is_null(trace) && is_null(peek_option("rlang:::disable_trace_capture"))) {
     # Prevents infloops when rlang throws during trace capture
-    local_options("rlang:::disable_trace_capture" = TRUE)
+    with_options("rlang:::disable_trace_capture" = TRUE, {
+      trace <- trace_back()
 
-    trace <- trace_back()
+      if (is_null(parent)) {
+        context <- trace_length(trace)
+      } else {
+        context <- find_capture_context(3L)
+      }
 
-    if (is_null(parent)) {
-      context <- trace_length(trace)
-    } else {
-      context <- find_capture_context(3L)
-    }
-    trace <- trace_trim_context(trace, context)
+      trace <- trace_trim_context(trace, context)
+    })
   }
 
   message <- validate_signal_message(message, class)
@@ -213,17 +202,33 @@ trace_trim_context <- function(trace, frame = caller_env()) {
   trace
 }
 
-# Assumes we're called from an exiting handler. Need to
+# Assumes we're called from a calling or exiting handler
 find_capture_context <- function(n = 3L) {
-  parent <- orig <- sys.parent(n)
-  call <- sys.call(parent)
+  calls <- sys.calls()
 
-  try_catch_n <- detect_index(sys.calls(), is_call, "tryCatch", .right = TRUE)
-  if (try_catch_n == 0L) {
-    sys.frame(sys.parent(n))
-  } else {
-    sys.frame(try_catch_n)
+  exiting_call <- quote(value[[3L]](cond))
+  exiting_n <- detect_index(calls, identical, exiting_call, .right = TRUE)
+
+  # tryCatch()
+  if (exiting_n != 0L) {
+    try_catch_calls <- calls[seq_len(exiting_n - 1L)]
+    try_catch_n <- detect_index(try_catch_calls, is_call, "tryCatch", .right = TRUE)
+    if (try_catch_n != 0L) {
+      return(sys.frame(try_catch_n))
+    } else {
+      return(sys.frame(sys.parent(n)))
+    }
   }
+
+  bottom_loc <- length(calls) - 3
+  bottom <- calls[[bottom_loc]]
+
+  # withCallingHandlers()
+  if (is_function(bottom[[1]])) {
+    return(sys.frame(bottom_loc))
+  }
+
+  sys.frame(sys.parent(n))
 }
 
 #' Display backtrace on error

@@ -35,7 +35,7 @@ sexp* r_base_ns_get(const char* name) {
 }
 
 
-static sexp* rlang_ns_env = NULL;
+sexp* rlang_ns_env = NULL;
 
 sexp* rlang_ns_get(const char* name) {
   return ns_env_get(rlang_ns_env, name);
@@ -91,13 +91,13 @@ sexp* r_env_as_list_compat(sexp* env, sexp* out) {
   }
 
   r_ssize n = r_length(nms);
-  sexp** nms_ptr = r_chr_deref(nms);
-  int* types_ptr = r_int_deref(types);
+  sexp* const * p_nms = r_chr_deref_const(nms);
+  const int* p_types = r_int_deref_const(types);
 
-  for (r_ssize i = 0; i < n; ++i, ++nms_ptr, ++types_ptr) {
-    enum r_env_binding_type type = *types_ptr;
+  for (r_ssize i = 0; i < n; ++i) {
+    enum r_env_binding_type type = p_types[i];
     if (type == R_ENV_BINDING_ACTIVE) {
-      r_ssize fn_idx = r_chr_detect_index(nms, r_str_deref(*nms_ptr));
+      r_ssize fn_idx = r_chr_detect_index(nms, r_str_deref(p_nms[i]));
       if (fn_idx < 0) {
         r_abort("Internal error: Can't find active binding in list");
       }
@@ -131,36 +131,95 @@ sexp* r_env_clone(sexp* env, sexp* parent) {
 }
 
 
+static sexp* poke_lazy_call = NULL;
+static sexp* poke_lazy_value_node = NULL;
+
+void r_env_poke_lazy(sexp* env, sexp* sym, sexp* expr, sexp* eval_env) {
+  sexp* name = KEEP(r_sym_as_character(sym));
+
+  r_node_poke_car(poke_lazy_value_node, expr);
+  r_eval_with_xyz(poke_lazy_call, rlang_ns_env, name, env, eval_env);
+  r_node_poke_car(poke_lazy_value_node, r_null);
+
+  FREE(1);
+}
+
+
 static sexp* remove_call = NULL;
 
-sexp* r_env_unbind_names(sexp* env, sexp* names, bool inherits) {
-  return eval_with_xyz(remove_call, env, names, inherits ? r_shared_true : r_shared_false);
+#if (R_VERSION < R_Version(4, 0, 0))
+void r__env_unbind(sexp* env, sexp* sym) {
+  // Check if binding exists to avoid `rm()` warning
+  if (r_env_has(env, sym)) {
+    sexp* nm = KEEP(r_sym_as_character(sym));
+    eval_with_xyz(remove_call, env, nm, r_shared_false);
+    FREE(1);
+  }
+}
+#endif
+
+void r_env_unbind_anywhere(sexp* env, sexp* sym) {
+  while (env != r_empty_env) {
+    if (r_env_has(env, sym)) {
+      r_env_unbind(env, sym);
+      return;
+    }
+
+    env = r_env_parent(env);
+  }
 }
 
-sexp* rlang_env_unbind(sexp* env, sexp* names, sexp* inherits) {
-  if (r_typeof(env) != r_type_environment) {
-    r_abort("`env` must be an environment");
+void r_env_unbind_syms(sexp* env, sexp** syms) {
+  while (syms) {
+    r_env_unbind(env, *syms++);
   }
-  if (r_typeof(names) != r_type_character) {
-    r_abort("`names` must be a character vector");
-  }
-  if (!r_is_scalar_logical(inherits)) {
-    r_abort("`inherits` must be a scalar logical vector");
-  }
-  return r_env_unbind_names(env, names, *r_lgl_deref(inherits));
 }
 
-sexp* r_env_unbind_all(sexp* env, const char** names, bool inherits) {
+static
+void env_unbind_names(sexp* env, sexp* names, bool inherit) {
+  sexp* const * p_names = r_chr_deref_const(names);
+  r_ssize n = r_length(names);
+
+  if (inherit) {
+    for (r_ssize i = 0; i < n; ++i) {
+      sexp* sym = r_str_as_symbol(p_names[i]);
+      r_env_unbind_anywhere(env, sym);
+    }
+  } else {
+    for (r_ssize i = 0; i < n; ++i) {
+      sexp* sym = r_str_as_symbol(p_names[i]);
+      r_env_unbind(env, sym);
+    }
+  }
+}
+
+void r_env_unbind_names(sexp* env, sexp* names) {
+  env_unbind_names(env, names, false);
+}
+void r_env_unbind_anywhere_names(sexp* env, sexp* names) {
+  env_unbind_names(env, names, true);
+}
+
+void r_env_unbind_strings(sexp* env, const char** names) {
   sexp* nms = KEEP(r_new_character(names));
-  sexp* out = r_env_unbind_names(env, nms, inherits);
+  r_env_unbind_names(env, nms);
   FREE(1);
-  return out;
+}
+void r_env_unbind_anywhere_strings(sexp* env, const char** names) {
+  sexp* nms = KEEP(r_new_character(names));
+  r_env_unbind_anywhere_names(env, nms);
+  FREE(1);
 }
 
-sexp* r_env_unbind(sexp* env, const char* name, bool inherits) {
+void r_env_unbind_string(sexp* env, const char* name) {
   static const char* names[2] = { "", NULL };
   names[0] = name;
-  return r_env_unbind_all(env, names, inherits);
+  r_env_unbind_strings(env, names);
+}
+void r_env_unbind_string_anywhere(sexp* env, const char* name) {
+  static const char* names[2] = { "", NULL };
+  names[0] = name;
+  r_env_unbind_anywhere_strings(env, names);
 }
 
 bool r_env_inherits(sexp* env, sexp* ancestor, sexp* top) {
@@ -208,6 +267,11 @@ void r_init_library_env() {
 
   list2env_call = r_parse("list2env(x, envir = NULL, parent = y, hash = TRUE)");
   r_mark_precious(list2env_call);
+
+  poke_lazy_call = r_parse("delayedAssign(x, value = NULL, assign.env = y, eval.env = z)");
+  r_mark_precious(poke_lazy_call);
+
+  poke_lazy_value_node = r_node_cddr(poke_lazy_call);
 
   remove_call = r_parse("remove(list = y, envir = x, inherits = z)");
   r_mark_precious(remove_call);

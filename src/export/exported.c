@@ -87,10 +87,10 @@ sexp* rlang_env_bind_list(sexp* env, sexp* names, sexp* data) {
     r_abort("Internal error: `data` and `names` must have the same length.");
   }
 
-  sexp** namesp = r_chr_deref(names);
+  sexp* const * p_names = r_chr_deref_const(names);
 
   for (r_ssize i = 0; i < n; ++i) {
-    Rf_defineVar(Rf_installChar(namesp[i]), r_list_get(data, i), env);
+    Rf_defineVar(r_str_as_symbol(p_names[i]), r_list_get(data, i), env);
   }
 
   return r_null;
@@ -295,10 +295,6 @@ sexp* rlang_duplicate(sexp* x, sexp* shallow) {
   return r_duplicate(x, r_lgl_get(shallow, 0));
 }
 
-sexp* rlang_is_null(sexp* x) {
-  return r_lgl(r_is_null(x));
-}
-
 sexp* rlang_sexp_address(sexp* x) {
   static char str[1000];
   snprintf(str, 1000, "%p", (void*) x);
@@ -384,6 +380,19 @@ sexp* rlang_named(sexp* x, sexp* env) {
 
 sexp* rlang_find_var(sexp* env, sexp* sym) {
   return Rf_findVar(sym, env);
+}
+
+sexp* rlang_chr_get(sexp* x, sexp* i) {
+  if (r_typeof(i) != r_type_integer || r_length(i) != 1) {
+    r_abort("`i` must be an integer value.");
+  }
+
+  int c_i = r_int_get(i, 0);
+  if (c_i < 0 || c_i >= r_length(x)) {
+    r_abort("`i` is out of bound. Note that `r_chr_get()` takes zero-based locations.");
+  }
+
+  return r_chr_get(x, c_i);
 }
 
 
@@ -532,10 +541,10 @@ sexp* rlang_is_string(sexp* x, sexp* string) {
 
   bool out = false;
   r_ssize n = r_length(string);
-  sexp** p = r_chr_deref(string);
+  sexp* const * p_string = r_chr_deref_const(string);
 
-  for (r_ssize i = 0; i < n; ++i, ++p) {
-    if (*p == value) {
+  for (r_ssize i = 0; i < n; ++i) {
+    if (p_string[i] == value) {
       out = true;
       break;
     }

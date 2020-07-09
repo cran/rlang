@@ -65,17 +65,17 @@
 #'   ```
 #'
 #'
-#' @section Life cycle:
+#' @section Caveats of inlining objects in calls:
 #'
-#' In rlang 0.2.0 `lang()` was soft-deprecated and renamed to
-#' `call2()`.
+#' `call2()` makes it possible to inline objects in calls, both in
+#' function and argument positions. Inlining an object or a function
+#' has the advantage that the correct object is used in all
+#' environments. If all components of the code are inlined, you can
+#' even evaluate in the [empty environment][empty_env].
 #'
-#' In early versions of rlang calls were called "language" objects in
-#' order to follow the R type nomenclature as returned by
-#' [base::typeof()]. The goal was to avoid adding to the confusion
-#' between S modes and R types. With hindsight we find it is better to
-#' use more meaningful type names.
-#'
+#' However inlining also has drawbacks. It can cause issues with NSE
+#' functions that expect symbolic arguments. The objects may also leak
+#' in representations of the call stack, such as [traceback()].
 #'
 #' @seealso call_modify
 #' @examples
@@ -95,7 +95,7 @@
 #' call2("[", quote(x), , drop = )
 #' @export
 call2 <- function(.fn, ..., .ns = NULL) {
-  .External2(rlang_call2_external, .fn, .ns)
+  .External2(rlang_ext2_call2, .fn, .ns)
 }
 #' Create pairlists with splicing support
 #'
@@ -317,8 +317,21 @@ is_call2 <- function(x, ...) {
 #' * `"special"` for function definitions, control-flow calls like
 #'   `if` or `for`, and subscripting calls like `foo[]` and `foo[[]]`.
 #'
-#'
 #' @param call A quoted function call. An error is raised if not a call.
+#'
+#' @section Finer print types:
+#'
+#' `call_print_fine_type()` is a lower level version with the following
+#' differences:
+#'
+#' * The `"special"` calls are categorised as `"control"` (`if`,
+#'   `for`, `while`, `repeat`, `function`), `"delim"` (`(` and `{`),
+#'   and `"subset"` (`[` and `[[`).
+#'
+#' * The `"prefixed"` calls are categorised as `"prefix"` (`+`, `-`,
+#'   ...) and `"calls"`.
+#'
+#'
 #' @examples
 #' call_print_type(quote(foo(bar)))
 #' call_print_type(quote(foo[[bar]]))
@@ -352,7 +365,7 @@ call_print_fine_type <- function(call) {
     abort("`call` must be a call")
   }
 
-  op <- which_operator(call)
+  op <- call_parse_type(call)
   if (op == "") {
     return("call")
   }
@@ -691,7 +704,7 @@ call_fn <- function(call, env = caller_env()) {
   )
 }
 
-#' Extract function name or namespaced of a call
+#' Extract function name or namespace of a call
 #'
 #' @section Life cycle:
 #'
@@ -851,7 +864,10 @@ is_namespaced_symbol <- function(x, ns = NULL, private = NULL) {
   }
 }
 
-which_operator <- function(call) {
+#' What is the parser type of a call?
+#' @keywords internal
+#' @export
+call_parse_type <- function(call) {
   .Call(rlang_which_operator, call)
 }
 call_has_precedence <- function(call, parent_call, side = NULL) {
