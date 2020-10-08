@@ -83,7 +83,7 @@ sexp* rlang_ext2_is_missing(sexp* _call, sexp* _op, sexp* args, sexp* env) {
     return r_shared_true;
   }
 
-  return r_lgl(r_eval(r_x_sym, env) == r_missing_sym);
+  return r_lgl(r_eval(r_syms_x, env) == r_syms_missing);
 }
 
 static sexp* stop_arg_match_call = NULL;
@@ -145,7 +145,7 @@ sexp* rlang_ext_arg_match0(sexp* args) {
   }
 
   sexp* my_values = KEEP(r_duplicate(values, true));
-  sexp** p_my_values = r_chr_deref(my_values);
+  sexp* const * p_my_values = r_chr_deref_const(my_values);
 
   // Invariant: my_values[i:(len-1)] contains the values we haven't matched yet
   for (; i < arg_len; ++i) {
@@ -160,7 +160,7 @@ sexp* rlang_ext_arg_match0(sexp* args) {
         matched = true;
 
         // Replace matched value by the element that failed to match at this iteration
-        p_my_values[j] = p_my_values[i];
+        SET_STRING_ELT(my_values, j, p_my_values[i]);
         break;
       }
     }

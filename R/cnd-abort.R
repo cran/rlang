@@ -135,10 +135,15 @@ abort <- function(message = NULL,
     with_options("rlang:::disable_trace_capture" = TRUE, {
       trace <- trace_back()
 
+      # Remove throwing context. Especially important when rethrowing
+      # from a condition handler because in that case there are a
+      # bunch of irrelevant frames in the trailing branch of the call
+      # stack. We want to display the call tree branch that is
+      # relevant to users in simplified backtraces.
       if (is_null(parent)) {
         context <- trace_length(trace)
       } else {
-        context <- find_capture_context(3L)
+        context <- trace_capture_depth(trace)
       }
 
       trace <- trace_trim_context(trace, context)
@@ -176,21 +181,34 @@ signal_abort <- function(cnd) {
   # Save the unhandled error for `rlang::last_error()`.
   last_error_env$cnd <- cnd
 
-  # Generate the error message, possibly with a backtrace or reminder
-  fallback$message <- paste_line(
-    conditionMessage(cnd),
-    format_onerror_backtrace(cnd)
-  )
+  if (is_interactive()) {
+    # Generate the error message, possibly with a backtrace or reminder
+    fallback$message <- paste_line(
+      conditionMessage(cnd),
+      format_onerror_backtrace(cnd)
+    )
+    fallback$rlang_entraced <- TRUE
+  } else {
+    file <- peek_option("rlang:::error_pipe") %||% stderr()
+    msg <- conditionMessage(cnd)
+    fallback$message <- msg
+
+    cat("Error: ", msg, "\n", sep = "", file = file)
+
+    # Print the backtrace eagerly in non-interactive sessions because
+    # the length of error messages is limited (#856)
+    cat(format_onerror_backtrace(cnd), "\n", sep = "", file = file)
+
+    # Turn off the regular error printing to avoid printing the error
+    # twice
+    local_options(show.error.messages = FALSE)
+  }
 
   stop(fallback)
 }
 
-trace_trim_context <- function(trace, frame = caller_env()) {
-  if (is_environment(frame)) {
-    idx <- detect_index(trace$ids, identical, env_label(frame))
-  } else if (is_scalar_integerish(frame)) {
-    idx <- frame
-  } else {
+trace_trim_context <- function(trace, idx) {
+  if (!is_scalar_integerish(idx)) {
     abort("`frame` must be a frame environment or index")
   }
 
@@ -203,8 +221,21 @@ trace_trim_context <- function(trace, frame = caller_env()) {
 }
 
 # Assumes we're called from a calling or exiting handler
-find_capture_context <- function(n = 3L) {
-  calls <- sys.calls()
+trace_capture_depth <- function(trace) {
+  calls <- trace$calls
+  default <- length(calls)
+
+  if (length(calls) <= 3L) {
+    return(default)
+  }
+
+  # withCallingHandlers()
+  wch_calls <- calls[seq2(length(calls) - 3L, length(calls) - 1L)]
+  if (is_call(wch_calls[[1]], "signal_abort") &&
+      is_call(wch_calls[[2]], "signalCondition") &&
+      is_call(wch_calls[[3]]) && is_function(wch_calls[[3]][[1]])) {
+    return(length(calls) - 4L)
+  }
 
   exiting_call <- quote(value[[3L]](cond))
   exiting_n <- detect_index(calls, identical, exiting_call, .right = TRUE)
@@ -214,21 +245,13 @@ find_capture_context <- function(n = 3L) {
     try_catch_calls <- calls[seq_len(exiting_n - 1L)]
     try_catch_n <- detect_index(try_catch_calls, is_call, "tryCatch", .right = TRUE)
     if (try_catch_n != 0L) {
-      return(sys.frame(try_catch_n))
+      return(try_catch_n)
     } else {
-      return(sys.frame(sys.parent(n)))
+      return(default)
     }
   }
 
-  bottom_loc <- length(calls) - 3
-  bottom <- calls[[bottom_loc]]
-
-  # withCallingHandlers()
-  if (is_function(bottom[[1]])) {
-    return(sys.frame(bottom_loc))
-  }
-
-  sys.frame(sys.parent(n))
+  default
 }
 
 #' Display backtrace on error
@@ -279,6 +302,15 @@ NULL
 # the dev version to be installed locally.
 format_onerror_backtrace <- function(cnd) {
   trace <- cnd$trace
+
+  # Show backtrace of oldest parent
+  while (is_condition(cnd$parent)) {
+    cnd <- cnd$parent
+    if (!is_null(cnd$trace)) {
+      trace <- cnd$trace
+    }
+  }
+
   if (is_null(trace) || !trace_length(trace)) {
     return(NULL)
   }
@@ -316,25 +348,10 @@ format_onerror_backtrace <- function(cnd) {
     show_trace
   )
 
-  out <- paste_line(
+  paste_line(
     "Backtrace:",
     format(trace, simplify = simplify, max_frames = max_frames)
   )
-
-  if (simplify == "none") {
-    # Show parent backtraces
-    while (!is_null(cnd <- cnd$parent)) {
-      trace <- trace_trim_common(cnd$trace, trace)
-      out <- paste_line(
-        out,
-        rlang_error_header(cnd, child = TRUE),
-        "Backtrace:",
-        format(trace, simplify = simplify, max_frames = max_frames)
-      )
-    }
-  }
-
-  out
 }
 
 show_trace_p <- function() {

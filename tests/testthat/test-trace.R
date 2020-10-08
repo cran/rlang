@@ -1,8 +1,16 @@
 context("trace.R")
 
+local_options(
+  rlang_trace_use_winch = FALSE
+)
+
 # These tests must come first because print method includes srcrefs
 test_that("tree printing only changes deliberately", {
   skip_unless_utf8()
+
+  # Because of srcrefs
+  skip_on_cran()
+  skip_if_not_installed("testthat", "2.99.0")
 
   local_options(
     rlang_trace_format_srcrefs = TRUE,
@@ -30,6 +38,10 @@ test_that("tree printing only changes deliberately", {
 
 test_that("can print tree with collapsed branches", {
   skip_unless_utf8()
+
+  # Because of srcrefs
+  skip_on_cran()
+  skip_if_not_installed("testthat", "2.99.0")
 
   # Fake eval() call does not have same signature on old R
   skip_if(getRversion() < "3.4")
@@ -203,7 +215,8 @@ test_that("eval() frames are collapsed", {
 
 test_that("%>% frames are collapsed", {
   skip_unless_utf8()
-  skip_if_not_installed("magrittr")
+  skip_if_not_installed("magrittr", "1.5.0.9000")
+  skip_on_cran()
 
   # Fake eval() call does not have same signature on old R
   skip_if(getRversion() < "3.4")
@@ -227,7 +240,8 @@ test_that("%>% frames are collapsed", {
 
 test_that("children of collapsed %>% frames have correct parent", {
   skip_unless_utf8()
-  skip_if_not_installed("magrittr")
+  skip_if_not_installed("magrittr", "1.5.0.9000")
+  skip_on_cran()
 
   # Fake eval() call does not have same signature on old R
   skip_if(getRversion() < "3.4")
@@ -288,7 +302,8 @@ test_that("pipe_collect_calls() collects calls", {
 
 test_that("combinations of incomplete and leading pipes collapse properly", {
   skip_unless_utf8()
-  skip_if_not_installed("magrittr")
+  skip_if_not_installed("magrittr", "1.5.0.9000")
+  skip_on_cran()
 
   # Fake eval() call does not have same signature on old R
   skip_if(getRversion() < "3.4")
@@ -323,7 +338,8 @@ test_that("combinations of incomplete and leading pipes collapse properly", {
 
 test_that("calls before and after pipe are preserved", {
   skip_unless_utf8()
-  skip_if_not_installed("magrittr")
+  skip_if_not_installed("magrittr", "1.5.0.9000")
+  skip_on_cran()
 
   # Fake eval() call does not have same signature on old R
   skip_if(getRversion() < "3.4")
@@ -406,13 +422,13 @@ test_that("collapsing of eval() frames detects when error occurs within eval()",
 test_that("can print degenerate backtraces", {
   skip_unless_utf8()
 
-  trace_sym <- new_trace(list(quote(foo)), int(0), chr(""))
+  trace_sym <- new_trace(list(quote(foo)), int(0))
   expect_known_trace_output(trace_sym, file = "test-trace-degenerate-sym.txt")
 
-  trace_null <- new_trace(list(NULL), int(0), chr(""))
+  trace_null <- new_trace(list(NULL), int(0))
   expect_known_trace_output(trace_null, file = "test-trace-degenerate-null.txt")
 
-  trace_scalar <- new_trace(list(1L), int(0), chr(""))
+  trace_scalar <- new_trace(list(1L), int(0))
   expect_known_trace_output(trace_scalar, file = "test-trace-degenerate-scalar.txt")
 })
 
