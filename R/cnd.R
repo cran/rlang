@@ -8,11 +8,6 @@
 #' created with `error_cnd()`, `warning_cnd()` and `message_cnd()`
 #' inherit from `error`, `warning` or `message`.
 #'
-#' @section Lifecycle:
-#'
-#' The `.type` and `.msg` arguments have been renamed to `.subclass`
-#' and `message`. They are deprecated as of rlang 0.3.0.
-#'
 #' @param class The condition subclass.
 #' @param ... <[dynamic][dyn-dots]> Named data fields stored inside
 #'   the condition object.
@@ -20,7 +15,6 @@
 #'   condition when it is signalled.
 #' @param trace A `trace` object created by [trace_back()].
 #' @param parent A parent condition object created by [abort()].
-#' @inheritParams abort
 #' @seealso [cnd_signal()], [with_handlers()].
 #'
 #' @keywords internal
@@ -43,30 +37,28 @@
 #' # Signalling an error condition aborts the current computation:
 #' err <- error_cnd("foo", message = "I am an error")
 #' try(cnd_signal(err))
-cnd <- function(class, ..., message = "", .subclass) {
-  if (!missing(.subclass)) {
-    deprecate_subclass(.subclass)
-  }
+cnd <- function(class, ..., message = "") {
   if (missing(class)) {
     abort("Bare conditions must be subclassed")
   }
-  .Call(rlang_new_condition, class, message, dots_list(...))
+  .Call(rlang_new_condition, class, message, cnd_fields(...))
 }
 #' @rdname cnd
 #' @export
-warning_cnd <- function(class = NULL, ..., message = "", .subclass) {
-  if (!missing(.subclass)) {
-    deprecate_subclass(.subclass)
-  }
-  .Call(rlang_new_condition, c(class, "warning"), message, dots_list(...))
+warning_cnd <- function(class = NULL, ..., message = "") {
+  .Call(rlang_new_condition, c(class, "warning"), message, cnd_fields(...))
 }
 #' @rdname cnd
 #' @export
-message_cnd <- function(class = NULL, ..., message = "", .subclass) {
-  if (!missing(.subclass)) {
-    deprecate_subclass(.subclass)
+message_cnd <- function(class = NULL, ..., message = "") {
+  .Call(rlang_new_condition, c(class, "message"), message, cnd_fields(...))
+}
+
+cnd_fields <- function(..., .subclass = NULL, env = caller_env()) {
+  if (!is_null(.subclass)) {
+    deprecate_subclass(.subclass, env)
   }
-  .Call(rlang_new_condition, c(class, "message"), message, dots_list(...))
+  dots_list(...)
 }
 
 #' Is object a condition?

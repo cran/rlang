@@ -14,6 +14,7 @@ typedef Rcomplex r_complex_t;
 
 typedef R_xlen_t r_ssize;
 #define R_SSIZE_MAX R_XLEN_T_MAX
+#define R_SSIZE_MIN (-R_XLEN_T_MAX)
 
 r_ssize r_as_ssize(sexp* n);
 
@@ -49,6 +50,13 @@ enum r_type {
   r_type_function    = 99
 };
 
+#include <Rversion.h>
+#if (R_VERSION < R_Version(3, 5, 0))
+# define r_list_deref_const(x) ((sexp* const *) STRING_PTR(x))
+#else
+# define r_list_deref_const(x) ((sexp* const *) DATAPTR_RO(x))
+#endif
+
 
 #define r_null R_NilValue
 extern sexp* r_shared_true;
@@ -70,6 +78,7 @@ extern sexp* r_shared_false;
 
 #include "attrs.h"
 #include "debug.h"
+#include "c-utils.h"
 #include "cnd.h"
 #include "env.h"
 #include "env-binding.h"

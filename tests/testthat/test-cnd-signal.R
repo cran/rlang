@@ -179,6 +179,24 @@ test_that("`.frequency_id` is mandatory", {
   expect_error(warn("foo", .frequency = "once"), "frequency_id")
 })
 
+test_that("cnd_signal() is a no-op with `NULL`", {
+  expect_null(catch_cnd(cnd_signal(NULL)))
+})
+
+test_that("`inform()` behaves consistently in interactive and non-interactive sessions (#1037)", {
+  # Default behaviour
+  out1 <- Rscript(shQuote(c("--vanilla", "-e", "rlang::inform('foo')")))
+  out2 <- Rscript(shQuote(c("--vanilla", "-e", "rlang::with_interactive(rlang::inform('foo'))")))
+  expect_equal(out1$out, "foo")
+  expect_equal(out1$out, out2$out)
+
+  # Sinked behaviour
+  out1 <- Rscript(shQuote(c("--vanilla", "-e", "capture.output(rlang::inform('foo'))")))
+  out2 <- Rscript(shQuote(c("--vanilla", "-e", "rlang::with_interactive(capture.output(rlang::inform('foo')))")))
+  expect_equal(out1$out, c("foo", "character(0)"))
+  expect_equal(out1$out, out2$out)
+})
+
 
 # Lifecycle ----------------------------------------------------------
 
@@ -191,5 +209,12 @@ test_that("deprecated arguments of cnd_signal() still work", {
 
   with_handlers(cnd_signal(cnd("foo"), .mufflable = TRUE),
     foo = calling(function(cnd) expect_true(rst_exists("rlang_muffle")))
+  )
+})
+
+test_that("error_cnd() still accepts `.subclass`", {
+  expect_equal(
+    error_cnd(.subclass = "foo"),
+    error_cnd("foo")
   )
 })

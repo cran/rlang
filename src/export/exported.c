@@ -1,4 +1,5 @@
 #include <rlang.h>
+#include "../internal/utils.h"
 
 
 // attrs.c
@@ -96,11 +97,36 @@ sexp* rlang_env_bind_list(sexp* env, sexp* names, sexp* data) {
   return r_null;
 }
 
+sexp* rlang_env_browse(sexp* env, sexp* value) {
+  if (r_typeof(env) != r_type_environment) {
+    r_abort("`env` must be an environment.");
+  }
+  if (!r_is_bool(value)) {
+    r_abort("`value` must be a single logical value.");
+  }
+
+  sexp* old = r_lgl(RDEBUG(env));
+  SET_RDEBUG(env, r_lgl_get(value, 0));
+  return old;
+}
+
+sexp* rlang_env_is_browsed(sexp* env) {
+  if (r_typeof(env) != r_type_environment) {
+    r_abort("`env` must be an environment.");
+  }
+  return r_lgl(RDEBUG(env));
+}
+
+sexp* rlang_ns_registry_env() {
+  return R_NamespaceRegistry;
+}
+
 
 // eval.c
 
-sexp* rlang_eval(sexp* expr, sexp* env) {
-  return Rf_eval(expr, env);
+sexp* rlang_ext2_eval(sexp* call, sexp* op, sexp* args, sexp* env) {
+  args = r_node_cdr(args);
+  return Rf_eval(r_node_car(args), r_node_cadr(args));
 }
 
 sexp* rlang_eval_top(sexp* expr, sexp* env) {

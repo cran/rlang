@@ -289,3 +289,28 @@ test_that("arguments of closured primitives are matched by name after `...`", {
 test_that("transforming defused formula to function causes an informative error (#953)", {
   expect_error(as_function(quote(~foo)), "defused formula")
 })
+
+test_that("functions created from quosures with as_function() print properly", {
+  fn <- as_function(quo(x))
+  expect_equal(body(fn), quote(x))
+})
+
+test_that("as_function() creates functions that respect visibility", {
+  f <- as_function(quo(invisible(1)))
+  expect_invisible(f())
+
+  f <- as_function(quo(1))
+  expect_visible(f())
+
+  f <- as_function(~ invisible(1))
+  expect_invisible(f())
+
+  f <- as_function(~ 1)
+  expect_visible(f())
+})
+
+test_that("as_function() with a quosure can be serialised", {
+  fn <- as_function(local({ a <- 10; quo(a) }))
+  blob <- serialize(fn, NULL)
+  expect_equal(eval_tidy(fn), eval_tidy(unserialize(blob)))
+})

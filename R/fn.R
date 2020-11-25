@@ -430,7 +430,9 @@ as_function <- function(x, env = caller_env()) {
   }
 
   if (is_quosure(x)) {
-    return(eval(expr(function(...) eval_tidy(!!x))))
+    mask <- eval_tidy(call2(environment), env = quo_get_env(x))
+    fn <- new_function(pairlist2(... = ), quo_get_expr(x), mask)
+    return(fn)
   }
 
   if (is_formula(x)) {

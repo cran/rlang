@@ -40,7 +40,6 @@ extern sexp* rlang_duplicate(sexp*, sexp*);
 extern sexp* r_node_tree_clone(sexp*);
 extern sexp* rlang_node_tag(sexp*);
 extern sexp* rlang_node_poke_tag(sexp*, sexp*);
-extern sexp* rlang_eval(sexp*, sexp*);
 extern sexp* rlang_interp(sexp*, sexp*);
 extern sexp* rlang_is_function(sexp*);
 extern sexp* rlang_is_closure(sexp*);
@@ -98,7 +97,6 @@ extern sexp* rlang_new_data_mask_compat(sexp*, sexp*, sexp*);
 extern sexp* rlang_as_data_mask(sexp*);
 extern sexp* rlang_as_data_mask_compat(sexp*, sexp*);
 extern sexp* rlang_data_mask_clean(sexp*);
-extern sexp* rlang_eval_tidy(sexp*, sexp*, sexp*);
 extern sexp* rlang_as_data_pronoun(sexp*);
 extern sexp* rlang_env_get(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_env_get_list(sexp*, sexp*, sexp*, sexp*);
@@ -142,6 +140,10 @@ extern sexp* rlang_env_has(sexp*, sexp*, sexp*);
 extern sexp* rlang_env_poke(sexp*, sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_env_bind(sexp*, sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_raw_deparse_str(sexp*, sexp*, sexp*);
+extern sexp* rlang_env_browse(sexp*, sexp*);
+extern sexp* rlang_env_is_browsed(sexp*);
+extern sexp* rlang_ns_registry_env();
+
 
 // Library initialisation defined below
 sexp* rlang_library_load(sexp*);
@@ -178,7 +180,6 @@ static const r_callable r_callables[] = {
   {"rlang_capturedots",                 (r_fn_ptr) &rlang_capturedots, 4},
   {"rlang_duplicate",                   (r_fn_ptr) &rlang_duplicate, 2},
   {"rlang_node_tree_clone",             (r_fn_ptr) &r_node_tree_clone, 1},
-  {"rlang_eval",                        (r_fn_ptr) &rlang_eval, 2},
   {"rlang_interp",                      (r_fn_ptr) &rlang_interp, 2},
   {"rlang_is_function",                 (r_fn_ptr) &rlang_is_function, 1},
   {"rlang_is_closure",                  (r_fn_ptr) &rlang_is_closure, 1},
@@ -224,6 +225,8 @@ static const r_callable r_callables[] = {
   {"rlang_sexp_address",                (r_fn_ptr) &rlang_sexp_address, 1},
   {"rlang_symbol",                      (r_fn_ptr) &rlang_symbol, 1},
   {"rlang_sym_as_character",            (r_fn_ptr) &rlang_sym_as_character, 1},
+  // No longer necessary but keep this around for a while in case
+  // quosures ended up saved as RDS.
   {"rlang_tilde_eval",                  (r_fn_ptr) &rlang_tilde_eval, 3},
   {"rlang_unescape_character",          (r_fn_ptr) &rlang_unescape_character, 1},
   {"rlang_new_call",                    (r_fn_ptr) &rlang_new_call_node, 2},
@@ -277,7 +280,6 @@ static const r_callable r_callables[] = {
   {"rlang_is_data_mask",                (r_fn_ptr) &rlang_is_data_mask, 1},
   {"rlang_data_pronoun_get",            (r_fn_ptr) &rlang_data_pronoun_get, 2},
   {"rlang_data_mask_clean",             (r_fn_ptr) &rlang_data_mask_clean, 1},
-  {"rlang_eval_tidy",                   (r_fn_ptr) &rlang_eval_tidy, 3},
   {"rlang_as_data_pronoun",             (r_fn_ptr) &rlang_as_data_pronoun, 1},
   {"rlang_env_binding_types",           (r_fn_ptr) &r_env_binding_types, 2},
   {"rlang_env_get",                     (r_fn_ptr) &rlang_env_get, 4},
@@ -318,25 +320,36 @@ static const r_callable r_callables[] = {
   {"rlang_env_poke",                    (r_fn_ptr) &rlang_env_poke, 5},
   {"rlang_env_bind",                    (r_fn_ptr) &rlang_env_bind, 5},
   {"rlang_raw_deparse_str",             (r_fn_ptr) &rlang_raw_deparse_str, 3},
+  {"rlang_env_browse",                  (r_fn_ptr) &rlang_env_browse, 2},
+  {"rlang_env_is_browsed",              (r_fn_ptr) &rlang_env_is_browsed, 1},
+  {"rlang_ns_registry_env",             (r_fn_ptr) &rlang_ns_registry_env, 0},
   {NULL, NULL, 0}
 };
 
 
 extern sexp* rlang_ext_arg_match0(sexp*);
+extern sexp* rlang_ext_capturearginfo(sexp*);
+extern sexp* rlang_ext_capturedots(sexp*);
+extern sexp* rlang_ext_dots_values(sexp*);
 
-extern sexp* rlang_ext2_is_missing(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_ext2_call2(sexp*, sexp*, sexp*, sexp*);
-extern sexp* rlang_ext2_dots_values(sexp*, sexp*, sexp*, sexp*);
 extern sexp* rlang_ext2_exec(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext2_eval(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext2_eval_tidy(sexp*, sexp*, sexp*, sexp*);
+extern sexp* rlang_ext2_tilde_eval(sexp*, sexp*, sexp*, sexp*);
 
 
 static const r_external externals[] = {
   {"rlang_ext_arg_match0",              (r_fn_ptr) &rlang_ext_arg_match0, 3},
+  {"rlang_ext_capturearginfo",          (r_fn_ptr) &rlang_ext_capturearginfo, 2},
+  {"rlang_ext_capturedots",             (r_fn_ptr) &rlang_ext_capturedots, 1},
+  {"rlang_ext_dots_values",             (r_fn_ptr) &rlang_ext_dots_values, 7},
 
-  {"rlang_ext2_is_missing",             (r_fn_ptr) &rlang_ext2_is_missing, 1},
   {"rlang_ext2_call2",                  (r_fn_ptr) &rlang_ext2_call2, 2},
-  {"rlang_ext2_dots_values",            (r_fn_ptr) &rlang_ext2_dots_values, 6},
   {"rlang_ext2_exec",                   (r_fn_ptr) &rlang_ext2_exec, 2},
+  {"rlang_ext2_eval",                   (r_fn_ptr) &rlang_ext2_eval, 2},
+  {"rlang_ext2_eval_tidy",              (r_fn_ptr) &rlang_ext2_eval_tidy, 3},
+  {"rlang_ext2_tilde_eval",             (r_fn_ptr) &rlang_ext2_tilde_eval, 3},
   {NULL, NULL, 0}
 };
 
@@ -344,10 +357,10 @@ static const r_external externals[] = {
 extern bool is_splice_box(sexp*);
 extern sexp* rlang_env_dots_values(sexp*);
 extern sexp* rlang_env_dots_list(sexp*);
+extern sexp* rlang_eval_tidy(sexp*, sexp*, sexp*);
+extern void rlang_print_backtrace(bool full);
 
 export void R_init_rlang(r_dll_info* dll) {
-  r_register_c_callable("rlang", "rlang_squash_if", (r_fn_ptr) &r_squash_if);
-
   // The quosure functions are stable
   r_register_c_callable("rlang", "rlang_new_quosure", (r_fn_ptr) &rlang_new_quosure);
   r_register_c_callable("rlang", "rlang_is_quosure", (r_fn_ptr) &rlang_is_quosure);
@@ -370,13 +383,20 @@ export void R_init_rlang(r_dll_info* dll) {
   r_register_c_callable("rlang", "rlang_env_dots_values", (r_fn_ptr) &rlang_env_dots_values);
   r_register_c_callable("rlang", "rlang_env_dots_list", (r_fn_ptr) &rlang_env_dots_list);
   r_register_c_callable("rlang", "rlang_sym_as_character", (r_fn_ptr) &rlang_sym_as_character);
+  r_register_c_callable("rlang", "rlang_str_as_symbol", (r_fn_ptr) &r_str_as_symbol);
 
   // Experimental method for exporting C function pointers as actual R objects
   rlang_register_pointer("rlang", "rlang_test_is_spliceable", (r_fn_ptr) &rlang_is_clevel_spliceable);
 
+  // Experimental
+  r_register_c_callable("rlang", "rlang_squash_if", (r_fn_ptr) &r_squash_if);
+
   // Compatibility
   r_register_c_callable("rlang", "rlang_as_data_mask", (r_fn_ptr) &rlang_as_data_mask_compat);
   r_register_c_callable("rlang", "rlang_new_data_mask", (r_fn_ptr) &rlang_new_data_mask_compat);
+
+  // Only for debugging - no stability guaranteed
+  r_register_c_callable("rlang", "rlang_print_backtrace", (r_fn_ptr) &rlang_print_backtrace);
 
   r_register_r_callables(dll, r_callables, externals);
 }

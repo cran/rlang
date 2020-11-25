@@ -7,19 +7,16 @@
 \alias{message_cnd}
 \title{Create a condition object}
 \usage{
-error_cnd(.subclass = NULL, ..., message = "", trace = NULL, parent = NULL)
+error_cnd(class = NULL, ..., message = "", trace = NULL, parent = NULL)
 
-cnd(class, ..., message = "", .subclass)
+cnd(class, ..., message = "")
 
-warning_cnd(class = NULL, ..., message = "", .subclass)
+warning_cnd(class = NULL, ..., message = "")
 
-message_cnd(class = NULL, ..., message = "", .subclass)
+message_cnd(class = NULL, ..., message = "")
 }
 \arguments{
-\item{.subclass}{This argument was renamed to \code{class} in rlang
-0.4.2.  It will be deprecated in the next major version. This is
-for consistency with our conventions for class constructors
-documented in \url{https://adv-r.hadley.nz/s3.html#s3-subclassing}.}
+\item{class}{The condition subclass.}
 
 \item{...}{<\link[=dyn-dots]{dynamic}> Named data fields stored inside
 the condition object.}
@@ -30,8 +27,6 @@ condition when it is signalled.}
 \item{trace}{A \code{trace} object created by \code{\link[=trace_back]{trace_back()}}.}
 
 \item{parent}{A parent condition object created by \code{\link[=abort]{abort()}}.}
-
-\item{class}{The condition subclass.}
 }
 \description{
 These constructors make it easy to create subclassed conditions.
@@ -43,13 +38,6 @@ also be used for passing messages to pre-established handlers.
 created with \code{error_cnd()}, \code{warning_cnd()} and \code{message_cnd()}
 inherit from \code{error}, \code{warning} or \code{message}.
 }
-\section{Lifecycle}{
-
-
-The \code{.type} and \code{.msg} arguments have been renamed to \code{.subclass}
-and \code{message}. They are deprecated as of rlang 0.3.0.
-}
-
 \examples{
 # Create a condition inheriting from the s3 type "foo":
 cnd <- cnd("foo")

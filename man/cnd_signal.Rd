@@ -4,12 +4,13 @@
 \alias{cnd_signal}
 \title{Signal a condition object}
 \usage{
-cnd_signal(cnd, .cnd, .mufflable)
+cnd_signal(cnd, ...)
 }
 \arguments{
-\item{cnd}{A condition object (see \code{\link[=cnd]{cnd()}}).}
+\item{cnd}{A condition object (see \code{\link[=cnd]{cnd()}}). If \code{NULL},
+\code{cnd_signal()} returns without signalling a condition.}
 
-\item{.cnd, .mufflable}{These arguments are deprecated.}
+\item{...}{These dots are for extensions and must be empty.}
 }
 \description{
 The type of signal depends on the class of the condition:
@@ -30,18 +31,6 @@ The type of signal depends on the class of the condition:
 
 Use \code{\link[=cnd_type]{cnd_type()}} to determine the type of a condition.
 }
-\section{Lifecycle}{
-
-\itemize{
-\item \code{.cnd} has been renamed to \code{cnd} and is deprecated as of rlang 0.3.0.
-\item The \code{.mufflable} argument is deprecated as of rlang 0.3.0 and no
-longer has any effect. Non-critical conditions are always
-signalled with a muffle restart.
-\item Creating a condition object with \code{\link[=cnd_signal]{cnd_signal()}} is deprecated as
-of rlang 0.3.0. Please use \code{\link[=signal]{signal()}} instead.
-}
-}
-
 \examples{
 # The type of signal depends on the class. If the condition
 # inherits from "warning", a warning is issued:

@@ -14,7 +14,7 @@ abort(
   ...,
   trace = NULL,
   parent = NULL,
-  .subclass
+  .subclass = deprecated()
 )
 
 warn(
@@ -23,7 +23,7 @@ warn(
   ...,
   .frequency = c("always", "regularly", "once"),
   .frequency_id = NULL,
-  .subclass
+  .subclass = deprecated()
 )
 
 inform(
@@ -33,20 +33,26 @@ inform(
   .file = NULL,
   .frequency = c("always", "regularly", "once"),
   .frequency_id = NULL,
-  .subclass
+  .subclass = deprecated()
 )
 
-signal(message, class, ..., .subclass)
+signal(message, class, ..., .subclass = deprecated())
 
 interrupt()
 }
 \arguments{
-\item{message}{The message to display.
+\item{message}{The message to display. Character vectors are
+formatted with \code{\link[=format_error_bullets]{format_error_bullets()}}. The first element
+defines a message header and the rest of the vector defines
+bullets. Bullets named \code{i} and \code{x} define info and error bullets
+respectively, with special Unicode and colour formatting applied
+if possible.
 
-If not supplied, it is expected that the message is generated
-lazily through \link[=cnd_message]{conditionMessage()}. In that case,
-\code{class} must be supplied. Only \code{inform()} allows empty messages
-as it is occasionally useful to build user output incrementally.}
+If a message is not supplied, it is expected that the message is
+generated lazily through \link[=cnd_message]{conditionMessage()}. In
+that case, \code{class} must be supplied. Only \code{inform()} allows empty
+messages as it is occasionally useful to build user output
+incrementally.}
 
 \item{class}{Subclass of the condition. This allows your users
 to selectively handle the conditions signalled by your functions.}
@@ -78,7 +84,10 @@ connection or character string which will be passed to \code{\link[=cat]{cat()}}
 By default, \code{inform()} prints to standard output in interactive
 sessions and standard error otherwise. This way IDEs can treat
 messages distinctly from warnings and errors, and R scripts can
-still filter out the messages easily by redirecting \code{stderr}.}
+still filter out the messages easily by redirecting \code{stderr}. If
+a sink is active, either on output or on messages, messages are
+printed to \code{stderr}. This ensures consistency of behaviour in
+interactive and non-interactive sessions.}
 }
 \description{
 These functions are equivalent to base functions \code{\link[base:stop]{base::stop()}},

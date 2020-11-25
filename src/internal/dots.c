@@ -254,7 +254,13 @@ sexp* big_bang_coerce_pairlist(sexp* x, bool deep) {
   case r_type_character:
   case r_type_raw:
   case r_type_list:
-    x = r_vec_coerce(x, r_type_pairlist);
+    // Check for length because `Rf_coerceVector()` to pairlist fails
+    // with named empty vectors (#1045)
+    if (r_length(x)) {
+      x = r_vec_coerce(x, r_type_pairlist);
+    } else {
+      x = r_null;
+    }
     break;
   case r_type_call:
     if (deep && r_is_symbol(r_node_car(x), "{")) {
@@ -860,18 +866,16 @@ static sexp* dots_values_impl(sexp* frame_env,
   return dots;
 }
 
-sexp* rlang_ext2_dots_values(sexp* call,
-                        sexp* op,
-                        sexp* args,
-                        sexp* env) {
+sexp* rlang_ext_dots_values(sexp* args) {
   args = r_node_cdr(args);
 
-  sexp* named =          KEEP(r_eval(r_node_car(args), env)); args = r_node_cdr(args);
-  sexp* ignore_empty =   KEEP(r_eval(r_node_car(args), env)); args = r_node_cdr(args);
-  sexp* preserve_empty = KEEP(r_eval(r_node_car(args), env)); args = r_node_cdr(args);
-  sexp* unquote_names =  KEEP(r_eval(r_node_car(args), env)); args = r_node_cdr(args);
-  sexp* homonyms =       KEEP(r_eval(r_node_car(args), env)); args = r_node_cdr(args);
-  sexp* check_assign =   KEEP(r_eval(r_node_car(args), env));
+  sexp* env =            r_node_car(args); args = r_node_cdr(args);
+  sexp* named =          r_node_car(args); args = r_node_cdr(args);
+  sexp* ignore_empty =   r_node_car(args); args = r_node_cdr(args);
+  sexp* preserve_empty = r_node_car(args); args = r_node_cdr(args);
+  sexp* unquote_names =  r_node_car(args); args = r_node_cdr(args);
+  sexp* homonyms =       r_node_car(args); args = r_node_cdr(args);
+  sexp* check_assign =   r_node_car(args);
 
   sexp* out = dots_values_impl(env,
                                named,
@@ -882,7 +886,6 @@ sexp* rlang_ext2_dots_values(sexp* call,
                                check_assign,
                                false);
 
-  FREE(6);
   return out;
 }
 sexp* rlang_env_dots_values(sexp* env) {

@@ -34,6 +34,9 @@
 #'   bound to the symbol (the expressions are thus evaluated only
 #'   once, if at all).
 #'
+#' - `%<~%` is a shortcut for `env_bind_lazy()`. It works like `<-`
+#'   but the RHS is evaluated lazily.
+#'
 #'
 #' @section Side effects:
 #'
@@ -220,6 +223,18 @@ env_bind_active <- function(.env, ...) {
     eval_env = caller_env()
   ))
 }
+#' @rdname env_bind
+#' @param lhs The variable name to which `rhs` will be lazily assigned.
+#' @param rhs An expression lazily evaluated and assigned to `lhs`.
+#' @export
+`%<~%` <- function(lhs, rhs) {
+  env_bind_lazy(
+    env,
+    !!substitute(lhs) := !!substitute(rhs),
+    .eval_env = caller_env()
+  )
+}
+
 
 #' Temporarily change bindings of an environment
 #'
@@ -274,8 +289,7 @@ with_bindings <- function(.expr, ..., .env = caller_env()) {
 #' `inherit` to `TRUE` to track down bindings in parent environments.
 #'
 #' @inheritParams get_env
-#' @param nms A character vector containing the names of the bindings
-#'   to remove.
+#' @param nms A character vector of binding names to remove.
 #' @param inherit Whether to look for bindings in the parent
 #'   environments.
 #' @return The input object `env` with its associated environment
@@ -310,6 +324,8 @@ env_unbind <- function(env = caller_env(), nms, inherit = FALSE) {
 #' any of its parents (with `inherit = TRUE`).
 #'
 #' @inheritParams env_unbind
+#' @param nms A character vector of binding names for which to check
+#'   existence.
 #' @return A named logical vector as long as `nms`.
 #' @export
 #' @examples

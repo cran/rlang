@@ -639,6 +639,12 @@ env_unlock <- function(env) {
 #'
 #' * Locked bindings get a `[L]` tag
 #'
+#' Note that printing a package namespace (see [ns_env()]) with
+#' `env_print()` will typically tag function bindings as `<lazy>`
+#' until they are evaluated the first time. This is because package
+#' functions are lazily-loaded from disk to improve performance when
+#' loading a package.
+#'
 #' @param env An environment, or object that can be converted to an
 #'   environment by [get_env()].
 #'
@@ -774,4 +780,29 @@ str.rlang_envs <- function(object, ...) {
     cat("\n")
   }
   invisible(object)
+}
+
+#' Browse environments
+#'
+#' @description
+#'
+#' * `env_browse(env)` is equivalent to evaluating `browser()` in
+#'   `env`. It persistently sets the environment for step-debugging.
+#'   Supply `value = FALSE` to disable browsing.
+#'
+#' * `env_is_browsed()` is a predicate that inspects whether an
+#'   environment is being browsed.
+#'
+#' @param env An environment.
+#' @param value Whether to browse `env`.
+#' @return `env_browse()` returns the previous value of
+#'   `env_is_browsed()` (a logical), invisibly.
+#' @export
+env_browse <- function(env, value = TRUE) {
+  invisible(.Call(rlang_env_browse, env, value))
+}
+#' @rdname env_browse
+#' @export
+env_is_browsed <- function(env) {
+  .Call(rlang_env_is_browsed, env)
 }

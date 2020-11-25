@@ -1,4 +1,4 @@
-#' Signal a condition object
+ #' Signal a condition object
 #'
 #' @description
 #'
@@ -22,20 +22,9 @@
 #'
 #' Use [cnd_type()] to determine the type of a condition.
 #'
-#'
-#' @section Lifecycle:
-#'
-#' * `.cnd` has been renamed to `cnd` and is deprecated as of rlang 0.3.0.
-#'
-#' * The `.mufflable` argument is deprecated as of rlang 0.3.0 and no
-#'   longer has any effect. Non-critical conditions are always
-#'   signalled with a muffle restart.
-#'
-#' * Creating a condition object with [cnd_signal()] is deprecated as
-#'   of rlang 0.3.0. Please use [signal()] instead.
-#'
-#' @param cnd A condition object (see [cnd()]).
-#' @param .cnd,.mufflable These arguments are deprecated.
+#' @param cnd A condition object (see [cnd()]). If `NULL`,
+#'   `cnd_signal()` returns without signalling a condition.
+#' @param ... These dots are for extensions and must be empty.
 #' @seealso [abort()], [warn()] and [inform()] for creating and
 #'   signalling structured R conditions. See [with_handlers()] for
 #'   establishing condition handlers.
@@ -49,8 +38,12 @@
 #' # If it inherits from "error", an error is raised:
 #' cnd <- error_cnd("my_error_class", message = "This is an error")
 #' try(cnd_signal(cnd))
-cnd_signal <- function(cnd, .cnd, .mufflable) {
-  validate_cnd_signal_args(cnd, .cnd, .mufflable)
+cnd_signal <- function(cnd, ...) {
+  validate_cnd_signal_args(cnd, ...)
+  if (is_null(cnd)) {
+    return(invisible(NULL))
+  }
+
   if (inherits(cnd, "rlang_error") && is_null(cnd$trace)) {
     trace <- trace_back()
     cnd$trace <- trace_trim_context(trace, trace_length(trace))
@@ -59,8 +52,14 @@ cnd_signal <- function(cnd, .cnd, .mufflable) {
     invisible(.Call(rlang_cnd_signal, cnd))
   }
 }
-validate_cnd_signal_args <- function(cnd, .cnd, .mufflable,
+validate_cnd_signal_args <- function(cnd,
+                                     ...,
+                                     .cnd,
+                                     .mufflable,
                                      env = parent.frame()) {
+  if (dots_n(...)) {
+    abort("`...` must be empty.")
+  }
   if (is_character(cnd)) {
     warn_deprecated(paste_line(
       "Creating a condition with `cnd_signal()` is deprecated as of rlang 0.3.0.",
@@ -104,7 +103,7 @@ warn <- function(message = NULL,
                  ...,
                  .frequency = c("always", "regularly", "once"),
                  .frequency_id = NULL,
-                 .subclass) {
+                 .subclass = deprecated()) {
   validate_signal_args(.subclass)
 
   message <- validate_signal_message(message, class)
@@ -128,7 +127,10 @@ warn <- function(message = NULL,
 #'   By default, `inform()` prints to standard output in interactive
 #'   sessions and standard error otherwise. This way IDEs can treat
 #'   messages distinctly from warnings and errors, and R scripts can
-#'   still filter out the messages easily by redirecting `stderr`.
+#'   still filter out the messages easily by redirecting `stderr`. If
+#'   a sink is active, either on output or on messages, messages are
+#'   printed to `stderr`. This ensures consistency of behaviour in
+#'   interactive and non-interactive sessions.
 #' @export
 inform <- function(message = NULL,
                    class = NULL,
@@ -136,7 +138,7 @@ inform <- function(message = NULL,
                    .file = NULL,
                    .frequency = c("always", "regularly", "once"),
                    .frequency_id = NULL,
-                   .subclass) {
+                   .subclass = deprecated()) {
   validate_signal_args(.subclass)
 
   message <- message %||% ""
@@ -155,26 +157,32 @@ inform <- function(message = NULL,
 
   withRestarts(muffleMessage = function() NULL, {
     signalCondition(cnd)
-
-    .file <- .file %||% if (is_interactive()) stdout() else stderr()
-    cat(message, file = .file)
+    cat(message, file = .file %||% default_message_file())
   })
 
   invisible()
 }
 #' @rdname abort
 #' @export
-signal <- function(message, class, ..., .subclass) {
-  if (!missing(.subclass)) {
-    deprecate_subclass(.subclass)
-  }
+signal <- function(message, class, ..., .subclass = deprecated()) {
+  validate_signal_args(.subclass)
   message <- collapse_cnd_message(message)
   cnd <- cnd(class, ..., message = message)
   cnd_signal(cnd)
 }
 
+default_message_file <- function() {
+  if (is_interactive() &&
+      sink.number("output") == 0 &&
+      sink.number("message") == 2) {
+    stdout()
+  } else {
+    stderr()
+  }
+}
+
 validate_signal_args <- function(subclass, env = caller_env()) {
-  if (!missing(subclass)) {
+  if (!is_missing(subclass)) {
     deprecate_subclass(subclass, env = env)
   }
 }

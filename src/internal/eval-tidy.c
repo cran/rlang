@@ -160,14 +160,14 @@ sexp* rlang_new_data_mask(sexp* bottom, sexp* top) {
   sexp* data_mask;
 
   if (bottom == r_null) {
-    bottom = KEEP(r_new_environment(r_empty_env, 0));
+    bottom = KEEP(r_new_environment(r_empty_env, 100));
     data_mask = bottom;
   } else {
     check_data_mask_input(bottom, "bottom");
     // Create a child because we don't know what might be in `bottom`
     // and we need to clear its contents without deleting any object
     // created in the data mask environment
-    data_mask = KEEP(r_new_environment(bottom, 0));
+    data_mask = KEEP(r_new_environment(bottom, 100));
   }
 
   if (top == r_null) {
@@ -221,7 +221,7 @@ static sexp* mask_find(sexp* env, sexp* sym) {
       FREE(1);
     }
 
-    if (obj != r_syms_unbound && !r_is_function(obj)) {
+    if (obj != r_syms_unbound) {
       FREE(n_kept);
       return obj;
     }
@@ -271,6 +271,7 @@ static void warn_env_as_mask_once() {
 }
 
 static sexp* data_pronoun_sym = NULL;
+static r_ssize mask_length(r_ssize n);
 
 sexp* rlang_as_data_mask(sexp* data) {
   if (mask_info(data).type == RLANG_MASK_DATA) {
@@ -304,17 +305,21 @@ sexp* rlang_as_data_mask(sexp* data) {
     check_unique_names(data);
 
     sexp* names = r_names(data);
-    bottom = KEEP_N(r_new_environment(r_empty_env, 0), n_protect);
+
+    r_ssize n_mask = mask_length(r_length(data));
+    bottom = KEEP_N(r_new_environment(r_empty_env, n_mask), n_protect);
 
     if (names != r_null) {
       r_ssize n = r_length(data);
 
+      sexp* const * p_names = r_chr_deref_const(names);
+      sexp* const * p_data = r_list_deref_const(data);
+
       for (r_ssize i = 0; i < n; ++i) {
         // Ignore empty or missing names
-        sexp* nm = r_chr_get(names, i);
+        sexp* nm = p_names[i];
         if (r_str_is_name(nm)) {
-          sexp* elt = r_list_get(data, i);
-          r_env_poke(bottom, r_str_as_symbol(nm), elt);
+          r_env_poke(bottom, r_str_as_symbol(nm), p_data[i]);
         }
       }
     }
@@ -333,6 +338,12 @@ sexp* rlang_as_data_mask(sexp* data) {
 
   FREE(n_protect);
   return data_mask;
+}
+
+static
+r_ssize mask_length(r_ssize n) {
+  r_ssize n_grown = r_double_as_ssize(r_double_mult(r_ssize_as_double(n), 1.05));
+  return r_ssize_max(n_grown, r_ssize_add(n, 20));
 }
 
 // For compatibility of the exported C callable
@@ -432,6 +443,14 @@ sexp* rlang_tilde_eval(sexp* tilde, sexp* current_frame, sexp* caller_frame) {
   return r_eval(expr, info.mask);
 }
 
+sexp* rlang_ext2_tilde_eval(sexp* call, sexp* op, sexp* args, sexp* rho) {
+  args = r_node_cdr(args);
+  sexp* tilde = r_node_car(args); args = r_node_cdr(args);
+  sexp* current_frame = r_node_car(args); args = r_node_cdr(args);
+  sexp* caller_frame = r_node_car(args);
+  return rlang_tilde_eval(tilde, current_frame, caller_frame);
+}
+
 static const char* data_mask_objects_names[5] = {
   ".__tidyeval_data_mask__.", "~", ".top_env", ".env", NULL
 };
@@ -519,13 +538,21 @@ sexp* rlang_eval_tidy(sexp* expr, sexp* data, sexp* env) {
   return out;
 }
 
+sexp* rlang_ext2_eval_tidy(sexp* call, sexp* op, sexp* args, sexp* rho) {
+  args = r_node_cdr(args);
+  sexp* expr = r_node_car(args); args = r_node_cdr(args);
+  sexp* data = r_node_car(args); args = r_node_cdr(args);
+  sexp* env = r_node_car(args);
+  return rlang_eval_tidy(expr, data, env);
+}
+
 
 void rlang_init_eval_tidy() {
   sexp* rlang_ns_env = KEEP(r_ns_env("rlang"));
 
   tilde_fn = r_parse_eval(
     "function(...) {                          \n"
-    "  .Call(rlang_tilde_eval,                \n"
+    "  .External2(rlang_ext2_tilde_eval,      \n"
     "    sys.call(),     # Quosure env        \n"
     "    environment(),  # Unwind-protect env \n"
     "    parent.frame()  # Lexical env        \n"
