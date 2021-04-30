@@ -1,3 +1,10 @@
+# rlang 0.4.11
+
+* Fix for CRAN checks.
+
+* Fixed a gcc11 warning related to `hash()` (#1088).
+
+
 # rlang 0.4.10
 
 * New `hash()` function to generate 128-bit hashes for arbitrary R objects
