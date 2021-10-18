@@ -1,8 +1,8 @@
-04465eebd6395d16187b2ce60f0d5914 *DESCRIPTION
+d10a6ac39014c73b50484d99ae0b0266 *DESCRIPTION
 e6f43178fbfc71c5d0c6586954b66df1 *LICENSE
 571f9fded5d43695ad11e04790c0af64 *LICENSE.note
 957b7e98f5210e498e06ad9408b0d912 *NAMESPACE
-6d28f73fcf6c664c17dbed67846e541a *NEWS.md
+d1f32bfc183a78016c1b0060aeeea0da *NEWS.md
 f07e13cb51f43acdc1f906333f9fd11b *R/aaa.R
 b49bbfe374a6a74c44e56d558bd31420 *R/arg.R
 4a64d177fa898904b3abe77c5d44c0eb *R/attr.R
@@ -63,8 +63,8 @@ ee59231a415a456645cce45c958f98a5 *R/vec-new.R
 c385c983f67b71461d7b0951db6a9c5d *R/vec-squash.R
 7abd99704c8a9dec7e55651158cc2853 *R/vec.R
 5835c34bf4379eb86b6257fd9dce56d7 *R/weakref.R
-b472ef3a6845cf5a178aa8e1af0f67f1 *README.md
-7f0609b9a1269163cde40a8a1aa0a391 *build/rlang.pdf
+60f6d09183e5015b1bbb6a90f774b8f4 *README.md
+1ed0a12d5a1c22bd0b69fb11f8b60e1c *build/rlang.pdf
 c9e47dbb0e1927076ed7b2e1ec157be7 *inst/backtrace-ver
 71ac8969b603b879fd01d9ed7cd0b231 *man/abort.Rd
 3978bd918c9341b59c6ca11082c33cc7 *man/are_na.Rd
@@ -349,7 +349,7 @@ b5087867417fdd50b07941b4fa4e8a92 *src/lib/vec-lgl.c
 0572d3ac35ad5e229d891d2d10218b33 *src/lib/vec.c
 0355c8d2b71d4a0b3cff2ef7e0015140 *src/lib/vec.h
 f62bfc377df0fd1681959ba55ea4d5a6 *src/lib/weakref.c
-60ee79cf085bb759ea28b888144d20bd *src/version.c
+7f61383b284e2f401ab1a0e0bec2a80d *src/version.c
 b535466226f2ed8212a97ea8790639c4 *tests/sink.R
 689f0fa1b25df0719206586844edb2d0 *tests/testthat.R
 3297ab75ebf197b920885af68a5767b6 *tests/testthat/_snaps/arg.md
@@ -419,7 +419,7 @@ f581e7bb8b471157139bdb84e0f392ae *tests/testthat/test-node.R
 369c5d7ba60165f89f5b19e6297ec741 *tests/testthat/test-nse-force.R
 013bf4e8505d674a99d620271e861d78 *tests/testthat/test-operators.R
 bb4e778340942684b87aaebffd40203d *tests/testthat/test-parse.R
-ef5becd3676a15e63c565cbe4257b6c9 *tests/testthat/test-quo.R
+53b51c732676f3a0d05e0b0fead862e8 *tests/testthat/test-quo.R
 9b5fcad3895f42f389b18c755e9d4dd1 *tests/testthat/test-raw.R
 f92a959428f6a9c7f5376ffb8fa00b0a *tests/testthat/test-retired.R
 cd79a31ecfc1258251c3949b62a4578f *tests/testthat/test-s3.R
