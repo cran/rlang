@@ -29,7 +29,7 @@
 #'
 #' @section Difference with base constructors:
 #'
-#' `call2()` is more flexible and convenient than `base::call()`:
+#' `call2()` is more flexible than `base::call()`:
 #'
 #' * The function to call can be a string or a [callable][is_callable]
 #'   object: a symbol, another call (e.g. a `$` or `[[` call), or a
@@ -48,20 +48,22 @@
 #'   ```
 #'   call2("list", 1, 2, .ns = "base")
 #'
-#'   ns_call <- as.call(list(as.name("::"), as.name("list"), as.name("base")))
+#'   # Equivalent to
+#'   ns_call <- call("::", as.symbol("list"), as.symbol("base"))
 #'   as.call(list(ns_call, 1, 2))
 #'   ```
 #'
-#' * `call2()` has [tidy dots][list2] support and you can splice lists
-#'   of arguments with `!!!`. With base R, you need to use `as.call()`
-#'   instead of `call()` if the arguments are in a list.
+#' * `call2()` has [dynamic dots][list2] support. You can splice lists
+#'   of arguments with `!!!` or unquote an argument name with glue
+#'   syntax.
 #'
 #'   ```
 #'   args <- list(na.rm = TRUE, trim = 0)
 #'
 #'   call2("mean", 1:10, !!!args)
 #'
-#'   as.call(c(list(as.name("mean"), 1:10), args))
+#'   # Equivalent to
+#'   as.call(c(list(as.symbol("mean"), 1:10), args))
 #'   ```
 #'
 #'
@@ -95,9 +97,9 @@
 #' call2("[", quote(x), , drop = )
 #' @export
 call2 <- function(.fn, ..., .ns = NULL) {
-  .External2(rlang_ext2_call2, .fn, .ns)
+  .External2(ffi_call2, .fn, .ns)
 }
-#' Create pairlists with splicing support
+#' Collect dynamic dots in a pairlist
 #'
 #' This pairlist constructor uses [dynamic dots][dyn-dots]. Use
 #' it to manually create argument lists for calls or parameter lists
@@ -116,7 +118,7 @@ call2 <- function(.fn, ..., .ns = NULL) {
 #' # parameters without defaults:
 #' new_function(pairlist2(x = , y = 3 * 6), quote(x * y))
 pairlist2 <- function(...) {
-  .Call(rlang_dots_pairlist,
+  .Call(ffi_dots_pairlist,
     frame_env = environment(),
     named = FALSE,
     ignore_empty = "trailing",
@@ -172,17 +174,8 @@ is_callable <- function(x) {
 #' pattern-matching predicate that returns `FALSE` if `name` and `n`
 #' are supplied and the call does not match these properties.
 #'
-#'
-#' @section Life cycle:
-#'
-#' `is_lang()` has been soft-deprecated and renamed to `is_call()` in
-#' rlang 0.2.0 and similarly for `is_unary_lang()` and
-#' `is_binary_lang()`. This renaming follows the general switch from
-#' "language" to "call" in the rlang type nomenclature. See lifecycle
-#' section in [call2()].
-#'
-#' @param x An object to test. If a formula, the right-hand side is
-#'   extracted.
+#' @param x An object to test. Formulas and quosures are treated
+#'   literally.
 #' @param name An optional name that the call should match. It is
 #'   passed to [sym()] before matching. This argument is vectorised
 #'   and you can supply a vector of names to match. In this case,
@@ -350,9 +343,11 @@ is_call2 <- function(x, ...) {
 #' call_print_type(call)
 #' @noRd
 call_print_type <- function(call) {
-  type <- call_print_fine_type(call)
+  check_call(call)
 
-  switch(type,
+  type <- call_print_fine_type(call)
+  switch(
+    type,
     call = "prefix",
     control = ,
     delim = ,
@@ -361,16 +356,15 @@ call_print_type <- function(call) {
   )
 }
 call_print_fine_type <- function(call) {
-  if (!is_call(call)) {
-    abort("`call` must be a call")
-  }
+  check_call(call)
 
   op <- call_parse_type(call)
   if (op == "") {
     return("call")
   }
 
-  switch(op,
+  switch(
+    op,
     `+unary` = ,
     `-unary` = ,
     `~unary` = ,
@@ -430,11 +424,121 @@ call_print_fine_type <- function(call) {
   )
 }
 
+#' Is object a call to infix operator?
+#' @param x An object.
+#' @return `FALSE` if not a call or not a call to an infix
+#'   operator. `TRUE` otherwise.
+#' @noRd
+#' @examples
+#' is_call_infix(quote(-1))
+#' is_call_infix(quote(1 - 2))
+#' is_call_infix(quote(1 %-% 2))
+#' is_call_infix(quote(a@b))
+is_call_infix <- function(x) {
+  switch(
+    call_parse_type(x),
+    `<-` = ,
+    `<<-` = ,
+    `=` = ,
+    `::` = ,
+    `:::` = ,
+    `$` = ,
+    `@` = ,
+    `+` = ,
+    `-` = ,
+    `?` = ,
+    `~` = ,
+    `:=` = ,
+    `|` = ,
+    `||` = ,
+    `&` = ,
+    `&&` = ,
+    `>` = ,
+    `>=` = ,
+    `<` = ,
+    `<=` = ,
+    `==` = ,
+    `!=` = ,
+    `*` = ,
+    `/` = ,
+    `%%` = ,
+    `special` = ,
+    `:` = ,
+    `^` = TRUE,
+    FALSE
+  )
+}
+
+#' What is the parser type of a call?
+#' @return A string, one of:
+#' - `""`
+#' - `"break"`
+#' - `"next"`
+#' - `"while"`
+#' - `"for"`
+#' - `"repeat"`
+#' - `"if"`
+#' - `"function"`
+#' - `"?"`
+#' - `"?unary"`
+#' - `"<-"`
+#' - `"<<-"`
+#' - `"="`
+#' - `":="`
+#' - `"~"`
+#' - `"~unary"`
+#' - `"|"`
+#' - `"||"`
+#' - `"&"`
+#' - `"&&"`
+#' - `"!"`
+#' - `"!!!"`
+#' - `">"`
+#' - `">="`
+#' - `"<"`
+#' - `"<="`
+#' - `"=="`
+#' - `"!="`
+#' - `"+"`
+#' - `"-"`
+#' - `"*"`
+#' - `"/"`
+#' - `"%%"`
+#' - `"special"`
+#' - `":"`
+#' - `"!!"`
+#' - `"+unary"`
+#' - `"-unary"`
+#' - `"^"`
+#' - `"$"`
+#' - `"@"`
+#' - `"::"`
+#' - `":::"`
+#' - `"("`
+#' - `"["`
+#' - `"[["`
+#' - `"{"`
+#' @keywords internal
+#' @noRd
+call_parse_type <- function(call) {
+  .Call(ffi_which_operator, call)
+}
+call_has_precedence <- function(call, parent_call, side = NULL) {
+  side <- switch(
+    side %||% "none",
+    lhs = -1L,
+    none = 0L,
+    rhs = 1L,
+    abort("Unexpected `side` value in `call_has_precendence()`.")
+  )
+  .Call(ffi_call_has_precedence, call, parent_call, side)
+}
+
 
 #' Modify the arguments of a call
 #'
 #' If you are working with a user-supplied call, make sure the
-#' arguments are standardised with [call_standardise()] before
+#' arguments are standardised with [call_match()] before
 #' modifying the call.
 #'
 #' @inheritParams dots_list
@@ -444,16 +548,8 @@ call_print_fine_type <- function(call) {
 #' @param ... <[dynamic][dyn-dots]> Named or unnamed expressions
 #'   (constants, names or calls) used to modify the call. Use [zap()]
 #'   to remove arguments. Empty arguments are preserved.
-#' @param .standardise,.env Soft-deprecated as of rlang 0.3.0. Please
-#'   call [call_standardise()] manually.
-#'
-#' @section Life cycle:
-#'
-#' * The `.standardise` argument is deprecated as of rlang 0.3.0.
-#'
-#' * In rlang 0.2.0, `lang_modify()` was deprecated and renamed to
-#'   `call_modify()`. See lifecycle section in [call2()] for more about
-#'   this change.
+#' @param .standardise,.env Deprecated as of rlang 0.3.0. Please
+#'   call [call_match()] manually.
 #'
 #' @return A quosure if `.call` is a quosure, a call otherwise.
 #' @export
@@ -493,19 +589,15 @@ call_print_fine_type <- function(call) {
 #'
 #'
 #' # When you're working with a user-supplied call, standardise it
-#' # beforehand because it might contain unmatched arguments:
+#' # beforehand in case it includes unmatched arguments:
 #' user_call <- quote(matrix(x, nc = 3))
 #' call_modify(user_call, ncol = 1)
 #'
-#' # Standardising applies the usual argument matching rules:
-#' user_call <- call_standardise(user_call)
+#' # `call_match()` applies R's argument matching rules. Matching
+#' # ensures you're modifying the intended argument.
+#' user_call <- call_match(user_call, matrix)
 #' user_call
 #' call_modify(user_call, ncol = 1)
-#'
-#'
-#' # You can also modify quosures inplace:
-#' f <- quo(matrix(bar))
-#' call_modify(f, quote(foo))
 #'
 #'
 #' # By default, arguments with the same name are kept. This has
@@ -525,21 +617,9 @@ call_modify <- function(.call,
                         .standardise = NULL,
                         .env = caller_env()) {
   args <- dots_list(..., .preserve_empty = TRUE, .homonyms = .homonyms)
+
   expr <- get_expr(.call)
-
-  if (!is_null(.standardise)) {
-    warn_deprecated(paste_line(
-      "`.standardise` is deprecated as of rlang 0.3.0.",
-      "Please use `call_standardise()` prior to calling `call_modify()`."
-    ))
-    if (.standardise) {
-      expr <- get_expr(call_standardise(.call, env = .env))
-    }
-  }
-
-  if (!is_call(expr)) {
-    abort_call_input_type(".call")
-  }
+  check_call(expr, arg = ".call")
 
   expr <- duplicate(expr, shallow = TRUE)
 
@@ -614,116 +694,175 @@ call_modify <- function(.call,
   set_expr(.call, expr)
 }
 
-abort_call_input_type <- function(arg) {
-  abort(sprintf("`%s` must be a quoted call", arg))
+abort_call_input_type <- function(arg, call = caller_env()) {
+  abort(
+    sprintf("%s must be a quoted call.", format_arg(arg)),
+    call = call
+  )
+}
+abort_simple_call_input_type <- function(arg, fn, call = caller_env()) {
+  msg <- c(
+    sprintf("%s must be a simple call.", format_arg(arg)),
+    i = "Calls to `::` or `:::` are not simple calls.",
+    i = sprintf("See %s.", format_code("?is_call_simple"))
+  )
+  abort(msg, call = call)
 }
 
-#' Standardise a call
+#' Match supplied arguments to function definition
 #'
-#' This is essentially equivalent to [base::match.call()], but with
-#' experimental handling of primitive functions.
+#' @description
+#' `call_match()` is like [match.call()] with these differences:
 #'
+#' - It supports matching missing argument to their defaults in the
+#'   function definition.
 #'
-#' @section Life cycle:
+#' - It requires you to be a little more specific in some cases.
+#'   Either all arguments are inferred from the call stack or none of
+#'   them are (see the Inference section).
 #'
-#' In rlang 0.2.0, `lang_standardise()` was deprecated and renamed to
-#' `call_standardise()`. See lifecycle section in [call2()] for more
-#' about this change.
+#' @param call A call. The arguments will be matched to `fn`.
+#' @param fn A function definition to match arguments to.
+#' @param ... These dots must be empty.
+#' @param defaults Whether to match missing arguments to their
+#'   defaults.
+#' @param dots_env An execution environment where to find dots. If
+#'   supplied and dots exist in this environment, and if `call`
+#'   includes `...`, the forwarded dots are matched to numbered dots
+#'   (e.g. `..1`, `..2`, etc). By default this is set to the empty
+#'   environment which means that `...` expands to nothing.
+#' @param dots_expand If `FALSE`, arguments passed through `...` will
+#'   not be spliced into `call`. Instead, they are gathered in a
+#'   pairlist and assigned to an argument named `...`. Gathering dots
+#'   arguments is useful if you need to separate them from the other
+#'   named arguments.
 #'
-#' @param call Can be a call or a quosure that wraps a call.
-#' @param env The environment where to find the definition of the
-#'   function quoted in `call` in case `call` is not wrapped in a
-#'   quosure.
+#'   Note that the resulting call is not meant to be evaluated since R
+#'   does not support passing dots through a named argument, even if
+#'   named `"..."`.
 #'
-#' @return A quosure if `call` is a quosure, a raw call otherwise.
+#' @section Inference from the call stack:
+#' When `call` is not supplied, it is inferred from the call stack
+#' along with `fn` and `dots_env`.
+#'
+#' - `call` and `fn` are inferred from the calling environment:
+#'   `sys.call(sys.parent())` and `sys.function(sys.parent())`.
+#'
+#' - `dots_env` is inferred from the caller of the calling
+#'   environment: `caller_env(2)`.
+#'
+#' If `call` is supplied, then you must supply `fn` as well. Also
+#' consider supplying `dots_env` as it is set to the empty environment
+#' when not inferred.
+#'
+#' @examples
+#' # `call_match()` supports matching missing arguments to their
+#' # defaults
+#' fn <- function(x = "default") fn
+#' call_match(quote(fn()), fn)
+#' call_match(quote(fn()), fn, defaults = TRUE)
 #' @export
-call_standardise <- function(call, env = caller_env()) {
-  expr <- get_expr(call)
-  if (!is_call(expr)) {
-    abort_call_input_type("call")
+call_match <- function(call = NULL,
+                       fn = NULL,
+                       ...,
+                       defaults = FALSE,
+                       dots_env = NULL,
+                       dots_expand = TRUE) {
+  check_dots_empty0(...)
+
+  if (is_null(call)) {
+    call <- sys.call(sys.parent())
+    fn <- fn %||% sys.function(sys.parent())
+    dots_env <- dots_env %||% caller_env(2)
+  } else {
+    dots_env <- dots_env %||% empty_env()
   }
 
-  if (is_frame(call)) {
-    fn <- call$fn
-  } else {
-    # The call name might be a literal, not necessarily a symbol
-    env <- get_env(call, env)
-    fn <- eval_bare(node_car(expr), env)
+  if (is_null(fn)) {
+    abort("`fn` must be supplied.")
+  }
+  if (!is_environment(dots_env)) {
+    abort("`dots_env` must be an environment.")
   }
 
   if (is_primitive(fn)) {
-    call
-  } else {
-    matched <- match.call(fn, expr)
-    set_expr(call, matched)
-  }
-}
-
-#' Extract function from a call
-#'
-#' If a frame or formula, the function will be retrieved from the
-#' associated environment. Otherwise, it is looked up in the calling
-#' frame.
-#'
-#'
-#' @section Life cycle:
-#'
-#' In rlang 0.2.0, `lang_fn()` was deprecated and renamed to
-#' `call_fn()`. See lifecycle section in [call2()] for more about this
-#' change.
-#'
-#' @inheritParams call_standardise
-#' @export
-#' @seealso [call_name()]
-#' @examples
-#' # Extract from a quoted call:
-#' call_fn(quote(matrix()))
-#' call_fn(quo(matrix()))
-#'
-#' # Extract the calling function
-#' test <- function() call_fn(call_frame())
-#' test()
-call_fn <- function(call, env = caller_env()) {
-  if (is_frame(call)) {
-    return(call$fn)
+    return(call)
   }
 
-  expr <- get_expr(call)
-  env <- get_env(call, env)
+  # Don't expand dots before matching defaults to make it easier to
+  # sort the arguments by formals
+  call <- match.call(fn, call, expand.dots = FALSE, envir = dots_env)
 
-  if (!is_call(expr)) {
-    abort_call_input_type("call")
+  if (defaults) {
+    fmls <- fn_fmls(fn)
+    names <- names(fmls)
+    missing <- !names %in% names(call)
+
+    args <- c(as.list(call[-1]), fmls[missing])
+    args <- args[names]
+    call <- call2(call[[1]], !!!args)
   }
 
-  switch(call_type(expr),
-    recursive = abort("`call` does not call a named or inlined function"),
-    inlined = node_car(expr),
-    named = ,
-    namespaced = ,
-    eval_bare(node_car(expr), env)
-  )
+  if (is_missing(call$...)) {
+    call$... <- NULL
+    return(call)
+  }
+
+  if (!dots_expand) {
+    return(call)
+  }
+
+  i <- match("...", names(call))
+  if (is_na(i)) {
+    return(call)
+  }
+
+  call <- as.list(call)
+  as.call(c(
+    call[seq2(1, i - 1)],
+    call$...,
+    call[seq2(i + 1, length(call))]
+  ))
 }
 
 #' Extract function name or namespace of a call
 #'
-#' @section Life cycle:
+#' @description
+#' `call_name()` and `call_ns()` extract the function name or
+#' namespace of _simple_ calls as a string. They return `NULL` for
+#' complex calls.
 #'
-#' In rlang 0.2.0, `lang_name()` was deprecated and renamed to
-#' `call_name()`. See lifecycle section in [call2()] for more about
-#' this change.
+#' * Simple calls: `foo()`, `bar::foo()`.
+#' * Complex calls: `foo()()`, `bar::foo`, `foo$bar()`, `(function() NULL)()`.
 #'
-#' @inheritParams call_standardise
-#' @return A string with the function name, or `NULL` if the function
-#'   is anonymous.
-#' @seealso [call_fn()]
-#' @export
+#' The `is_call_simple()` predicate helps you determine whether a call
+#' is simple. There are two invariants you can count on:
+#'
+#' 1. If `is_call_simple(x)` returns `TRUE`, `call_name(x)` returns a
+#'    string. Otherwise it returns `NULL`.
+#'
+#' 2. If `is_call_simple(x, ns = TRUE)` returns `TRUE`, `call_ns()`
+#'    returns a string. Otherwise it returns `NULL`.
+#'
+#' @param call A defused call.
+#' @return The function name or namespace as a string, or `NULL` if
+#'   the call is not named or namespaced.
+#'
 #' @examples
+#' # Is the function named?
+#' is_call_simple(quote(foo()))
+#' is_call_simple(quote(foo[[1]]()))
+#'
+#' # Is the function namespaced?
+#' is_call_simple(quote(list()), ns = TRUE)
+#' is_call_simple(quote(base::list()), ns = TRUE)
+#'
 #' # Extract the function name from quoted calls:
 #' call_name(quote(foo(bar)))
 #' call_name(quo(foo(bar)))
 #'
 #' # Namespaced calls are correctly handled:
-#' call_name(~base::matrix(baz))
+#' call_name(quote(base::matrix(baz)))
 #'
 #' # Anonymous and subsetted functions return NULL:
 #' call_name(quote(foo$bar()))
@@ -735,16 +874,17 @@ call_fn <- function(call, env = caller_env()) {
 #'
 #' # If not namespaced, call_ns() returns NULL:
 #' call_ns(quote(bar()))
+#' @export
 call_name <- function(call) {
+  check_required(call)
+
   if (is_quosure(call) || is_formula(call)) {
     call <- get_expr(call)
   }
+  check_call(call)
 
-  # FIXME: Disabled for the 0.3.1 release
-  # if (!is_call(call) || is_call(call, c("::", ":::"))) {
-
-  if (!is_call(call)) {
-    abort_call_input_type("call")
+  if (is_call(call, c("::", ":::"))) {
+    return(NULL)
   }
 
   switch(call_type(call),
@@ -756,34 +896,62 @@ call_name <- function(call) {
 #' @rdname call_name
 #' @export
 call_ns <- function(call) {
+  check_required(call)
+
   if (is_quosure(call) || is_formula(call)) {
     call <- get_expr(call)
   }
+  check_call(call)
 
   if (!is_call(call)) {
     abort_call_input_type("call")
   }
 
-  head <- node_car(call)
+  head <- call[[1]]
   if (is_call(head, c("::", ":::"))) {
-    as_string(node_cadr(head))
+    as_string(head[[2]])
   } else {
     NULL
   }
 }
+#' @rdname call_name
+#' @param x An object to test.
+#' @param ns Whether call is namespaced. If `NULL`, `is_call_simple()`
+#'   is insensitive to namespaces. If `TRUE`, `is_call_simple()`
+#'   detects namespaced calls. If `FALSE`, it detects unnamespaced
+#'   calls.
+#' @export
+is_call_simple <- function(x, ns = NULL) {
+  check_required(x)
+
+  # For compatibility with `call_name()` and `call_ns()`
+  if (is_quosure(x) || is_formula(x)) {
+    x <- get_expr(x)
+  }
+
+  if (!is_call(maybe_missing(x))) {
+    return(FALSE)
+  }
+
+  if (is_call(x, c("::", ":::"))) {
+    return(FALSE)
+  }
+
+  head <- x[[1]]
+  namespaced <- is_call(head, c("::", ":::"))
+
+  if (!is_null(ns) && !identical(namespaced, ns)) {
+    return(FALSE)
+  }
+
+  namespaced || is_symbol(head)
+}
 
 #' Extract arguments from a call
 #'
-#' @section Life cycle:
-#'
-#' In rlang 0.2.0, `lang_args()` and `lang_args_names()` were
-#' deprecated and renamed to `call_args()` and `call_args_names()`.
-#' See lifecycle section in [call2()] for more about this change.
-#'
-#' @inheritParams call_standardise
+#' @inheritParams call_name
 #' @return A named list of arguments.
 #' @seealso [fn_fmls()] and [fn_fmls_names()]
-#' @export
 #' @examples
 #' call <- quote(f(a, b))
 #'
@@ -798,11 +966,14 @@ call_ns <- function(call) {
 #' # When the arguments are unnamed, a vector of empty strings is
 #' # supplied (rather than NULL):
 #' call_args_names(call)
+#' @export
 call_args <- function(call) {
-  call <- get_expr(call)
-  if (!is_call(call)) {
-    abort_call_input_type("call")
+  check_required(call)
+
+  if (is_quosure(call) || is_formula(call)) {
+    call <- get_expr(call)
   }
+  check_call(call)
 
   args <- as.list(call[-1])
   set_names((args), names2(args))
@@ -810,10 +981,13 @@ call_args <- function(call) {
 #' @rdname call_args
 #' @export
 call_args_names <- function(call) {
-  call <- get_expr(call)
-  if (!is_call(call)) {
-    abort_call_input_type("call")
+  check_required(call)
+
+  if (is_quosure(call) || is_formula(call)) {
+    call <- get_expr(call)
   }
+  check_call(call)
+
   names2(call[-1])
 }
 
@@ -864,16 +1038,6 @@ is_namespaced_symbol <- function(x, ns = NULL, private = NULL) {
   }
 }
 
-#' What is the parser type of a call?
-#' @keywords internal
-#' @export
-call_parse_type <- function(call) {
-  .Call(rlang_which_operator, call)
-}
-call_has_precedence <- function(call, parent_call, side = NULL) {
-  .Call(rlang_call_has_precedence, call, parent_call, side)
-}
-
 call_type <- function(x) {
   x <- get_expr(x)
   stopifnot(typeof(x) == "language")
@@ -889,5 +1053,26 @@ call_type <- function(x) {
     "inlined"
   } else {
     abort("corrupt language object")
+  }
+}
+
+call_zap_inline <- function(x) {
+  if (is_call(x)) {
+    if (is_call(x, "function")) {
+      if (!is_null(x[[2]])) {
+        x[[2]] <- as.pairlist(map(x[[2]], call_zap_inline))
+      }
+      x[[3]] <- call_zap_inline(x[[3]])
+    } else {
+      x[] <- map(x, call_zap_inline)
+    }
+    return(x)
+  }
+
+  if (is_symbol(x) || is_syntactic_literal(x)) {
+    x
+  } else {
+    name <- sprintf("<%s>", rlang_type_sum(x))
+    sym(name)
   }
 }

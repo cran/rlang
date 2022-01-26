@@ -1,60 +1,50 @@
-test_that("with_abort() promotes base errors to rlang errors", {
-  f <- function() g()
-  g <- function() h()
-  h <- function() stop("Low-level message")
-
-  a <- function() b()
-  b <- function() c()
-  c <- function() {
-    tryCatch(
-      with_abort(f()),
-      error = function(err) {
-        abort("High-level message", parent = err)
-      }
-    )
-  }
-
-  local_options(
-    rlang_trace_format_srcrefs = FALSE,
-    rlang_trace_top_env = current_env()
-  )
-  err <- identity(catch_cnd(a()))
-
-  expect_snapshot({
-    print(err)
-
-    summary(err)
-  })
-})
-
-test_that("with_abort() entraces conditions properly", {
-  catch_abort <- function(signaller, arg, classes = "error") {
+test_that("cnd_entrace() entraces conditions properly", {
+  with_cnd_entrace <- function(signaller, catcher, arg, classes = "error") {
     f <- function() g()
     g <- function() h()
     h <- function() signaller(arg)
 
-    catch_cnd(with_abort(f(), classes = classes))
+    handlers <- rep_named(classes, alist(function(cnd) {
+      cnd <- cnd_entrace(cnd)
+      cnd_signal(cnd)
+    }))
+    env_bind_lazy(current_env(), do = catcher(withCallingHandlers(f(), !!!handlers)))
+
+    do
   }
 
-  expect_abort_trace <- function(signaller,
-                                 arg,
-                                 native = NULL,
-                                 classes = "error") {
-    err <- catch_abort(signaller, arg, classes = classes)
-    expect_s3_class(err, "rlang_error")
+  expect_cnd_trace <- function(signaller,
+                               catcher,
+                               arg,
+                               native = NULL,
+                               classes = "error",
+                               abort = FALSE) {
+    err <- with_cnd_entrace(signaller, catcher, arg, classes = classes)
 
     trace <- err$trace
     n <- trace_length(err$trace)
 
-    if (is_null(native)) {
-      calls <- trace$calls[seq2(n - 2, n)]
+    if (is_null(trace)) {
+      abort("Expected trace, got NULL.")
+    }
+
+    if (abort) {
+      calls <- trace$call[seq2(n - 3, n)]
+      expect_true(all(
+        is_call(calls[[1]], "f"),
+        is_call(calls[[2]], "g"),
+        is_call(calls[[3]], "h"),
+        is_call(calls[[4]], "signaller")
+      ))
+    } else if (is_null(native)) {
+      calls <- trace$call[seq2(n - 2, n)]
       expect_true(all(
         is_call(calls[[1]], "f"),
         is_call(calls[[2]], "g"),
         is_call(calls[[3]], "h")
       ))
     } else {
-      calls <- trace$calls[seq2(n - 4, n)]
+      calls <- trace$call[seq2(n - 4, n)]
       expect_true(all(
         is_call(calls[[1]], "f"),
         is_call(calls[[2]], "g"),
@@ -69,27 +59,24 @@ test_that("with_abort() entraces conditions properly", {
     rlang_trace_top_env = current_env()
   )
 
-  msg <- catch_abort(base::message, "")
-  expect_true(inherits_all(msg, c("message", "condition")))
+  with_cnd_entrace(base::message, catch_message, "")
+  with_cnd_entrace(base::message, catch_error, "", classes = "message")
 
-  err <- catch_abort(base::message, "", classes = "message")
-  expect_s3_class(err, "rlang_error")
+  expect_cnd_trace(base::stop, catch_error, "")
+  expect_cnd_trace(base::stop, catch_error, cnd("error"))
+  expect_cnd_trace(function(msg) errorcall(NULL, msg), catch_error, "", "errorcall")
+  expect_cnd_trace(abort, catch_error, "", abort = TRUE)
 
-  expect_abort_trace(base::stop, "")
-  expect_abort_trace(base::stop, cnd("error"))
-  expect_abort_trace(function(msg) errorcall(NULL, msg), "", "errorcall")
-  expect_abort_trace(abort, "")
+  expect_cnd_trace(base::warning, catch_warning, "", classes = "warning")
+  expect_cnd_trace(base::warning, catch_warning, cnd("warning"), classes = "warning")
+  expect_cnd_trace(function(msg) warningcall(NULL, msg), catch_warning, "", "warningcall", classes = "warning")
+  expect_cnd_trace(warn, catch_warning, "", classes = "warning")
 
-  expect_abort_trace(base::warning, "", classes = "warning")
-  expect_abort_trace(base::warning, cnd("warning"), classes = "warning")
-  expect_abort_trace(function(msg) warningcall(NULL, msg), "", "warningcall", classes = "warning")
-  expect_abort_trace(warn, "", classes = "warning")
+  expect_cnd_trace(base::message, catch_message, "", classes = "message")
+  expect_cnd_trace(base::message, catch_message, cnd("message"), classes = "message")
+  expect_cnd_trace(inform, catch_message, "", classes = "message")
 
-  expect_abort_trace(base::message, "", classes = "message")
-  expect_abort_trace(base::message, cnd("message"), classes = "message")
-  expect_abort_trace(inform, "", classes = "message")
-
-  expect_abort_trace(base::signalCondition, cnd("foo"), classes = "condition")
+  expect_cnd_trace(base::signalCondition, catch_cnd, cnd("foo"), classes = "condition")
 })
 
 test_that("signal context is detected", {
@@ -99,31 +86,34 @@ test_that("signal context is detected", {
     info <- list(out[[1]], sys.call(out[[2]]))
     invokeRestart("out", info)
   }
-  signal_info <- function(signaller, arg) {
+  signal_info <- function(class, signaller, arg) {
     f <- function() signaller(arg)
-    withRestarts(
-      out = identity,
-      withCallingHandlers(condition = get_signal_info, f())
+    hnd <- set_names(list(get_signal_info), class)
+    inject(
+      withRestarts(
+        out = identity,
+        withCallingHandlers(!!!hnd, f())
+      )
     )
   }
 
-  expect_equal(signal_info(base::stop, ""), list("stop_message", quote(f())))
-  expect_equal(signal_info(base::stop, cnd("error")), list("stop_condition", quote(f())))
-  expect_equal(signal_info(function(msg) errorcall(NULL, msg), ""), list("stop_native", quote(errorcall(NULL, msg))))
+  expect_equal(signal_info("error", base::stop, ""), list("stop_message", quote(f())))
+  expect_equal(signal_info("error", base::stop, cnd("error")), list("stop_condition", quote(f())))
+  expect_equal(signal_info("error", function(msg) errorcall(NULL, msg), ""), list("stop_native", quote(errorcall(NULL, msg))))
 
   # No longer works since we switched to signalCondition approach
   # expect_equal(signal_info(abort, "")[[1]], "stop_rlang")
 
-  expect_equal(signal_info(base::warning, ""), list("warning_message", quote(f())))
-  expect_equal(signal_info(base::warning, cnd("warning")), list("warning_condition", quote(f())))
-  expect_equal(signal_info(function(msg) warningcall(NULL, msg), ""), list("warning_native", quote(warningcall(NULL, msg))))
-  expect_equal(signal_info(warn, "")[[1]], "warning_rlang")
+  expect_equal(signal_info("warning", base::warning, ""), list("warning_message", quote(f())))
+  expect_equal(signal_info("warning", base::warning, cnd("warning")), list("warning_condition", quote(f())))
+  expect_equal(signal_info("warning", function(msg) warningcall(NULL, msg), ""), list("warning_native", quote(warningcall(NULL, msg))))
+  expect_equal(signal_info("warning", warn, "")[[1]], "warning_rlang")
 
-  expect_equal(signal_info(base::message, ""), list("message", quote(f())))
-  expect_equal(signal_info(base::message, cnd("message")), list("message", quote(f())))
-  expect_equal(signal_info(inform, "")[[1]], "message_rlang")
+  expect_equal(signal_info("message", base::message, ""), list("message", quote(f())))
+  expect_equal(signal_info("message", base::message, cnd("message")), list("message", quote(f())))
+  expect_equal(signal_info("message", inform, "")[[1]], "message_rlang")
 
-  expect_equal(signal_info(base::signalCondition, cnd("foo")), list("condition", quote(f())))
+  expect_equal(signal_info("condition", base::signalCondition, cnd("foo")), list("condition", quote(f())))
 
   # Warnings won't be promoted if `condition` is handled. We need to
   # handle `error` instead.
@@ -155,7 +145,7 @@ test_that("cnd_entrace() skips capture context", {
   local_options(rlang_trace_top_env = current_env())
   err <- capture(foo())
 
-  last <- err$trace$calls[[4]]
+  last <- err$trace$call[[4]]
   expect_match(deparse(last), "bar")
 })
 
@@ -182,8 +172,7 @@ test_that("entrace() preserves exit status in non-interactive sessions (#1052, r
   out <- Rscript(shQuote(c("--vanilla", "-e", 'options(error = rlang::entrace); stop("An error")')))
   expect_false(out$status == 0L)
 
-  code <- '
-  {
+  code <- '{
     options(error = rlang::entrace)
     f <- function() g()
     g <- function() h()
@@ -192,4 +181,120 @@ test_that("entrace() preserves exit status in non-interactive sessions (#1052, r
   }'
   out <- Rscript(shQuote(c("--vanilla", "-e", code)))
   expect_false(out$status == 0L)
+})
+
+test_that("entrace() doesn't embed backtraces twice", {
+  skip_if_stale_backtrace()
+
+  code <- "withCallingHandlers(error = rlang::entrace, rlang::abort('foo'))"
+  out <- Rscript(shQuote(c("--vanilla", "-e", code)))$out
+
+  expect_equal(sum(grepl("^Backtrace", out)), 1)
+})
+
+test_that("`options(error = entrace)` strips error prefix", {
+  code <- '
+  {
+    options(error = rlang::entrace)
+    f <- function() g()
+    g <- function() h()
+    h <- function() 1 + ""
+    f()
+    last_error()
+  }'
+  out <- Rscript(shQuote(c("--vanilla", "-e", code)))
+
+  expect_false(out$status == 0L)
+})
+
+test_that("can supply handler environment as `bottom`", {
+  local_options(
+    rlang_trace_format_srcrefs = FALSE,
+    rlang_trace_top_env = current_env()
+  )
+
+  f <- function() g()
+  g <- function() h()
+  h <- function() identity(1 + "")
+
+  err <- catch_cnd(
+    withCallingHandlers(
+      error = function(...) rlang::entrace(..., bottom = environment()),
+      f()
+    ),
+    "error"
+  )
+  expect_snapshot(print(err))
+})
+
+test_that("can set `entrace()` as a global handler", {
+  skip_if_not_installed("base", "4.0")
+
+  expect_snapshot_output(run('{
+    suppressMessages(testthat::local_reproducible_output())
+    rlang::global_entrace()
+    f <- function() g()
+    g <- function() h()
+    h <- function() 1 + ""
+    f()
+  }'))
+
+  # Indirected case for developers of rlang
+  expect_snapshot_output(run('{
+    suppressMessages(testthat::local_reproducible_output())
+    globalCallingHandlers(error = function(...) rlang::entrace(..., bottom = environment()))
+    f <- function() g()
+    g <- function() h()
+    h <- function() 1 + ""
+    f()
+  }'))
+
+  expect_snapshot_output(run('{
+    suppressMessages(testthat::local_reproducible_output())
+    rlang::global_entrace()
+    f <- function() { warning("foo"); message("FOO"); g() }
+    g <- function() { warning("bar", immediate. = TRUE); h() }
+    h <- function() message("baz")
+    f()
+    writeLines("> rlang::last_warnings()")
+    print(rlang::last_warnings())
+
+    writeLines("\\n> rlang::last_warnings(2)")
+    print(rlang::last_warnings(2))
+
+    writeLines("\\n> summary(rlang::last_messages())")
+    summary(rlang::last_messages())
+
+    writeLines("\\n> summary(rlang::last_messages(1))")
+    summary(rlang::last_messages(1))
+  }'))
+})
+
+test_that("can set `entrace()` as a global handler (older R)", {
+  skip_if(getRversion() >= "4.0", )
+
+  expect_snapshot_output(run('{
+    suppressMessages(testthat::local_reproducible_output())
+    rlang::global_entrace()
+    f <- function() g()
+    g <- function() h()
+    h <- function() 1 + ""
+    f()
+  }'))
+})
+
+test_that("errors are saved by `entrace()`", {
+  out <- tryCatch(
+    withCallingHandlers(
+      abort("foo"),
+      error = entrace
+    ),
+    error = identity
+  )
+
+  # Remove internal data stored by `last_error()`
+  err <- last_error()
+  err$rlang <- NULL
+
+  expect_equal(err, out)
 })

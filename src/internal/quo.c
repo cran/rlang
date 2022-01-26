@@ -1,53 +1,55 @@
 #include <rlang.h>
 
-static const char* quo_tags[3] = { "quosure", "formula", NULL };
+static
+const char* quo_tags[2] = { "quosure", "formula" };
 
-sexp* new_raw_formula(sexp* lhs, sexp* rhs, sexp* env);
+r_obj* new_raw_formula(r_obj* lhs, r_obj* rhs, r_obj* env);
 
-sexp* rlang_new_quosure(sexp* expr, sexp* env) {
-  if (r_typeof(env) != r_type_environment) {
+r_obj* ffi_new_quosure(r_obj* expr, r_obj* env) {
+  if (r_typeof(env) != R_TYPE_environment) {
     r_abort("`env` must be an environment");
   }
-  sexp* quo = KEEP(new_raw_formula(r_null, expr, env));
-  r_push_classes(quo, quo_tags);
+  r_obj* quo = KEEP(new_raw_formula(r_null, expr, env));
+  r_attrib_push_classes(quo, quo_tags, R_ARR_SIZEOF(quo_tags));
   FREE(1);
   return quo;
 }
-bool rlang_is_quosure(sexp* x) {
-  return r_typeof(x) == r_type_call && Rf_inherits(x, "quosure");
+bool is_quosure(r_obj* x) {
+  return r_typeof(x) == R_TYPE_call && r_inherits(x, "quosure");
 }
 
-inline void check_quosure(sexp* quo) {
-  if (!rlang_is_quosure(quo)) {
+inline void check_quosure(r_obj* quo) {
+  if (!is_quosure(quo)) {
     r_abort("`quo` must be a quosure");
   }
 }
-sexp* rlang_quo_get_expr(sexp* quo) {
+r_obj* ffi_quo_get_expr(r_obj* quo) {
   check_quosure(quo);
   return r_node_cadr(quo);
 }
-sexp* rlang_quo_set_expr(sexp* quo, sexp* expr) {
+r_obj* ffi_quo_set_expr(r_obj* quo, r_obj* expr) {
   check_quosure(quo);
   quo = r_clone(quo);
-  return r_node_poke_cadr(quo, expr);
+  r_node_poke_cadr(quo, expr);
+  return quo;
 }
 
-sexp* rlang_quo_get_env(sexp* quo) {
+r_obj* ffi_quo_get_env(r_obj* quo) {
   check_quosure(quo);
-  return r_attrib_get(quo, r_syms_dot_environment);
+  return r_attrib_get(quo, r_syms.dot_environment);
 }
-sexp* rlang_quo_set_env(sexp* quo, sexp* env) {
+r_obj* ffi_quo_set_env(r_obj* quo, r_obj* env) {
   check_quosure(quo);
-  if (r_typeof(env) != r_type_environment) {
+  if (r_typeof(env) != R_TYPE_environment) {
     r_abort("`env` must be an environment");
   }
-  return r_attrib_set(quo, r_syms_dot_environment, env);
+  return r_attrib_set(quo, r_syms.dot_environment, env);
 }
 
-sexp* rlang_get_expression(sexp* x, sexp* alternate) {
+r_obj* ffi_get_expression(r_obj* x, r_obj* alternate) {
   switch (r_typeof(x)) {
   case LANGSXP:
-    if (r_is_formulaish(x, -1, 0)) {
+    if (r_is_formula(x, -1, 0)) {
       return r_f_rhs(x);
     }
     break;
@@ -69,18 +71,18 @@ sexp* rlang_get_expression(sexp* x, sexp* alternate) {
   }
 }
 
-bool quo_is_missing(sexp* quo) {
+bool quo_is_missing(r_obj* quo) {
   return r_node_cadr(quo) == R_MissingArg;
 }
-bool quo_is_symbol(sexp* quo) {
-  return r_typeof(r_node_cadr(quo)) == r_type_symbol;
+bool quo_is_symbol(r_obj* quo) {
+  return r_typeof(r_node_cadr(quo)) == R_TYPE_symbol;
 }
-bool quo_is_call(sexp* quo) {
-  return r_typeof(r_node_cadr(quo)) == r_type_call;
+bool quo_is_call(r_obj* quo) {
+  return r_typeof(r_node_cadr(quo)) == R_TYPE_call;
 }
-bool quo_is_symbolic(sexp* quo) {
+bool quo_is_symbolic(r_obj* quo) {
   return r_is_symbolic(r_node_cadr(quo));
 }
-bool quo_is_null(sexp* quo) {
+bool quo_is_null(r_obj* quo) {
   return r_node_cadr(quo) == r_null;
 }

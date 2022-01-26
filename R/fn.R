@@ -2,8 +2,6 @@
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
-#'
 #' This constructs a new function given its three components:
 #' list of arguments, body code and parent environment.
 #'
@@ -37,7 +35,7 @@
 #' new_function(pairlist2(x = , y = 5 + 5), quote(x + y))
 #' new_function(exprs(x = , y = 5 + 5), quote(x + y))
 new_function <- function(args, body, env = caller_env()) {
-  .Call(rlang_new_function, args, body, env)
+  .Call(ffi_new_function, args, body, env)
 }
 
 prim_eval <- eval(quote(sys.function(0)))
@@ -70,7 +68,7 @@ prim_name <- function(prim) {
 #' Unlike `formals()`, these helpers throw an error with primitive
 #' functions instead of returning `NULL`.
 #'
-#' @param fn A function. It is lookep up in the calling frame if not
+#' @param fn A function. It is looked up in the calling frame if not
 #'   supplied.
 #' @seealso [call_args()] and [call_args_names()]
 #' @export
@@ -141,12 +139,6 @@ fn_fmls_syms <- function(fn = caller_fn()) {
   fn
 }
 
-check_closure <- function(x) {
-  if (!is_closure(x)) {
-    abort(sprintf("`fn` must be an R function, not %s", friendly_type_of(x)))
-  }
-}
-
 #' Get or set function body
 #'
 #' `fn_body()` is a simple wrapper around [base::body()]. It always
@@ -166,9 +158,7 @@ check_closure <- function(x) {
 #' # It also throws an error when used on a primitive function:
 #' try(fn_body(base::list))
 fn_body <- function(fn = caller_fn()) {
-  if(!is_closure(fn)) {
-    abort("`fn` is not a closure")
-  }
+  check_closure(fn)
 
   body <- body(fn)
 
@@ -215,9 +205,9 @@ fn_body_node <- function(fn) {
 #' environment. When closures are evaluated, a new environment called
 #' the evaluation frame is created with the closure environment as
 #' parent. This is where the body of the closure is evaluated. These
-#' closure frames appear on the evaluation stack (see [ctxt_stack()]),
-#' as opposed to primitive functions which do not necessarily have
-#' their own evaluation frame and never appear on the stack.
+#' closure frames appear on the evaluation stack, as opposed to
+#' primitive functions which do not necessarily have their own
+#' evaluation frame and never appear on the stack.
 #'
 #' Primitive functions are more efficient than closures for two
 #' reasons. First, they are written entirely in fast low-level
@@ -269,28 +259,20 @@ fn_body_node <- function(fn) {
 #' # Both closures and primitives are functions:
 #' is_function(base::c)
 #' is_function(base::eval)
-#'
-#' # Primitive functions never appear in evaluation stacks:
-#' is_primitive(base::`[[`)
-#' is_primitive(base::list)
-#' list(ctxt_stack())[[1]]
-#'
-#' # While closures do:
-#' identity(identity(ctxt_stack()))
 is_function <- function(x) {
-  .Call(rlang_is_function, x)
+  .Call(ffi_is_function, x)
 }
 
 #' @export
 #' @rdname is_function
 is_closure <- function(x) {
-  .Call(rlang_is_closure, x)
+  .Call(ffi_is_closure, x)
 }
 
 #' @export
 #' @rdname is_function
 is_primitive <- function(x) {
-  .Call(rlang_is_primitive, x)
+  .Call(ffi_is_primitive, x)
 }
 #' @export
 #' @rdname is_function
@@ -301,7 +283,7 @@ is_primitive <- function(x) {
 #' is_primitive_eager(base::list)
 #' is_primitive_eager(base::`+`)
 is_primitive_eager <- function(x) {
-  .Call(rlang_is_primitive_eager, x)
+  .Call(ffi_is_primitive_eager, x)
 }
 #' @export
 #' @rdname is_function
@@ -312,7 +294,7 @@ is_primitive_eager <- function(x) {
 #' is_primitive_lazy(base::quote)
 #' is_primitive_lazy(base::substitute)
 is_primitive_lazy <- function(x) {
-  .Call(rlang_is_primitive_lazy, x)
+  .Call(ffi_is_primitive_lazy, x)
 }
 
 
@@ -320,9 +302,9 @@ is_primitive_lazy <- function(x) {
 #'
 #' Closure environments define the scope of functions (see [env()]).
 #' When a function call is evaluated, R creates an evaluation frame
-#' (see [ctxt_stack()]) that inherits from the closure environment.
-#' This makes all objects defined in the closure environment and all
-#' its parents available to code executed within the function.
+#' that inherits from the closure environment. This makes all objects
+#' defined in the closure environment and all its parents available to
+#' code executed within the function.
 #'
 #' `fn_env()` returns the closure environment of `fn`. There is also
 #' an assignment method to set a new closure environment.
@@ -347,34 +329,22 @@ fn_env <- function(fn) {
     return(environment(fn))
   }
 
-  abort("`fn` is not a function")
+  check_function(fn)
 }
 
 #' @export
 #' @rdname fn_env
 `fn_env<-` <- function(x, value) {
-  if(!is_function(x)) {
-    abort("`fn` is not a function")
-  }
+  check_function(x)
   environment(x) <- value
   x
 }
 
-
-#' Convert to function or closure
+#' Convert to function
 #'
 #' @description
-#'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
-#'
-#' * `as_function()` transforms a one-sided formula into a function.
-#'   This powers the lambda syntax in packages like purrr.
-#'
-#' * `as_closure()` first passes its argument to `as_function()`. If
-#'   the result is a primitive function, it regularises it to a proper
-#'   [closure] (see [is_function()] about primitive functions). Some
-#'   special control flow primitives like `if`, `for`, or `break`
-#'   can't be coerced to a closure.
+#' `as_function()` transforms a one-sided formula into a function.
+#' This powers the lambda syntax in packages like purrr.
 #'
 #' @param x A function or formula.
 #'
@@ -387,11 +357,15 @@ fn_env <- function(fn) {
 #'   to two inputs. Functions created from formulas have a special
 #'   class. Use `is_lambda()` to test for it.
 #'
-#'   Lambdas currently do not support [nse-force],
-#'   due to the way the arguments are handled internally.
+#'   If a **string**, the function is looked up in `env`. Note that
+#'   this interface is strictly for user convenience because of the
+#'   scoping issues involved. Package developers should avoid
+#'   supplying functions by name and instead supply them by value.
 #'
 #' @param env Environment in which to fetch the function in case `x`
 #'   is a string.
+#' @inheritParams args_dots_empty
+#' @inheritParams args_error_context
 #' @export
 #' @examples
 #' f <- as_function(~ .x + 1)
@@ -406,25 +380,14 @@ fn_env <- function(fn) {
 #' # Functions created from a formula have a special class:
 #' is_lambda(f)
 #' is_lambda(as_function(function() "foo"))
-#'
-#' # Primitive functions are regularised as closures
-#' as_closure(list)
-#' as_closure("list")
-#'
-#' # Operators have `.x` and `.y` as arguments, just like lambda
-#' # functions created with the formula syntax:
-#' as_closure(`+`)
-#' as_closure(`~`)
-#'
-#' # Use a regular function for tidy evaluation, also when calling functions
-#' # that use tidy evaluation:
-#' ## Bad:
-#' e <- as_function(~ as_label(ensym(.x)))
-#' ## Good:
-#' e <- as_function(function(x) as_label(ensym(x)))
-#'
-#' e(y)
-as_function <- function(x, env = caller_env()) {
+as_function <- function(x,
+                        env = global_env(),
+                        ...,
+                        arg = caller_arg(x),
+                        call = caller_env()) {
+  check_dots_empty0(...)
+  local_error_call(call)
+
   if (is_function(x)) {
     return(x)
   }
@@ -437,15 +400,17 @@ as_function <- function(x, env = caller_env()) {
 
   if (is_formula(x)) {
     if (length(x) > 2) {
-      abort("Can't convert a two-sided formula to a function")
+      abort_coercion(
+        x,
+        x_type = "a two-sided formula",
+        to_type = "a function",
+        arg = arg
+      )
     }
 
     env <- f_env(x)
     if (!is_environment(env)) {
-      abort(c(
-        "Can't transform defused formula to a function.",
-        i = "A defused formula doesn't carry an environment."
-      ))
+      abort("Formula must carry an environment.")
     }
 
     args <- list(... = missing_arg(), .x = quote(..1), .y = quote(..2), . = quote(..1))
@@ -458,7 +423,7 @@ as_function <- function(x, env = caller_env()) {
     return(get(x, envir = env, mode = "function"))
   }
 
-  abort_coercion(x, friendly_type("function"))
+  abort_coercion(x, "a function", arg = arg)
 }
 #' @export
 print.rlang_lambda_function <- function(x, ...) {
@@ -471,7 +436,26 @@ is_lambda <- function(x) {
   inherits(x, "rlang_lambda_function")
 }
 
-#' @rdname as_function
+#' Transform to a closure
+#'
+#' `as_closure()` is like [as_function()] but also wraps primitive
+#' functions inside closures. Some special control flow primitives
+#' like `if`, `for`, or `break` can't be wrapped and will cause an
+#' error.
+#'
+#' @inheritParams as_function
+#'
+#' @examples
+#' # Primitive functions are regularised as closures
+#' as_closure(list)
+#' as_closure("list")
+#'
+#' # Operators have `.x` and `.y` as arguments, just like lambda
+#' # functions created with the formula syntax:
+#' as_closure(`+`)
+#' as_closure(`~`)
+#'
+#' @keywords internal
 #' @export
 as_closure <- function(x, env = caller_env()) {
   x <- as_function(x, env = env)
@@ -537,7 +521,7 @@ op_as_closure <- function(prim_nm) {
       args <- exprs(...)
       n <- length(args)
       if (n < 2L) {
-        abort("Must supply operands to `[<-`")
+        abort("Must supply operands to `[<-`.")
       }
       expr <- expr((!!enexpr(.x))[!!!args[-n]] <- !!args[[n]])
       eval_bare(expr, caller_env())
@@ -595,7 +579,7 @@ op_as_closure <- function(prim_nm) {
     `return` = ,
     `while` = {
       nm <- chr_quoted(prim_nm)
-      abort(paste0("Can't coerce the primitive function ", nm, " to a closure"))
+      abort(paste0("Can't coerce the primitive function ", nm, " to a closure."))
     }
   )
 }
@@ -631,21 +615,21 @@ binary_check_nodes <- pairlist(
   quote(
     if (missing(.x)) {
       if (missing(e1)) {
-        abort("Must supply `e1` or `.x` to binary operator")
+        abort("Must supply `e1` or `.x` to binary operator.")
       }
       .x <- e1
     } else if (!missing(e1)) {
-      abort("Can't supply both `e1` and `.x` to binary operator")
+      abort("Can't supply both `e1` and `.x` to binary operator.")
     }
   ),
   quote(
     if (missing(.y)) {
       if (missing(e2)) {
-        abort("Must supply `e2` or `.y` to binary operator")
+        abort("Must supply `e2` or `.y` to binary operator.")
       }
       .y <- e2
     } else if (!missing(e2)) {
-      abort("Can't supply both `e2` and `.y` to binary operator")
+      abort("Can't supply both `e2` and `.y` to binary operator.")
     }
   )
 )
@@ -655,7 +639,7 @@ versatile_check_nodes <- as.pairlist(c(
     if (missing(.y) && !missing(e2)) {
       .y <- e2
     } else if (!missing(e2)) {
-      abort("Can't supply both `e2` and `.y` to binary operator")
+      abort("Can't supply both `e2` and `.y` to binary operator.")
     }
   )
 ))
@@ -664,41 +648,6 @@ shortcircuiting_check_nodes <- as.pairlist(c(
   quote(if (.x) return(TRUE)),
   binary_check_nodes[[2]]
 ))
-
-#' Make an `fn` object
-#'
-#' @noRd
-#' @description
-#'
-#' `new_fn()` takes a function and sets the class to `c("fn",
-#' function)`.
-#'
-#' * Inheriting from `"fn"` enables a print method that strips all
-#'   attributes (except `srcref`) before printing. This is currently
-#'   the only purpose of the `fn` class.
-#'
-#' * Inheriting from `"function"` makes sure your function still
-#'   dispatches on type methods.
-#'
-#' @param fn A closure.
-#' @return An object of class `c("fn", "function")`.
-#' @examples
-#' fn <- structure(function() "foo", attribute = "foobar")
-#' print(fn)
-#'
-#' # The `fn` object doesn't print with attributes:
-#' fn <- new_fn(fn)
-#' print(fn)
-new_fn <- function(fn) {
-  stopifnot(is_closure(fn))
-  structure(fn, class = c("fn", "function"))
-}
-print.fn <- function(x, ...) {
-  srcref <- attr(x, "srcref")
-  attributes(x) <- NULL
-  x <- structure(x, srcref = srcref)
-  print(x)
-}
 
 as_predicate <- function(.fn, ...) {
   .fn <- as_function(.fn)

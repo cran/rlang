@@ -22,69 +22,69 @@
 #' @keywords internal
 #' @export
 new_node <- function(car, cdr = NULL) {
-  .Call(rlang_new_node, car, cdr)
+  .Call(ffi_new_node, car, cdr)
 }
 
 #' @rdname new_node
 #' @export
 node_car <- function(x) {
-  .Call(rlang_node_car, x)
+  .Call(ffi_node_car, x)
 }
 #' @rdname new_node
 #' @export
 node_cdr <- function(x) {
-  .Call(rlang_node_cdr, x)
+  .Call(ffi_node_cdr, x)
 }
 #' @rdname new_node
 #' @export
 node_caar <- function(x) {
-  .Call(rlang_node_caar, x)
+  .Call(ffi_node_caar, x)
 }
 #' @rdname new_node
 #' @export
 node_cadr <- function(x) {
-  .Call(rlang_node_cadr, x)
+  .Call(ffi_node_cadr, x)
 }
 #' @rdname new_node
 #' @export
 node_cdar <- function(x) {
-  .Call(rlang_node_cdar, x)
+  .Call(ffi_node_cdar, x)
 }
 #' @rdname new_node
 #' @export
 node_cddr <- function(x) {
-  .Call(rlang_node_cddr, x)
+  .Call(ffi_node_cddr, x)
 }
 
 #' @rdname new_node
 #' @export
 node_poke_car <- function(x, newcar) {
-  invisible(.Call(rlang_node_poke_car, x, newcar))
+  invisible(.Call(ffi_node_poke_car, x, newcar))
 }
 #' @rdname new_node
 #' @export
 node_poke_cdr <- function(x, newcdr) {
-  invisible(.Call(rlang_node_poke_cdr, x, newcdr))
+  invisible(.Call(ffi_node_poke_cdr, x, newcdr))
 }
 #' @rdname new_node
 #' @export
 node_poke_caar <- function(x, newcar) {
-  invisible(.Call(rlang_node_poke_caar, x, newcar))
+  invisible(.Call(ffi_node_poke_caar, x, newcar))
 }
 #' @rdname new_node
 #' @export
 node_poke_cadr <- function(x, newcar) {
-  invisible(.Call(rlang_node_poke_cadr, x, newcar))
+  invisible(.Call(ffi_node_poke_cadr, x, newcar))
 }
 #' @rdname new_node
 #' @export
 node_poke_cdar <- function(x, newcdr) {
-  invisible(.Call(rlang_node_poke_cdar, x, newcdr))
+  invisible(.Call(ffi_node_poke_cdar, x, newcdr))
 }
 #' @rdname new_node
 #' @export
 node_poke_cddr <- function(x, newcdr) {
-  invisible(.Call(rlang_node_poke_cddr, x, newcdr))
+  invisible(.Call(ffi_node_poke_cddr, x, newcdr))
 }
 
 node_get <- function(node, i) {
@@ -104,33 +104,12 @@ node_get_car <- function(node, i) {
 #' @rdname new_node
 #' @export
 node_tag <- function(x) {
-  .Call(rlang_node_tag, x)
+  .Call(ffi_node_tag, x)
 }
 #' @rdname new_node
 #' @export
 node_poke_tag <- function(x, newtag) {
-  invisible(.Call(rlang_node_poke_tag, x, newtag))
-}
-
-#' Coerce to pairlist
-#'
-#' This transforms vector objects to a linked pairlist of nodes. See
-#' the [pairlist][node] type help page.
-#'
-#'
-#' @keywords internal
-#' @section Life cycle:
-#'
-#' `as_pairlist()` is experimental because we are still figuring out
-#' the naming scheme for pairlists and node-like objects.
-#'
-#' @param x An object to coerce.
-#' @export
-as_pairlist <- function(x) {
-  if (! typeof(x) %in% c(atomic_types, "list", "pairlist", "NULL")) {
-    abort_coercion(x, "pairlist")
-  }
-  as.vector(x, "pairlist")
+  invisible(.Call(ffi_node_poke_tag, x, newtag))
 }
 
 #' Is object a node or pairlist?
@@ -172,7 +151,7 @@ is_node_list <- function(x) {
 
 # Shallow copy of node trees
 node_tree_clone <- function(x) {
-  .Call(rlang_node_tree_clone, x);
+  .Call(ffi_node_tree_clone, x);
 }
 
 node_walk <- function(.x, .f, ...) {
@@ -206,7 +185,7 @@ node_append <- function(.x, .y) {
 }
 
 node_list_reverse <- function(x) {
-  .Call(rlang_pairlist_rev, x)
+  .Call(ffi_pairlist_rev, x)
 }
 
 
@@ -215,11 +194,11 @@ node_list_reverse <- function(x) {
 #' @param car The head of the call. It should be a
 #'   [callable][is_callable] object: a symbol, call, or literal
 #'   function.
-#' @param cdr The tail of the call, i.e. a [node list][node] of
+#' @param cdr The tail of the call, i.e. a [pairlist][new_node] of
 #'   arguments.
 #'
 #' @keywords internal
 #' @export
 new_call <- function(car, cdr = NULL) {
-  .Call(rlang_new_call, car, cdr)
+  .Call(ffi_new_call, car, cdr)
 }

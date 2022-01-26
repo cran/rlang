@@ -5,16 +5,36 @@
 \alias{arg_match0}
 \title{Match an argument to a character vector}
 \usage{
-arg_match(arg, values = NULL)
+arg_match(
+  arg,
+  values = NULL,
+  ...,
+  multiple = FALSE,
+  error_arg = caller_arg(arg),
+  error_call = caller_env()
+)
 
-arg_match0(arg, values, arg_nm = as_label(substitute(arg)))
+arg_match0(arg, values, arg_nm = caller_arg(arg), error_call = caller_env())
 }
 \arguments{
 \item{arg}{A symbol referring to an argument accepting strings.}
 
-\item{values}{The possible values that \code{arg} can take.}
+\item{values}{A character vector of possible values that \code{arg} can take.}
 
-\item{arg_nm}{The label to be used for \code{arg} in error messages.}
+\item{...}{These dots are for future extensions and must be empty.}
+
+\item{multiple}{Whether \code{arg} may contain zero or several values.}
+
+\item{error_arg}{An argument name as a string. This argument
+will be mentioned in error messages as the input that is at the
+origin of a problem.}
+
+\item{error_call}{The execution environment of a currently
+running function, e.g. \code{caller_env()}. The function will be
+mentioned in error messages as the source of the error. See the
+\code{call} argument of \code{\link[=abort]{abort()}} for more information.}
+
+\item{arg_nm}{Same as \code{error_arg}.}
 }
 \value{
 The string supplied to \code{arg}.
@@ -28,10 +48,10 @@ standards.
 }
 
 \code{arg_match()} derives the possible values from the
-\link[=caller_frame]{caller frame}.
+\link[=caller_fn]{caller function}.
 
 \code{arg_match0()} is a bare-bones version if performance is at a premium.
-It requires a string as \code{arg} and explicit \code{values}.
+It requires a string as \code{arg} and explicit character \code{values}.
 For convenience, \code{arg} may also be a character vector containing
 every element of \code{values}, possibly permuted.
 In this case, the first element of \code{arg} is used.
@@ -54,4 +74,7 @@ fn3 <- function(x) arg_match0(x, c("foo", "bar", "baz"))
 fn1()
 fn2("bar")
 try(fn3("zoo"))
+}
+\seealso{
+\code{\link[=check_required]{check_required()}}
 }

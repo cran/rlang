@@ -265,7 +265,7 @@ test_that("new_quosure() checks input", {
 })
 
 test_that("as_string(quo) produces informative error message", {
-  expect_error(as_string(quo(foo)), "a `quosure/formula` object to a string")
+  expect_error(as_string(quo(foo)), "a <quosure> object to a string")
 })
 
 test_that("`[` properly reconstructs quosure lists", {
@@ -277,6 +277,13 @@ test_that("quosure lists are considered vectors", {
   skip_if_not_installed("vctrs", "0.2.3")
   expect_true(vctrs::vec_is(quos()))
   expect_identical(vctrs::vec_slice(quos(1, 2, 3), 2:3), quos(2, 3))
+})
+
+test_that("quosure attributes are cloned (#1142)", {
+  x <- quos()
+  attr(x, "foo") <- TRUE
+  y <- quos()
+  expect_true(setequal(names(attributes(y)), c("names", "class")))
 })
 
 

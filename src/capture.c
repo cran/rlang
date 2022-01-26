@@ -1,7 +1,12 @@
 #include <Rinternals.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define attribute_hidden
 #define _(string) (string)
+
+static Rboolean dotDotVal(SEXP);
+static SEXP capturedot(SEXP, int);
 
 
 SEXP attribute_hidden new_captured_arg(SEXP x, SEXP env) {
@@ -33,6 +38,15 @@ SEXP attribute_hidden new_captured_promise(SEXP x, SEXP env) {
     while (TYPEOF(expr) == PROMSXP) {
         expr_env = PRENV(expr);
         expr = PREXPR(expr);
+
+	if (expr_env == R_NilValue)
+	    break;
+
+	if (TYPEOF(expr) == SYMSXP) {
+	    int dd = dotDotVal(expr);
+	    if (dd)
+		expr = capturedot(expr_env, dd);
+	}
     }
 
     // Evaluated arguments are returned as literals
@@ -58,9 +72,9 @@ SEXP attribute_hidden rlang_capturearginfo(SEXP call, SEXP op, SEXP args, SEXP r
 
     // May be a literal if compiler did not wrap in a promise
     if (TYPEOF(sym) != PROMSXP) {
-      SEXP value = new_captured_literal(sym);
-      UNPROTECT(nProt);
-      return value;
+	SEXP value = new_captured_literal(sym);
+	UNPROTECT(nProt);
+	return value;
     }
 
     sym = PREXPR(sym);
@@ -71,13 +85,17 @@ SEXP attribute_hidden rlang_capturearginfo(SEXP call, SEXP op, SEXP args, SEXP r
     }
 
     SEXP frame = CAR(args);
-    SEXP arg = findVar(sym, frame);
-    PROTECT(arg); ++nProt;
+    SEXP arg;
 
-    if (arg == R_UnboundValue) {
-        UNPROTECT(nProt);
-        error(_("object '%s' not found"), CHAR(PRINTNAME(sym)));
+    int dd = dotDotVal(sym);
+    if (dd) {
+	arg = capturedot(frame, dd);
+    } else {
+	arg = findVar(sym, frame);
+	if (arg == R_UnboundValue)
+	    error(_("object '%s' not found"), CHAR(PRINTNAME(sym)));
     }
+    PROTECT(arg); ++nProt;
 
     SEXP value;
     if (arg == R_MissingArg)
@@ -94,9 +112,9 @@ SEXP attribute_hidden rlang_capturearginfo(SEXP call, SEXP op, SEXP args, SEXP r
 SEXP capturedots(SEXP frame) {
     SEXP dots = PROTECT(findVar(R_DotsSymbol, frame));
 
-    if (dots == R_UnboundValue) {
-        error(_("Must capture dots in a function where dots exist"));
-    }
+    if (dots == R_UnboundValue)
+	error(_("'...' used in an incorrect context"));
+
     if (dots == R_MissingArg) {
         UNPROTECT(1);
         return R_NilValue;
@@ -130,3 +148,55 @@ SEXP attribute_hidden rlang_capturedots(SEXP call, SEXP op, SEXP args, SEXP rho)
     SEXP caller_env = CAR(args);
     return capturedots(caller_env);
 }
+
+
+static Rboolean dotDotVal(SEXP sym)
+{
+    const char* str = CHAR(PRINTNAME(sym));
+
+    if (strlen(str) < 3)
+	return 0;
+    if (*str++ != '.')
+	return 0;
+    if (*str++ != '.')
+	return 0;
+
+    char* p_end;
+    int val = (int) strtol(str, &p_end, 10);
+
+    if (*p_end == '\0')
+	return val;
+    else
+	return 0;
+}
+
+static SEXP capturedot(SEXP frame, int i) {
+    if (i < 1)
+	error("'i' must be a positive non-zero integer");
+
+    SEXP dots = PROTECT(findVar(R_DotsSymbol, frame));
+    if (dots == R_UnboundValue)
+	error(_("'...' used in an incorrect context"));
+
+    if (dots == R_MissingArg)
+	goto fewer;
+
+    for (int j = 1; j != i; ++j)
+	dots = CDR(dots);
+
+    if (dots == R_NilValue)
+	goto fewer;
+
+    UNPROTECT(1);
+    return CAR(dots);
+
+ fewer:
+    error(_("the ... list contains fewer than %d elements"), i);
+}
+
+
+// Local Variables:
+// tab-width: 8
+// c-basic-offset: 4
+// indent-tabs-mode: t
+// End:

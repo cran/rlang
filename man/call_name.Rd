@@ -3,37 +3,62 @@
 \name{call_name}
 \alias{call_name}
 \alias{call_ns}
+\alias{is_call_simple}
 \title{Extract function name or namespace of a call}
 \usage{
 call_name(call)
 
 call_ns(call)
+
+is_call_simple(x, ns = NULL)
 }
 \arguments{
-\item{call}{Can be a call or a quosure that wraps a call.}
+\item{call}{A defused call.}
+
+\item{x}{An object to test.}
+
+\item{ns}{Whether call is namespaced. If \code{NULL}, \code{is_call_simple()}
+is insensitive to namespaces. If \code{TRUE}, \code{is_call_simple()}
+detects namespaced calls. If \code{FALSE}, it detects unnamespaced
+calls.}
 }
 \value{
-A string with the function name, or \code{NULL} if the function
-is anonymous.
+The function name or namespace as a string, or \code{NULL} if
+the call is not named or namespaced.
 }
 \description{
-Extract function name or namespace of a call
-}
-\section{Life cycle}{
-
-
-In rlang 0.2.0, \code{lang_name()} was deprecated and renamed to
-\code{call_name()}. See lifecycle section in \code{\link[=call2]{call2()}} for more about
-this change.
+\code{call_name()} and \code{call_ns()} extract the function name or
+namespace of \emph{simple} calls as a string. They return \code{NULL} for
+complex calls.
+\itemize{
+\item Simple calls: \code{foo()}, \code{bar::foo()}.
+\item Complex calls: \code{foo()()}, \code{bar::foo}, \code{foo$bar()}, \code{(function() NULL)()}.
 }
 
+The \code{is_call_simple()} predicate helps you determine whether a call
+is simple. There are two invariants you can count on:
+\enumerate{
+\item If \code{is_call_simple(x)} returns \code{TRUE}, \code{call_name(x)} returns a
+string. Otherwise it returns \code{NULL}.
+\item If \code{is_call_simple(x, ns = TRUE)} returns \code{TRUE}, \code{call_ns()}
+returns a string. Otherwise it returns \code{NULL}.
+}
+}
 \examples{
+# Is the function named?
+is_call_simple(quote(foo()))
+is_call_simple(quote(foo[[1]]()))
+
+# Is the function namespaced?
+is_call_simple(quote(list()), ns = TRUE)
+is_call_simple(quote(base::list()), ns = TRUE)
+
 # Extract the function name from quoted calls:
 call_name(quote(foo(bar)))
 call_name(quo(foo(bar)))
 
 # Namespaced calls are correctly handled:
-call_name(~base::matrix(baz))
+call_name(quote(base::matrix(baz)))
 
 # Anonymous and subsetted functions return NULL:
 call_name(quote(foo$bar()))
@@ -45,7 +70,4 @@ call_ns(quote(base::bar()))
 
 # If not namespaced, call_ns() returns NULL:
 call_ns(quote(bar()))
-}
-\seealso{
-\code{\link[=call_fn]{call_fn()}}
 }

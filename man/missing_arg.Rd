@@ -25,7 +25,8 @@ object.
 \item \code{missing_arg()} generates a missing argument.
 \item \code{is_missing()} is like \code{\link[base:missing]{base::missing()}} but also supports
 testing for missing arguments contained in other objects like
-lists.
+lists. It is also more consistent with default arguments which
+are never treated as missing (see section below).
 \item \code{maybe_missing()} is useful to pass down an input that might be
 missing to another function, potentially substituting by a
 default value. It avoids triggering an "argument is missing" error.
@@ -42,22 +43,66 @@ quosure containing the missing argument object.
 }
 }
 
+\section{\code{is_missing()} and default arguments}{
+
+
+The base function \code{\link[=missing]{missing()}} makes a distinction between default
+values supplied explicitly and default values generated through a
+missing argument:\if{html}{\out{<div class="sourceCode r">}}\preformatted{fn <- function(x = 1) base::missing(x)
+
+fn()
+}\if{html}{\out{</div>}}\preformatted{## [1] TRUE
+}\if{html}{\out{<div class="sourceCode r">}}\preformatted{fn(1)
+}\if{html}{\out{</div>}}\preformatted{## [1] FALSE
+}
+
+This only happens within a function. If the default value has been
+generated in a calling function, it is never treated as missing:\if{html}{\out{<div class="sourceCode r">}}\preformatted{caller <- function(x = 1) fn(x)
+caller()
+}\if{html}{\out{</div>}}\preformatted{## [1] FALSE
+}
+
+\code{rlang::is_missing()} simplifies these rules by never treating
+default arguments as missing, even in internal contexts:\if{html}{\out{<div class="sourceCode r">}}\preformatted{fn <- function(x = 1) rlang::is_missing(x)
+
+fn()
+}\if{html}{\out{</div>}}\preformatted{## [1] FALSE
+}\if{html}{\out{<div class="sourceCode r">}}\preformatted{fn(1)
+}\if{html}{\out{</div>}}\preformatted{## [1] FALSE
+}
+
+This is a little less flexible because you can't specialise
+behaviour based on implicitly supplied default values. However,
+this makes the behaviour of \code{is_missing()} and functions using it
+simpler to understand.
+}
+
 \section{Fragility of the missing argument object}{
 
 
 The missing argument is an object that triggers an error if and
 only if it is the result of evaluating a symbol. No error is
 produced when a function call evaluates to the missing argument
-object. This means that expressions like \code{x[[1]] <- missing_arg()}
-are perfectly safe. Likewise, \code{x[[1]]} is safe even if the result
-is the missing object.
+object. For instance, it is possible to bind the missing argument
+to a variable with an expression like \code{x[[1]] <- missing_arg()}.
+Likewise, \code{x[[1]]} is safe to use as argument, e.g. \code{list(x[[1]])}
+even when the result is the missing object.
 
 However, as soon as the missing argument is passed down between
-functions through an argument, you're at risk of triggering a
-missing error. This is because arguments are passed through
-symbols. To work around this, \code{is_missing()} and \code{maybe_missing(x)}
-use a bit of magic to determine if the input is the missing
-argument without triggering a missing error.
+functions through a bare variable, it is likely to cause a missing
+argument error:\if{html}{\out{<div class="sourceCode r">}}\preformatted{x <- missing_arg()
+list(x)
+#> Error:
+#> ! argument "x" is missing, with no default
+}\if{html}{\out{</div>}}
+
+To work around this, \code{is_missing()} and \code{maybe_missing(x)} use a
+bit of magic to determine if the input is the missing argument
+without triggering a missing error.\if{html}{\out{<div class="sourceCode r">}}\preformatted{x <- missing_arg()
+list(maybe_missing(x))
+#> [[1]]
+#>
+}\if{html}{\out{</div>}}
 
 \code{maybe_missing()} is particularly useful for prototyping
 meta-programming algorithms in R. The missing argument is a likely
@@ -67,14 +112,6 @@ return the missing argument and pass it to other C functions, this
 is not the case on the R side. If you're implementing your
 meta-programming algorithm in R, use \code{maybe_missing()} when an
 input might be the missing argument object.
-}
-
-\section{Life cycle}{
-
-\itemize{
-\item \code{missing_arg()} and \code{is_missing()} are stable.
-\item Like the rest of rlang, \code{maybe_missing()} is maturing.
-}
 }
 
 \examples{

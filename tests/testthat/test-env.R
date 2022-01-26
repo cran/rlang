@@ -31,7 +31,7 @@ test_that("env_tail() climbs env chain", {
 test_that("env_tail() stops at the global env", {
   tail <- env(global_env())
   env <- env(tail)
-  expect_reference(env_tail(env), tail)
+  expect_identical(env_tail(env), tail)
 })
 
 test_that("with_env() evaluates within correct environment", {
@@ -91,7 +91,7 @@ test_that("finds correct env type", {
 })
 
 test_that("current_env() fails if no default", {
-  expect_error(get_env(list()), "Can't extract an environment from a list")
+  expect_error(get_env(list()), "Can't extract an environment from")
 })
 
 test_that("current_env() picks up default", {
@@ -259,9 +259,9 @@ test_that("active and promise bindings are pretty-printed", {
 
 test_that("locked environments are pretty-printed", {
   env <- env()
-  expect_output(env_print(env), sprintf("<environment: %s>\n", sexp_address(env)))
+  expect_output(env_print(env), sprintf("<environment: %s>\n", obj_address(env)))
   env_lock(env)
-  expect_output(env_print(env), sprintf("<environment: %s> \\[L\\]\n", sexp_address(env)))
+  expect_output(env_print(env), sprintf("<environment: %s> \\[L\\]\n", obj_address(env)))
 })
 
 test_that("locked bindings are pretty-printed", {
@@ -283,7 +283,7 @@ test_that("special names are backticked", {
 })
 
 test_that("empty environment is pretty printed", {
-  expect_output(env_print(empty_env()), "<environment: empty>\nparent: NULL$")
+  expect_output(env_print(empty_env()), "<environment: empty>\nParent: NULL$")
 })
 
 test_that("envs printer: padding is added to right-align indices", {
@@ -330,7 +330,7 @@ test_that("can print environment containing missing argument", {
 
 test_that("parent environment is printed with full header", {
   env <- env(global_env())
-  expect_output(env_print(env), "parent: <environment: global>")
+  expect_output(env_print(env), "Parent: <environment: global>")
 })
 
 test_that("environment is printed with class if any", {
@@ -339,20 +339,38 @@ test_that("environment is printed with class if any", {
   expect_false(any(grepl("class", out)))
 
   env <- structure(env(), class = "foo")
-  expect_output(env_print(env), "class: foo")
+  expect_output(env_print(env), "Class: foo")
 
   env <- structure(env(), class = c("foo", "bar"))
-  expect_output(env_print(env), "class: foo, bar")
+  expect_output(env_print(env), "Class: foo, bar")
 })
 
-test_that("env_clone() invokes active bindings in all R versions", {
-  if (getRversion() >= "4.0") {
-    skip("Until the workaround is in place")
-  }
+test_that("env_clone() handles active bindings", {
+  # FIXME: Seems cloning evaluates the binding
+  value <- NULL
+
   e <- env()
-  env_bind_active(e, foo = function() "foo")
+  env_bind_active(e, foo = function() value)
   out <- env_clone(e)
-  expect_identical(out$foo, "foo")
+
+  value <- "foo"
+  expect_equal(out$foo, "foo")
+
+  value <- "bar"
+  expect_equal(out$foo, "bar")
+})
+
+test_that("env_clone() doesn't force promises", {
+  skip_if_not_installed("base", "4.0.0")
+
+  e <- env()
+  env_bind_lazy(e, foo = value)
+
+  value <- "foo"
+  out <- env_clone(e)
+
+  value <- "bar"
+  expect_equal(out$foo, "bar")
 })
 
 test_that("env_poke_parent() pokes parent", {
@@ -405,6 +423,9 @@ test_that("env_clone() duplicates hash table", {
 
 test_that("env_clone() increases refcounts (#621)", {
   e <- env(x = 1:2)
+  env_bind_lazy(e, foo = 1)
+  env_bind_active(e, bar = function() 1)
+
   c <- env_clone(e)
   c$x[1] <- NA
 
@@ -468,30 +489,12 @@ test_that("can browse environments", {
   expect_false(env_is_browsed(env))
 })
 
+test_that("env_has() doesn't force active bindings (#1292)", {
+  e <- env()
+  env_bind_active(e, active = function() abort("forced"))
 
-#  Lifecycle ---------------------------------------------------------
+  expect_true(env_has(e, "active"))
 
-test_that("env API warns with non-environments", {
-  local_options(lifecycle_verbose_soft_deprecation = TRUE)
-
-  f <- local(~foo)
-  expect_warning(env_parent(f) <- empty_env(), "deprecated")
-
-  expect_warning(env_depth(function() foo), "deprecated")
-  expect_warning(env_poke_parent(local(~foo), empty_env()), "deprecated")
-  expect_warning(env_parent(~foo), "deprecated")
-  expect_warning(env_tail(~foo), "deprecated")
-  expect_warning(set_env(~foo, ~bar), "deprecated")
-  expect_warning(env_clone(~foo), "deprecated")
-  expect_warning(env_inherits(~foo, empty_env()), "deprecated")
-
-  expect_warning(env_bind(~foo, a = 1), "deprecated")
-  expect_warning(local_bindings(.env = ~foo), "deprecated")
-  expect_warning(with_bindings(NULL, a = 1, .env = ~foo), "deprecated")
-  expect_warning(env_poke(~foo, "a", NULL), "deprecated")
-  expect_warning(env_has(~foo, "a"), "deprecated")
-  expect_warning(env_get(~foo, "f"), "deprecated")
-  expect_warning(env_names(~foo), "deprecated")
-  expect_warning(env_bind_lazy(~foo, foo = list()), "deprecated")
-  expect_warning(env_bind_active(~foo, a = function() "foo"), "deprecated")
+  e2 <- env(e)
+  expect_true(env_has(e2, "active", inherit = TRUE))
 })

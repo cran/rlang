@@ -5,19 +5,25 @@
 \alias{quos_auto_name}
 \title{Ensure that all elements of a list of expressions are named}
 \usage{
-exprs_auto_name(exprs, width = NULL, printer = NULL)
+exprs_auto_name(
+  exprs,
+  ...,
+  repair_auto = c("minimal", "unique"),
+  repair_quiet = FALSE
+)
 
-quos_auto_name(quos, width = NULL)
+quos_auto_name(quos)
 }
 \arguments{
 \item{exprs}{A list of expressions.}
 
-\item{width}{Deprecated. Maximum width of names.}
+\item{...}{These dots are for future extensions and must be empty.}
 
-\item{printer}{Deprecated. A function that takes an expression
-and converts it to a string. This function must take an
-expression as the first argument and \code{width} as the second
-argument.}
+\item{repair_auto}{Whether to repair the automatic names. By
+default, minimal names are returned. See \code{?vctrs::vec_as_names}
+for information about name repairing.}
+
+\item{repair_quiet}{Whether to inform user about repaired names.}
 
 \item{quos}{A list of quosures.}
 }

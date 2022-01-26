@@ -256,9 +256,25 @@ test_that("literal lists are deparsed", {
   expect_identical(sexp_deparse(list(TRUE, b = 2L, 3, d = "4", as.raw(5))), "<list: TRUE, b = 2L, 3, d = \"4\", <raw: 05>>")
 })
 
-test_that("long vectors are truncated", {
+test_that("long vectors are truncated by default", {
   expect_identical(sexp_deparse(1:10), "<int: 1L, 2L, 3L, 4L, 5L, ...>")
   expect_identical(sexp_deparse(as.list(1:10)), "<list: 1L, 2L, 3L, 4L, 5L, ...>")
+})
+
+test_that("long vectors are truncated when max_elements = 0L", {
+  lines <- new_lines(max_elements = 0L)
+  expect_identical(sexp_deparse(1:10, lines), "<int: ...>")
+
+  lines <- new_lines(max_elements = 0L)
+  expect_identical(sexp_deparse(as.list(1:10), lines), "<list: ...>")
+})
+
+test_that("long vectors are not truncated when max_elements = NULL", {
+  lines <- new_lines(max_elements = NULL)
+  expect_identical(sexp_deparse(1:10, lines), "<int: 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L>")
+
+  lines <- new_lines(max_elements = NULL)
+  expect_identical(sexp_deparse(as.list(1:10), lines), "<list: 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L>")
 })
 
 test_that("other objects are deparsed with base deparser", {
@@ -518,5 +534,161 @@ test_that("triple colon is never wrapped (#1072)", {
   expect_identical(
     expr_deparse(quote(id_fun <- base:::identity), width = 20),
     "id_fun <- base:::identity"
+  )
+})
+
+test_that("backslashes in strings are properly escaped (#1160)", {
+  expect_equal(
+    expr_deparse(sym("a\\b")),
+    "`a\\\\b`"
+  )
+
+  # Escaping ensures this roundtrip
+  expect_equal(
+    parse_expr(expr_deparse(sym("a\\b"))),
+    sym("a\\b")
+  )
+
+  # Argument names
+  expect_equal(
+    expr_deparse(quote(c("a\\b" = "c\\d"))),
+    "c(`a\\\\b` = \"c\\\\d\")"
+  )
+
+  # Vector names
+  expect_equal(
+    expr_deparse(c("a\\b" = "c\\d")),
+    "<chr: a\\\\b = \"c\\\\d\">"
+  )
+  expect_equal(
+    expr_deparse(list("a\\b" = "c\\d")),
+    "<list: a\\\\b = \"c\\\\d\">"
+  )
+})
+
+test_that("formulas are deparsed (#1169)", {
+  # Evaluated formulas are treated as objects
+  expect_equal(
+    expr_deparse(~foo),
+    "<formula>"
+  )
+
+  # Unevaluated formulas with a symbol have no space
+  expect_equal(
+    expr_deparse(quote(~foo)),
+    "~foo"
+  )
+
+  # Unevaluated formulas with expressions have a space
+  expect_equal(
+    expr_deparse(quote(~+foo)),
+    "~ +foo"
+  )
+  expect_equal(
+    expr_deparse(quote(~foo())),
+    "~ foo()"
+  )
+})
+
+test_that("matrices and arrays are formatted (#383)", {
+  mat <- matrix(1:3)
+  expect_equal(as_label(mat), "<int[,1]>")
+  expect_equal(expr_deparse(mat), "<int[,1]: 1L, 2L, 3L>")
+
+  mat2 <- matrix(1:4, 2)
+  expect_equal(as_label(mat2), "<int[,2]>")
+  expect_equal(expr_deparse(mat2), "<int[,2]: 1L, 2L, 3L, 4L>")
+
+  arr <- array(1:3, c(1, 1, 3))
+  expect_equal(as_label(arr), "<int[,1,3]>")
+  expect_equal(expr_deparse(arr), "<int[,1,3]: 1L, 2L, 3L>")
+})
+
+test_that("infix operators are labelled (#956, r-lib/testthat#1432)", {
+  expect_equal(
+    as_label(quote({ 1; 2} + 3)),
+    "... + 3"
+  )
+
+  expect_equal(
+    as_label(quote(`+`(1, 2, 3))),
+    "`+`(1, 2, 3)"
+  )
+
+  expect_equal(
+    as_label(quote(
+      arg + arg + arg + arg + arg + arg + arg + arg + arg + arg + arg + arg
+    )),
+    "... + arg"
+  )
+
+  expect_equal(
+    as_label(quote(X[key1 == "val1" & key2 == "val2"]$key3 & foobarbaz(foobarbaz(foobarbaz(foobarbaz(foobarbaz(foobarbaz(foobarbaz())))))))),
+    "X[key1 == \"val1\" & key2 == \"val2\"]$key3 & ..."
+  )
+
+  expect_equal(
+    as_label(quote(X[key1 == "val1"]$key3 & foobarbaz(foobarbaz()))),
+    "X[key1 == \"val1\"]$key3 & foobarbaz(foobarbaz())"
+  )
+
+  # This fits in 60 characters so we don't need to truncate it
+  expect_equal(
+    as_label(quote(nchar(chr, type = "bytes", allowNA = TRUE) == 1)),
+    "nchar(chr, type = \"bytes\", allowNA = TRUE) == 1"
+  )
+
+  # This fits into 60 characters if we truncate either side,
+  # so we don't need to shorten both of them
+  expect_equal(
+    as_label(quote(very_long_expression[with(subsetting), -1] -
+                     another_very_long_expression[with(subsetting), -1]
+    )),
+    "very_long_expression[with(subsetting), -1] - ..."
+  )
+
+  lhs_perfect_fit <- sym(paste(rep("a", 56), collapse = ""))
+  lhs_no_fit <- sym(paste(rep("a", 57), collapse = ""))
+
+  expect_equal(
+    as_label(expr(!!lhs_perfect_fit + 1)),
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + 1"
+  )
+  expect_equal(
+    as_label(expr(!!lhs_perfect_fit + 10)),
+    "... + 10"
+  )
+
+  expect_equal(
+    as_label(expr(1 + !!lhs_perfect_fit)),
+    "1 + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  )
+  expect_equal(
+    as_label(expr(10 + !!lhs_perfect_fit)),
+    "10 + ..."
+  )
+
+  expect_equal(
+    as_label(expr(!!lhs_no_fit + 1)),
+    "... + 1"
+  )
+  expect_equal(
+    as_label(expr(!!lhs_no_fit + !!lhs_no_fit)),
+    "... + ..."
+  )
+})
+
+test_that("binary op without arguments", {
+  expect_equal(
+    expr_deparse(quote(`+`())),
+    "`+`()"
+  )
+  expect_equal(
+    expr_deparse(quote(`$`())),
+    "`$`()"
+  )
+  expect_equal(
+    expr_deparse(quote(`~`())),
+    "`~`()"
   )
 })

@@ -1,64 +1,200 @@
-#' Add backtrace from error handler
+#' Entrace unexpected errors
 #'
 #' @description
+#' `global_entrace()` enriches base errors with rlang features:
 #'
-#' `entrace()` interrupts an error throw to add an [rlang
-#' backtrace][trace_back()] to the error. The error throw is
-#' immediately resumed. `cnd_entrace()` adds a backtrace to a
-#' condition object, without any other effect. Both functions should
-#' be called directly from an error handler.
+#' - They are assigned a backtrace. You can configure whether to
+#'   display a backtrace on error with the [rlang_backtrace_on_error]
+#'   global option.
 #'
-#' Set the `error` global option to `rlang::entrace` to
-#' transform base errors to rlang errors. These enriched errors
-#' include a backtrace. The RProfile is a good place to set the
-#' handler. See [`rlang_backtrace_on_error`] for details.
+#' - They are recorded in [last_error()]. Calling this function is
+#'   another way of inspecting the backtrace.
 #'
-#' `entrace()` also works as a [calling][calling] handler, though it
-#' is often more practical to use the higher-level function
-#' [with_abort()].
+#' When global entracing is enabled, all errors behave as if they had
+#' been thrown with [rlang::abort()], even the ones thrown with
+#' [stop()] or from native code.
+#'
+#' Set global entracing in your RProfile with:
+#'
+#' ```
+#' rlang::global_entrace()
+#' ```
+#'
+#' @param enable Whether to enable or disable global handling.
+#' @param class A character vector of one or several classes of
+#'   conditions to be entraced.
+#'
+#' @section Under the hood:
+#' On R 4.0 and newer, `global_entrace()` installs a global handler
+#' with `globalCallingHandlers()`. On older R versions, `entrace()` is
+#' set as an `option(error = )` handler. The latter method has the
+#' disadvantage that only one handler can be set at a time. This means
+#' that you need to manually switch between `entrace()` and other
+#' handlers like [recover()]. Also this causes a conflict with IDE
+#' handlers (e.g. in RStudio).
+#' @export
+global_entrace <- function(enable = TRUE,
+                           class = c("error", "warning", "message")) {
+  check_bool(enable)
+  class <- arg_match(class, multiple = TRUE)
+
+  if (getRversion() < "4.0") {
+    return(global_entrace_fallback(enable, class))
+  }
+
+  handlers <- rep_named(class, list(hnd_entrace))
+  poke_global_handlers(enable, !!!handlers)
+
+  invisible(NULL)
+}
+global_entrace_fallback <- function(enable, class) {
+  if (!"error" %in% class) {
+    return(invisible(NULL))
+  }
+
+  if (enable) {
+    options(error = entrace)
+  } else {
+    opt <- peek_option("error")
+    if (identical(opt, entrace)) {
+      options(error = NULL)
+    }
+  }
+
+  invisible(NULL)
+}
+
+# Keep `rlang::` indirection in case rlang is reloaded. This way the
+# global handlers can be set once in RProfile and they will always
+# call into the most recently loaded version.
+hnd_entrace <- function(cnd) rlang::entrace(cnd)
+
+# Set to `base_env()` to avoid duplicate handlers in case of
+# reload. This makes `global_entrace()` idempotent.  Requires
+# https://bugs.r-project.org/show_bug.cgi?id=18197
+environment(hnd_entrace) <- baseenv()
+
+
+#' Add backtrace from error handler
+#'
+#' @keywords internal
+#' @description
+#' `entrace()` is a low level function. See [global_entrace()] for a
+#' user-friendly way of enriching errors and other conditions from
+#' your RProfile.
+#'
+#' * `entrace()` is meant to be used as a global handler. It enriches
+#'   conditions with a backtrace. Errors are saved to [last_error()]
+#'   and rethrown immediately. Messages and warnings are recorded into
+#'   [last_messages()] and [last_warnings()] and let through.
+#'
+#' * `cnd_entrace()` adds a backtrace to a condition object, without
+#'   any other effect. It should be called from a condition handler.
+#'
+#' `entrace()` also works as an `option(error = )` handler for
+#' compatibility with versions of R older than 4.0.
+#'
+#' When used as calling handler, rlang trims the handler invokation
+#' context from the backtrace.
 #'
 #' @inheritParams trace_back
 #' @param cnd When `entrace()` is used as a calling handler, `cnd` is
 #'   the condition to handle.
 #' @param ... Unused. These dots are for future extensions.
 #'
-#' @seealso [with_abort()] to promote conditions to rlang errors.
-#'   [cnd_entrace()] to manually add a backtrace to a condition.
+#' @seealso [global_entrace()] for configuring errors with
+#'   `entrace()`. [cnd_entrace()] to manually add a backtrace to a
+#'   condition.
 #' @examples
-#' if (FALSE) {  # Not run
+#' quote({  # Not run
 #'
-#' # Set the error handler in your RProfile like this:
-#' if (requireNamespace("rlang", quietly = TRUE)) {
-#'   options(error = rlang::entrace)
-#' }
+#' # Set `entrace()` globally in your RProfile
+#' globalCallingHandlers(error = rlang::entrace)
 #'
-#' }
+#' # On older R versions which don't feature `globalCallingHandlers`,
+#' # set the error handler like this:
+#' options(error = rlang::entrace)
+#'
+#' })
+#' @keywords internal
 #' @export
 entrace <- function(cnd, ..., top = NULL, bottom = NULL) {
-  check_dots_empty(...)
+  check_dots_empty0(...)
 
-  if (!missing(cnd) && is_trace(cnd$trace)) {
+  if (!missing(cnd) && inherits(cnd, "rlang_error")) {
+    poke_last_error(cnd)
     return()
   }
 
   if (is_null(bottom)) {
-    nframe <- sys.nframe() - 1
+    if (missing(cnd)) {
+      bottom <- current_env()
+    } else {
+      bottom <- caller_env()
+    }
+  }
+
+  # Remove handler invokation context from the trace
+  if (is_environment(bottom)) {
+    nframe <- eval_bare(quote(base::sys.nframe()), bottom) - 1
     info <- signal_context_info(nframe)
     bottom <- sys.frame(info[[2]])
   }
+
   trace <- trace_back(top = top, bottom = bottom)
 
+  # `options(error = )` case
   if (missing(cnd)) {
-    entrace_handle_top(trace)
-  } else {
-    abort(conditionMessage(cnd) %||% "", error = cnd, trace = trace)
+    return(entrace_handle_top(trace))
   }
+
+  # Log warnings and messages
+  if (is_warning(cnd)) {
+    push_warning(as_rlang_warning(cnd, trace))
+    return()
+  }
+  if (is_message(cnd)) {
+    push_message(as_rlang_message(cnd, trace))
+    return()
+  }
+
+  # Rethrow errors
+  if (is_error(cnd)) {
+    if (has_recover()) {
+      return()
+    }
+    entraced <- error_cnd(
+      message = conditionMessage(cnd) %||% "",
+      call = conditionCall(cnd),
+      error = cnd,
+      trace = trace,
+      use_cli_format = FALSE
+    )
+    poke_last_error(entraced)
+    cnd_signal(entraced)
+  }
+
+  # Ignore other condition types
+  NULL
+}
+
+has_recover <- function() {
+  handler_call <- peek_option("error")
+  if (!is_call(handler_call)) {
+    return(FALSE)
+  }
+
+  if (is_call(handler_call, "recover", ns = c("", "base"))) {
+    return(TRUE)
+  }
+
+  identical(handler_call[[1]], utils::recover)
 }
 
 #' @rdname entrace
 #' @export
 cnd_entrace <- function(cnd, ..., top = NULL, bottom = NULL) {
-  check_dots_empty(...)
+  check_dots_empty0(...)
 
   if (!is_null(cnd$trace)) {
     return(cnd)
@@ -102,30 +238,30 @@ cnd_entrace <- function(cnd, ..., top = NULL, bottom = NULL) {
 signal_context_info <- function(nframe) {
   first <- sys_body(nframe)
 
-  if (is_same_body(first, body(.handleSimpleError))) {
-    if (is_same_body(sys_body(nframe - 1), body(stop))) {
+  if (identical(first, body(.handleSimpleError))) {
+    if (identical(sys_body(nframe - 1), body(stop))) {
       return(list(type = "stop_message", depth = nframe - 2))
-    } else if (is_same_body(sys_body(nframe - 4), body(.signalSimpleWarning))) {
+    } else if (identical(sys_body(nframe - 4), body(.signalSimpleWarning))) {
       return(list(type = "warning_promoted", depth = nframe - 6))
     } else {
       return(list(type = "stop_native", depth = nframe - 1))
     }
   }
 
-  if (is_same_body(first, body(stop))) {
-    if (is_same_body(sys_body(nframe - 1), body(abort))) {
+  if (identical(first, body(stop))) {
+    if (identical(sys_body(nframe - 1), body(abort))) {
       return(list(type = "stop_rlang", depth = nframe - 2))
     } else {
       return(list(type = "stop_condition", depth = nframe - 1))
     }
   }
 
-  if (is_same_body(first, body(signalCondition))) {
+  if (identical(first, body(signalCondition))) {
     from_restarts <- from_withrestarts(nframe - 1)
     signal_body <- sys_body(nframe - 4)
-    if (from_restarts && is_same_body(signal_body, body(message))) {
+    if (from_restarts && identical(signal_body, body(message))) {
       return(list(type = "message", depth = nframe - 5))
-    } else if (from_restarts && is_same_body(signal_body, body(inform))) {
+    } else if (from_restarts && identical(signal_body, body(inform))) {
       return(list(type = "message_rlang", depth = nframe - 5))
     } else {
       return(list(type = "condition", depth = nframe - 1))
@@ -134,14 +270,14 @@ signal_context_info <- function(nframe) {
 
   if (from_withrestarts(nframe)) {
     withrestarts_caller <- sys_body(nframe - 3)
-    if (is_same_body(withrestarts_caller, body(.signalSimpleWarning))) {
-      if (is_same_body(sys_body(nframe - 4), body(warning))) {
+    if (identical(withrestarts_caller, body(.signalSimpleWarning))) {
+      if (identical(sys_body(nframe - 4), body(warning))) {
         return(list(type = "warning_message", depth = nframe - 5))
       } else {
         return(list(type = "warning_native", depth = nframe - 4))
       }
-    } else if (is_same_body(withrestarts_caller, body(warning))) {
-      if (is_same_body(sys_body(nframe - 4), body(warn))) {
+    } else if (identical(withrestarts_caller, body(warning))) {
+      if (identical(sys_body(nframe - 4), body(warn))) {
         return(list(type = "warning_rlang", depth = nframe - 5))
       } else {
         return(list(type = "warning_condition", depth = nframe - 4))
@@ -154,7 +290,7 @@ signal_context_info <- function(nframe) {
 
 from_withrestarts <- function(nframe) {
   is_call(sys.call(nframe), "doWithOneRestart") &&
-    is_same_body(sys_body(nframe - 2), body(withRestarts))
+    identical(sys_body(nframe - 2), body(withRestarts))
 }
 sys_body <- function(n) {
   body(sys.function(n))
@@ -174,7 +310,7 @@ entrace_handle_top <- function(trace) {
   from_stop <- is_call(stop_call, "stop", ns = c("", "base"))
 
   # No need to do anything for rlang errors
-  if (from_stop && (is_trace(cnd$trace) || is_true(cnd$rlang_entraced))) {
+  if (from_stop && (is_trace(cnd$trace) || is_true(cnd$rlang$internal$entraced))) {
     return(entrace_exit())
   }
 
@@ -186,12 +322,16 @@ entrace_handle_top <- function(trace) {
       msg <- cnd$message
     }
   } else {
+    # `geterrmessage()` returns the full error message including
+    # prefix and newline, which we strip here
     msg <- geterrmessage()
+    msg <- sub("^.*: ?", "", msg)
+    msg <- sub("\n$", "", msg)
   }
 
   # Save a fake rlang error containing the backtrace
   err <- error_cnd(message = msg, error = cnd, trace = trace, parent = cnd)
-  last_error_env$cnd <- err
+  poke_last_error(err)
 
   # Print backtrace for current error
   backtrace_lines <- format_onerror_backtrace(err)
@@ -217,47 +357,4 @@ add_backtrace <- function() {
   msg <- "Warning: `add_backtrace()` is now exported as `entrace()` as of rlang 0.3.1"
   cat_line(msg, file = stderr())
   entrace(bottom = sys.frame(-1))
-}
-
-#' Promote all errors to rlang errors
-#'
-#' @description
-#'
-#' `with_abort()` promotes conditions as if they were thrown with
-#' [abort()]. These errors embed a [backtrace][trace_back]. They are
-#' particularly suitable to be set as *parent errors* (see `parent`
-#' argument of [abort()]).
-#'
-#' @param expr An expression run in a context where errors are
-#'   promoted to rlang errors.
-#' @param classes Character vector of condition classes that should be
-#'   promoted to rlang errors.
-#'
-#' @details
-#'
-#' `with_abort()` installs a [calling handler][calling] for errors and
-#' rethrows non-rlang errors with [abort()]. However, error handlers
-#' installed *within* `with_abort()` have priority. For this reason,
-#' you should use [tryCatch()] and [exiting] handlers outside
-#' `with_abort()` rather than inside.
-#'
-#' @examples
-#' # with_abort() automatically casts simple errors thrown by stop()
-#' # to rlang errors. It is is handy for rethrowing low level
-#' # errors. The backtraces are then segmented between the low level
-#' # and high level contexts.
-#' f <- function() g()
-#' g <- function() stop("Low level error")
-#'
-#' high_level <- function() {
-#'   with_handlers(
-#'     with_abort(f()),
-#'     error = ~ abort("High level error", parent = .)
-#'   )
-#' }
-#' @export
-with_abort <- function(expr, classes = "error") {
-  handlers <- rep_named(classes, list(entrace))
-  handle_call <- rlang::expr(withCallingHandlers(expr, !!!handlers))
-  .External2(rlang_ext2_eval, handle_call, current_env())
 }

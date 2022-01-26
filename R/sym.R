@@ -1,17 +1,58 @@
 #' Create a symbol or list of symbols
 #'
-#' These functions take strings as input and turn them into symbols.
+#' @description
 #'
-#' @param x A string or list of strings.
-#' @return A symbol for `sym()` and a list of symbols for `syms()`.
-#' @export
+#' Symbols are a kind of [defused expression][topic-defuse] that
+#' represent objects in environments.
+#'
+#' * `sym()` and `syms()` take strings as input and turn them into
+#'   symbols.
+#'
+#' * `data_sym()` and `data_syms()` create calls of the form
+#'   `.data$foo` instead of symbols. Subsetting the [`.data`] pronoun
+#'   is more robust when you expect a data-variable. See
+#'   `r link("topic_data_mask_ambiguity")`.
+#'
+#' Only tidy eval APIs support the [`.data`] pronoun. With base R
+#' functions, use simple symbols created with `sym()` or `syms()`.
+#'
+#' @param x For `sym()` and `data_sym()`, a string. For `syms()` and
+#'   `data_syms()`, a list of strings.
+#' @return For `sym()` and `syms()`, a symbol or list of symbols. For
+#'   `data_sym()` and `data_syms()`, calls of the form `.data$foo`.
+#'
+#' @seealso
+#' - `r link("topic_defuse")`
+#' - `r link("topic_metaprogramming")`
+#'
 #' @examples
+#' # Create a symbol
+#' sym("cyl")
+#'
+#' # Create a list of symbols
+#' syms(c("cyl", "am"))
+#'
+#' # Symbolised names refer to variables
+#' eval(sym("cyl"), mtcars)
+#'
+#' # Beware of scoping issues
+#' Cyl <- "wrong"
+#' eval(sym("Cyl"), mtcars)
+#'
+#' # Data symbols are explicitly scoped in the data mask
+#' try(eval_tidy(data_sym("Cyl"), mtcars))
+#'
+#' # These can only be used with tidy eval functions
+#' try(eval(data_sym("Cyl"), mtcars))
+#'
 #' # The empty string returns the missing argument:
 #' sym("")
 #'
 #' # This way sym() and as_string() are inverse of each other:
 #' as_string(missing_arg())
 #' sym(as_string(missing_arg()))
+#'
+#' @export
 sym <- function(x) {
   if (is_symbol(x)) {
     return(x)
@@ -20,14 +61,25 @@ sym <- function(x) {
     return(missing_arg())
   }
   if (!is_string(x)) {
-    abort("Only strings can be converted to symbols")
+    abort_coercion(x, "a symbol")
   }
-  .Call(rlang_symbol, x)
+  .Call(ffi_symbol, x)
 }
 #' @rdname sym
 #' @export
 syms <- function(x) {
   map(x, sym)
+}
+
+#' @rdname sym
+#' @export
+data_sym <- function(x) {
+  call("$", quote(.data), sym(x))
+}
+#' @rdname sym
+#' @export
+data_syms <- function(x) {
+  map(x, data_sym)
 }
 
 #' Is object a symbol?
@@ -102,7 +154,7 @@ as_string <- function(x) {
   }
 
   if (is_symbol(x)) {
-    return(.Call(rlang_sym_as_character, x))
+    return(.Call(ffi_sym_as_character, x))
   }
 
   abort_coercion(x, "a string")

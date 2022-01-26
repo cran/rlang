@@ -1,75 +1,27 @@
+deprecated <- function() missing_arg()
 
-substitute_ <- function(x, env) {
-  if (identical(env, globalenv())) {
-    env <- as.list(env)
+abort_coercion <- function(x,
+                           to_type,
+                           x_type = NULL,
+                           arg = NULL,
+                           call = caller_env()) {
+  x_type <- x_type %||% friendly_type_of(x, value = TRUE)
+
+  if (is_null(arg)) {
+    msg <- sprintf("Can't convert %s to %s.", x_type, to_type)
+  } else {
+    arg <- format_arg(arg)
+    msg <- sprintf("Can't convert %s, %s, to %s.", arg, x_type, to_type)
   }
 
-  call <- substitute(substitute(x, env), list(x = x))
-  eval_bare(call)
+  abort(msg, call = call)
 }
 
-drop_last <- function(x) {
-  x[-length(x)]
-}
-drop_first <- function(x) {
-  x[-1]
-}
 set_names2 <- function(x, nms = names2(x)) {
   empty <- nms == ""
   nms[empty] <- x[empty]
   names(x) <- nms
   x
-}
-
-imap <- function(.x, .f, ...) {
-  idx <- names(.x) %||% seq_along(.x)
-  out <- Map(.f, idx, .x, ...)
-  names(out) <- names(.x)
-  out
-}
-imap_chr <- function(.x, .f, ...) {
-  as.vector(imap(.x, .f, ...), "character")
-}
-
-map_around <- function(.x, .neighbour = c("right", "left"), .f, ...) {
-  where <- arg_match(.neighbour)
-  n <- length(.x)
-  out <- vector("list", n)
-
-  if (n == 0) {
-    return(.x)
-  }
-
-  if (n == 1) {
-    out[[1]] <- .f(.x[[1]], missing_arg(), ...)
-    return(out)
-  }
-
-  if (n > 1 && where == "right") {
-    neighbours <- .x[seq(2, n)]
-    idx <- seq_len(n - 1)
-    out[idx] <- Map(.f, .x[idx], neighbours, ...)
-    out[[n]] <- .f(.x[[n]], missing_arg(), ...)
-    return(out)
-  }
-
-  if (n > 1 && where == "left") {
-    neighbours <- .x[seq(1, n - 1)]
-    idx <- seq(2, n)
-    out[idx] <- Map(.f, .x[idx], neighbours, ...)
-    out[[1]] <- .f(.x[[1]], missing_arg(), ...)
-    return(out)
-  }
-
-  stop("unimplemented")
-}
-
-discard_unnamed <- function(x) {
-  if (is_environment(x)) {
-    x
-  } else {
-    discard(x, names2(x) == "")
-  }
 }
 
 cat_line <- function(..., .trailing = TRUE, file = "") {
@@ -107,16 +59,14 @@ open_green   <- function() if (has_crayon()) open_style("green")
 open_yellow  <- function() if (has_crayon()) open_style("yellow")
 open_magenta <- function() if (has_crayon()) open_style("magenta")
 open_cyan    <- function() if (has_crayon()) open_style("cyan")
+open_bold    <- function() if (has_crayon()) open_style("bold")
 close_colour <- function() if (has_crayon()) "\u001b[39m"
 close_italic <- function() if (has_crayon()) "\u001b[23m"
+close_bold   <- function() if (has_crayon()) close_style("bold")
 
 open_yellow_italic   <- function() if (has_crayon()) "\u001b[33m\u001b[3m"
 open_blurred_italic  <- function() if (has_crayon()) "\u001b[2m\u001b[3m"
 close_blurred_italic <- function() if (has_crayon()) "\u001b[23m\u001b[22m"
-
-bullet <- function(x) {
-  paste0(bold(silver("* ")), x)
-}
 
 
 open_style <- function(style) {
@@ -200,9 +150,6 @@ pluralise <- function(n, singular, plural) {
     plural
   }
 }
-pluralise_along <- function(x, singular, plural) {
-  pluralise(length(x), singular, plural)
-}
 pluralise_n <- function(n, singular, plural) {
   pluralise(n, singular, plural)
 }
@@ -218,13 +165,38 @@ pad_spaces <- function(x, left = TRUE) {
   }
 }
 
+# Import symbols from cli if available
+on_load({
+  has_cli <- is_installed("cli")
+  has_cli_format <- is_installed("cli", version = "2.5.0")
+  has_cli_inline <- is_installed("cli", version = "3.0.0")
+})
+
 info <- function() {
-  i <- if (is_installed("cli")) cli::symbol$info else "i"
+  i <- if (has_cli) cli::symbol$info else "i"
   blue(i)
 }
 cross <- function() {
-  x <- if (is_installed("cli")) cli::symbol$cross else "x"
+  x <- if (has_cli) cli::symbol$cross else "x"
   red(x)
+}
+tick <- function() {
+  x <- if (has_cli) cli::symbol$tick else "v"
+  green(x)
+}
+bullet <- function() {
+  x <- if (has_cli) cli::symbol$bullet else "*"
+
+  # Use small bullet if cli is too old.
+  # See https://github.com/r-lib/cli/issues/241
+  if (!has_cli_format && !is_string(x, "*")) {
+    x <- "\u2022"
+  }
+
+  cyan(x)
+}
+arrow_right <- function() {
+  if (has_cli) cli::symbol$arrow_right else ">"
 }
 
 strip_trailing_newline <- function(x) {
@@ -246,20 +218,21 @@ unstructure <- function(x) {
   out
 }
 
-cli_rule <- function() {
-  if (is_installed("cli")) {
-    cli::rule()
-  } else {
-    strrep("-", peek_option("width") %||% 60L)
+stop_internal <- function(message, ..., call = caller_env(2)) {
+  abort(message, ..., call = call, .internal = TRUE)
+}
+stop_internal_c_lib <- function(fn, message) {
+  if (!is_installed("winch") && is_interactive()) {
+    message <- c(
+      message,
+      "i" = sprintf(
+        "Install the %s package to get additional debugging info the next time you get this error.",
+        format_pkg("winch")
+      )
+    )
   }
-}
 
-split_lines <- function(x) {
-  strsplit(x, "\n", fixed = TRUE)[[1]]
-}
-
-stop_internal <- function(fn, msg) {
-  abort(sprintf("Internal error in `%s()`: %s"), fn, msg)
+  abort(message, call = call(fn), .internal = TRUE)
 }
 
 with_srcref <- function(src, env = caller_env(), file = NULL) {
@@ -268,4 +241,111 @@ with_srcref <- function(src, env = caller_env(), file = NULL) {
 
   writeLines(src, file)
   source(file, local = env, keep.source = TRUE)
+}
+
+chr_has_curly <- function(x) {
+  .Call(ffi_chr_has_curly, x)
+}
+
+
+new_stack <- function() {
+  stack <- new_dyn_vector("list", 100)
+
+  push <- function(...) {
+    for (obj in list2(...)) {
+      arr_push_back(stack, maybe_missing(obj))
+    }
+  }
+
+  # Can be used as a coro generator
+  pop <- function() {
+    if (arr_count(stack)) {
+      arr_pop_back(stack)
+    } else {
+      exhausted()
+    }
+  }
+
+  new_environment(list(
+    push = push,
+    pop = pop
+  ))
+}
+
+exhausted <- function() as.symbol(".__exhausted__.")
+is_exhausted <- function(x) identical(x, exhausted())
+
+path_trim_prefix <- function(path, n) {
+  split <- strsplit(path, "/")[[1]]
+  n_split <- length(split)
+
+  if (n_split <= n) {
+    path
+  } else {
+    paste(split[seq2(n_split - n + 1, n_split)], collapse = "/")
+  }
+}
+
+browser <- function(...,
+                    skipCalls = 0,
+                    frame = parent.frame()) {
+  if (!identical(stdout(), getConnection(1))) {
+    sink(getConnection(1))
+    withr::defer(sink(), envir = frame)
+  }
+
+  # Calling `browser()` on exit avoids RStudio displaying the
+  # `browser2()` location. We still need one `n` to get to the
+  # expected place. Ideally `skipCalls` would not skip but exit the
+  # contexts.
+  on.exit(base::browser(..., skipCalls = skipCalls + 1))
+}
+
+df_print <- function(x, ...) {
+  class(x) <- c("tbl", "data.frame")
+  print(x, ...)
+  invisible(x)
+}
+
+is_testing <- function() {
+  identical(Sys.getenv("TESTTHAT"), "true")
+}
+
+glue_escape <- function(x) {
+  gsub("\\}", "}}", gsub("\\{", "{{", x))
+}
+
+detect_run_starts <- function(x) {
+  if (!length(x)) {
+    return(lgl())
+  }
+
+  lagged <- c(NA, x[-length(x)])
+  x != lagged | (is.na(lagged) & !is.na(x))
+}
+
+# No ANSI support
+capitalise <- function(x) {
+  stopifnot(length(x) == 1)
+  n <- nchar(x)
+  if (n == 0) {
+    x
+  } else if (n == 1) {
+    toupper(x)
+  } else {
+    paste0(toupper(substring(x, 1, 1)), substring(x, 2))
+  }
+}
+
+testing <- function() {
+  nzchar(Sys.getenv("TESTTHAT"))
+}
+
+cli_with_whiteline_escapes <- function(x, fn) {
+  x <- gsub("\n", "__NEW_LINE__", x, fixed = TRUE)
+  x <- gsub(" ", "__SPACE__", x, fixed = TRUE)
+  x <- fn(x)
+  x <- gsub("__SPACE__", " ", x, fixed = TRUE)
+  x <- gsub("__NEW_LINE__", "\n", x, fixed = TRUE)
+  x
 }

@@ -22,7 +22,14 @@ represents the oldest call in the backtrace.
 This is needed in particular when you call \code{trace_back()}
 indirectly or from a larger context, for example in tests or
 inside an RMarkdown document where you don't want all of the
-knitr evaluation mechanisms to appear in the backtrace.}
+knitr evaluation mechanisms to appear in the backtrace.
+
+If not supplied, the \code{rlang_trace_top_env} global option is
+consulted. This makes it possible to trim the embedding context
+for all backtraces created while the option is set. If knitr is
+in progress, the default value for this option is
+\code{knitr::knit_global()} so that the knitr context is trimmed out
+of backtraces.}
 
 \item{bottom}{The last frame environment to be included in the
 backtrace. This becomes the rightmost leaf of the backtrace tree
@@ -34,31 +41,39 @@ capture context.
 Can also be an integer that will be passed to \code{\link[=caller_env]{caller_env()}}.}
 }
 \description{
-\code{entrace()} interrupts an error throw to add an \link[=trace_back]{rlang backtrace} to the error. The error throw is
-immediately resumed. \code{cnd_entrace()} adds a backtrace to a
-condition object, without any other effect. Both functions should
-be called directly from an error handler.
+\code{entrace()} is a low level function. See \code{\link[=global_entrace]{global_entrace()}} for a
+user-friendly way of enriching errors and other conditions from
+your RProfile.
+\itemize{
+\item \code{entrace()} is meant to be used as a global handler. It enriches
+conditions with a backtrace. Errors are saved to \code{\link[=last_error]{last_error()}}
+and rethrown immediately. Messages and warnings are recorded into
+\code{\link[=last_messages]{last_messages()}} and \code{\link[=last_warnings]{last_warnings()}} and let through.
+\item \code{cnd_entrace()} adds a backtrace to a condition object, without
+any other effect. It should be called from a condition handler.
+}
 
-Set the \code{error} global option to \code{rlang::entrace} to
-transform base errors to rlang errors. These enriched errors
-include a backtrace. The RProfile is a good place to set the
-handler. See \code{\link{rlang_backtrace_on_error}} for details.
+\code{entrace()} also works as an \code{option(error = )} handler for
+compatibility with versions of R older than 4.0.
 
-\code{entrace()} also works as a \link{calling} handler, though it
-is often more practical to use the higher-level function
-\code{\link[=with_abort]{with_abort()}}.
+When used as calling handler, rlang trims the handler invokation
+context from the backtrace.
 }
 \examples{
-if (FALSE) {  # Not run
+quote({  # Not run
 
-# Set the error handler in your RProfile like this:
-if (requireNamespace("rlang", quietly = TRUE)) {
-  options(error = rlang::entrace)
-}
+# Set `entrace()` globally in your RProfile
+globalCallingHandlers(error = rlang::entrace)
 
-}
+# On older R versions which don't feature `globalCallingHandlers`,
+# set the error handler like this:
+options(error = rlang::entrace)
+
+})
 }
 \seealso{
-\code{\link[=with_abort]{with_abort()}} to promote conditions to rlang errors.
-\code{\link[=cnd_entrace]{cnd_entrace()}} to manually add a backtrace to a condition.
+\code{\link[=global_entrace]{global_entrace()}} for configuring errors with
+\code{entrace()}. \code{\link[=cnd_entrace]{cnd_entrace()}} to manually add a backtrace to a
+condition.
 }
+\keyword{internal}

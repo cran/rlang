@@ -42,14 +42,13 @@ default, \code{"keep"}, preserves these arguments. Set \code{.homonyms} to
 the last occurrences, and to \code{"error"} to raise an informative
 error and indicate what arguments have duplicated names.}
 
-\item{.check_assign}{Whether to check for \verb{<-} calls passed in
-dots. When \code{TRUE} and a \verb{<-} call is detected, a warning is
-issued to advise users to use \code{=} if they meant to match a
-function parameter, or wrap the \verb{<-} call in braces otherwise.
+\item{.check_assign}{Whether to check for \verb{<-} calls. When \code{TRUE} a
+warning recommends users to use \code{=} if they meant to match a
+function parameter or wrap the \verb{<-} call in curly braces otherwise.
 This ensures assignments are explicit.}
 }
 \description{
-\Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#questioning}{\figure{lifecycle-questioning.svg}{options: alt='[Questioning]'}}}{\strong{[Questioning]}}
 \itemize{
 \item \code{splice} marks an object to be spliced. It is equivalent to using
 \verb{!!!} in a function taking \link[=dyn-dots]{dynamic dots}.

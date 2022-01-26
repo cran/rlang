@@ -53,8 +53,8 @@ test_that("expr_name() with symbols, calls, and literals", {
   expect_identical(expr_name(function() NULL), "function () ...")
   expect_identical(expr_name(expr(function() { a; b })), "function() ...")
   expect_identical(expr_name(NULL), "NULL")
-  expect_error(expr_name(1:2), "must quote")
-  expect_error(expr_name(env()), "must quote")
+  expect_error(expr_name(1:2), "must be")
+  expect_error(expr_name(env()), "must be")
 })
 
 # --------------------------------------------------------------------
@@ -79,4 +79,15 @@ test_that("imaginary numbers with real part are not syntactic", {
   expect_true(is_syntactic_literal(0i))
   expect_true(is_syntactic_literal(na_cpl))
   expect_false(is_syntactic_literal(1 + 1i))
+})
+
+test_that("is_expression() detects non-parsable parse trees", {
+  expect_true(is_expression(quote(foo(bar = baz(1, NULL)))))
+  expect_false(is_expression(expr(foo(bar = baz(!!(1:2), NULL)))))
+  expect_false(is_expression(call2(identity)))
+})
+
+test_that("is_expression() supports missing arguments", {
+  expect_false(is_expression(missing_arg()))
+  expect_false(is_expression(quote(foo(, ))))
 })

@@ -10,11 +10,16 @@
 #'   standards.
 #'
 #' `arg_match()` derives the possible values from the
-#' [caller frame][caller_frame].
+#' [caller function][caller_fn].
 #'
 #' @param arg A symbol referring to an argument accepting strings.
+#' @param values A character vector of possible values that `arg` can take.
+#' @param ... These dots are for future extensions and must be empty.
+#' @param multiple Whether `arg` may contain zero or several values.
+#' @inheritParams args_error_context
 #' @return The string supplied to `arg`.
 #' @importFrom utils adist
+#' @seealso [check_required()]
 #' @export
 #' @examples
 #' fn <- function(x = c("foo", "bar")) arg_match(x)
@@ -23,40 +28,59 @@
 #' # Throws an informative error for mismatches:
 #' try(fn("b"))
 #' try(fn("baz"))
-arg_match <- function(arg, values = NULL) {
-  arg_expr <- enexpr(arg)
-  if (!is_symbol(arg_expr)) {
-    abort("Internal error: `arg_match()` expects a symbol")
-  }
+arg_match <- function(arg,
+                      values = NULL,
+                      ...,
+                      multiple = FALSE,
+                      error_arg = caller_arg(arg),
+                      error_call = caller_env()) {
+  check_dots_empty0(...)
 
-  arg_nm <- as_string(arg_expr)
+  arg_expr <- enexpr(arg)
+  error_arg <- as_string(error_arg)
+
+  check_symbol(arg_expr, arg = "arg", call = caller_env(), .internal = TRUE)
+  check_character(arg, arg = error_arg, call = error_call)
 
   if (is_null(values)) {
     fn <- caller_fn()
-    values <- fn_fmls(fn)[[arg_nm]]
+    values <- formals(fn)[[error_arg]]
     values <- eval_bare(values, get_env(fn))
   }
-  if (!is_character(arg)) {
-    abort(paste0(chr_quoted(arg_nm), " must be a character vector."))
+
+  if (multiple) {
+    return(arg_match_multi(arg, values, error_arg, error_call))
   }
+
   if (length(arg) > 1 && !setequal(arg, values)) {
-    abort(arg_match_invalid_msg(arg_nm, values))
+    abort(
+      arg_match_invalid_msg(arg, values, error_arg),
+      call = error_call
+    )
   }
 
   arg <- arg[[1]]
-  arg_match0(arg, values, arg_nm)
+  arg_match0(
+    arg,
+    values,
+    error_arg,
+    error_call = error_call
+  )
+}
+
+arg_match_multi <- function(arg, values, error_arg, error_call) {
+  map_chr(arg, ~ arg_match0(.x, values, error_arg, error_call = error_call))
 }
 
 #' @description
 #' `arg_match0()` is a bare-bones version if performance is at a premium.
-#' It requires a string as `arg` and explicit `values`.
+#' It requires a string as `arg` and explicit character `values`.
 #' For convenience, `arg` may also be a character vector containing
 #' every element of `values`, possibly permuted.
 #' In this case, the first element of `arg` is used.
 #'
-#' @param values The possible values that `arg` can take.
-#' @param arg_nm The label to be used for `arg` in error messages.
 #' @rdname arg_match
+#' @param arg_nm Same as `error_arg`.
 #' @export
 #' @examples
 #'
@@ -70,13 +94,31 @@ arg_match <- function(arg, values = NULL) {
 #' fn1()
 #' fn2("bar")
 #' try(fn3("zoo"))
-arg_match0 <- function(arg, values, arg_nm = as_label(substitute(arg))) {
-  .External(rlang_ext_arg_match0, arg, values, environment())
+arg_match0 <- function(arg,
+                       values,
+                       arg_nm = caller_arg(arg),
+                       error_call = caller_env()) {
+  .External(ffi_arg_match0, arg, values, arg_nm, error_call)
 }
 
-stop_arg_match <- function(arg, values, arg_nm) {
-  msg <- arg_match_invalid_msg(arg_nm, values)
+stop_arg_match <- function(arg, values, error_arg, error_call) {
+  if (length(arg) > 1) {
+    sorted_arg <- sort(unique(arg))
+    sorted_values <- sort(unique(values))
+    if (!identical(sorted_arg, sorted_values)) {
+      msg <- sprintf(
+        "%s must be length 1 or a permutation of %s.",
+        format_arg("arg"),
+        format_arg("values")
+      )
+      abort(msg, call = quote(arg_match()))
+    }
+  }
 
+  msg <- arg_match_invalid_msg(arg, values, error_arg)
+
+  # Try suggest the most probable and helpful candidate value
+  candidate <- NULL
   i_partial <- pmatch(arg, values)
   if (!is_na(i_partial)) {
     candidate <- values[[i_partial]]
@@ -87,18 +129,70 @@ stop_arg_match <- function(arg, values, arg_nm) {
     candidate <- values[[which.min(i_close)]]
   }
 
-  if (exists("candidate")) {
-    candidate <- chr_quoted(candidate, "\"")
-    msg <- paste0(msg, "\n", "Did you mean ", candidate, "?")
+  if (is_null(candidate)) {
+    # Make case-insensitive match only after failed case-sensitive one to be
+    # more helpful in certain edge cases. For example,
+    # `arg_match0("aa", c("AA", "aA"))`: here "aA" is the closest candidate.
+    i_close_nocase <- adist(arg, values, ignore.case = TRUE) / nchar(values)
+    if (any(i_close_nocase <= 0.5)) {
+      candidate <- values[[which.min(i_close_nocase)]]
+    }
   }
 
-  abort(msg)
+  if (!is_null(candidate)) {
+    candidate <- chr_quoted(candidate, "\"")
+    msg <- c(msg, i = paste0("Did you mean ", candidate, "?"))
+  }
+
+  abort(msg, call = error_call)
 }
 
-arg_match_invalid_msg <- function(arg_nm, values) {
-  msg <- paste0(chr_quoted(arg_nm), " must be one of ")
-  msg <- paste0(msg, chr_enumerate(chr_quoted(values, "\"")), ".")
+arg_match_invalid_msg <- function(val, values, error_arg) {
+  msg <- paste0(format_arg(error_arg), " must be one of ")
+  msg <- paste0(msg, chr_enumerate(chr_quoted(values, "\"")))
+
+  if (is_null(val)) {
+    msg <- paste0(msg, ".")
+  } else {
+    msg <- paste0(msg, sprintf(', not "%s\".', val[[1]]))
+  }
+
   msg
+}
+
+#' Check that argument is supplied
+#'
+#' Throws an error if `x` is missing.
+#'
+#' @param x A function argument. Must be a symbol.
+#' @inheritParams args_error_context
+#'
+#' @seealso [arg_match()]
+#' @examples
+#' f <- function(x)  {
+#'   check_required(x)
+#' }
+#'
+#' # Fails because `x` is not supplied
+#' try(f())
+#'
+#' # Succeeds
+#' f(NULL)
+#' @export
+check_required <- function(x,
+                           arg = caller_arg(x),
+                           call = caller_env()) {
+  if (!missing(x)) {
+    invisible(return(TRUE))
+  }
+
+  arg_expr <- substitute(x)
+  if (!is_symbol(arg_expr)) {
+    abort(sprintf("%s must be an argument name.", format_arg("x")))
+  }
+
+  msg <- sprintf("%s is absent but must be supplied.", format_arg(arg))
+  abort(msg, call = call)
 }
 
 chr_quoted <- function(chr, type = "`") {
@@ -125,6 +219,91 @@ chr_enumerate <- function(chr, sep = ", ", final = "or") {
   }
 }
 
+#' Check that arguments are mutually exclusive
+#'
+#' `check_exclusive()` checks that only one argument is supplied out of
+#' a set of mutually exclusive arguments. An informative error is
+#' thrown if multiple arguments are supplied.
+#'
+#' @param ... Function arguments.
+#' @param .require Whether at least one argument must be supplied.
+#' @param .frame Environment where the arguments in `...` are defined.
+#' @inheritParams args_error_context
+#' @return The supplied argument name as a string. If `.require` is
+#'   `FALSE` and no argument is supplied, the empty string `""` is
+#'   returned.
+#'
+#' @examples
+#' f <- function(x, y) {
+#'   switch(
+#'     check_exclusive(x, y),
+#'     x = message("`x` was supplied."),
+#'     y = message("`y` was supplied.")
+#'   )
+#' }
+#'
+#' # Supplying zero or multiple arguments is forbidden
+#' try(f())
+#' try(f(NULL, NULL))
+#'
+#' # The user must supply one of the mutually exclusive arguments
+#' f(NULL)
+#' f(y = NULL)
+#'
+#'
+#' # With `.require` you can allow zero arguments
+#' f <- function(x, y) {
+#'   switch(
+#'     check_exclusive(x, y, .require = FALSE),
+#'     x = message("`x` was supplied."),
+#'     y = message("`y` was supplied."),
+#'     message("No arguments were supplied")
+#'   )
+#' }
+#' f()
+#' @export
+check_exclusive <- function(...,
+                            .require = TRUE,
+                            .frame = caller_env(),
+                            .error_call = .frame) {
+  args <- enexprs(..., .named = TRUE)
+  if (length(args) < 2) {
+    abort("Must supply at least two arguments.")
+  }
+  if (!every(args, is_symbol)) {
+    abort("`...` must be function arguments.")
+  }
+
+  present <- map_lgl(args, ~ inject(!base::missing(!!.x), .frame))
+  n_present <- sum(present)
+
+  if (n_present == 0) {
+    if (.require) {
+      args <- map(names(args), format_arg)
+      enum <- chr_enumerate(args)
+      msg <- sprintf("One of %s must be supplied.", enum)
+      abort(msg, call = .error_call)
+    } else {
+      return("")
+    }
+  }
+
+  if (n_present == 1) {
+    return(as_string(args[[which(present)]]))
+  }
+
+  args <- map_chr(names(args), format_arg)
+  enum <- chr_enumerate(args)
+  msg <- sprintf("Exactly one of %s must be supplied.", enum)
+
+  if (n_present != length(args)) {
+    enum <- chr_enumerate(args[present], final = "and")
+    msg <- c(msg, x = sprintf("%s were supplied together.", enum))
+  }
+
+  abort(msg, call = .error_call)
+}
+
 #' Generate or handle a missing argument
 #'
 #' @description
@@ -136,7 +315,8 @@ chr_enumerate <- function(chr, sep = ", ", final = "or") {
 #'
 #' * `is_missing()` is like [base::missing()] but also supports
 #'   testing for missing arguments contained in other objects like
-#'   lists.
+#'   lists. It is also more consistent with default arguments which
+#'   are never treated as missing (see section below).
 #'
 #' * `maybe_missing()` is useful to pass down an input that might be
 #'   missing to another function, potentially substituting by a
@@ -154,21 +334,74 @@ chr_enumerate <- function(chr, sep = ", ", final = "or") {
 #'   quosure containing the missing argument object.
 #'
 #'
+#' @section `is_missing()` and default arguments:
+#'
+#' The base function [missing()] makes a distinction between default
+#' values supplied explicitly and default values generated through a
+#' missing argument:
+#'
+#' ```{r}
+#' fn <- function(x = 1) base::missing(x)
+#'
+#' fn()
+#' fn(1)
+#' ```
+#'
+#' This only happens within a function. If the default value has been
+#' generated in a calling function, it is never treated as missing:
+#'
+#' ```{r}
+#' caller <- function(x = 1) fn(x)
+#' caller()
+#' ```
+#'
+#' `rlang::is_missing()` simplifies these rules by never treating
+#' default arguments as missing, even in internal contexts:
+#'
+#' ```{r}
+#' fn <- function(x = 1) rlang::is_missing(x)
+#'
+#' fn()
+#' fn(1)
+#' ```
+#'
+#' This is a little less flexible because you can't specialise
+#' behaviour based on implicitly supplied default values. However,
+#' this makes the behaviour of `is_missing()` and functions using it
+#' simpler to understand.
+#'
+#'
 #' @section Fragility of the missing argument object:
 #'
 #' The missing argument is an object that triggers an error if and
 #' only if it is the result of evaluating a symbol. No error is
 #' produced when a function call evaluates to the missing argument
-#' object. This means that expressions like `x[[1]] <- missing_arg()`
-#' are perfectly safe. Likewise, `x[[1]]` is safe even if the result
-#' is the missing object.
+#' object. For instance, it is possible to bind the missing argument
+#' to a variable with an expression like `x[[1]] <- missing_arg()`.
+#' Likewise, `x[[1]]` is safe to use as argument, e.g. `list(x[[1]])`
+#' even when the result is the missing object.
 #'
 #' However, as soon as the missing argument is passed down between
-#' functions through an argument, you're at risk of triggering a
-#' missing error. This is because arguments are passed through
-#' symbols. To work around this, `is_missing()` and `maybe_missing(x)`
-#' use a bit of magic to determine if the input is the missing
-#' argument without triggering a missing error.
+#' functions through a bare variable, it is likely to cause a missing
+#' argument error:
+#'
+#' ```r
+#' x <- missing_arg()
+#' list(x)
+#' #> Error:
+#' #> ! argument "x" is missing, with no default
+#' ```
+#'
+#' To work around this, `is_missing()` and `maybe_missing(x)` use a
+#' bit of magic to determine if the input is the missing argument
+#' without triggering a missing error.
+#'
+#' ```r
+#' x <- missing_arg()
+#' list(maybe_missing(x))
+#' #> [[1]]
+#' #>
+#' ```
 #'
 #' `maybe_missing()` is particularly useful for prototyping
 #' meta-programming algorithms in R. The missing argument is a likely
@@ -178,12 +411,6 @@ chr_enumerate <- function(chr, sep = ", ", final = "or") {
 #' is not the case on the R side. If you're implementing your
 #' meta-programming algorithm in R, use `maybe_missing()` when an
 #' input might be the missing argument object.
-#'
-#'
-#' @section Life cycle:
-#'
-#' * `missing_arg()` and `is_missing()` are stable.
-#' * Like the rest of rlang, `maybe_missing()` is maturing.
 #'
 #' @param x An object that might be the missing argument.
 #' @export
@@ -235,13 +462,13 @@ chr_enumerate <- function(chr, sep = ", ", final = "or") {
 #' is_missing(missing_arg())
 #' is_missing(l[[1]])
 missing_arg <- function() {
-  .Call(rlang_missing_arg)
+  .Call(ffi_missing_arg)
 }
 
 #' @rdname missing_arg
 #' @export
 is_missing <- function(x) {
-  missing(x) || is_reference(x, quote(expr = ))
+  missing(x) || identical(x, quote(expr = ))
 }
 
 #' @rdname missing_arg

@@ -29,7 +29,7 @@ NULL
 #' @export
 #' @rdname type-predicates
 is_list <- function(x, n = NULL) {
-  .Call(rlang_is_list, x, n)
+  .Call(ffi_is_list, x, n)
 }
 
 parsable_atomic_types <- c("logical", "integer", "double", "complex", "character")
@@ -37,43 +37,65 @@ atomic_types <- c(parsable_atomic_types, "raw")
 #' @export
 #' @rdname type-predicates
 is_atomic <- function(x, n = NULL) {
-  .Call(rlang_is_atomic, x, n)
+  .Call(ffi_is_atomic, x, n)
 }
 #' @export
 #' @rdname type-predicates
 is_vector <- function(x, n = NULL) {
-  .Call(rlang_is_vector, x, n)
+  .Call(ffi_is_vector, x, n)
 }
 
 # Mostly for unit testing
 is_finite <- function(x) {
-  .Call(rlang_is_finite, x)
+  .Call(ffi_is_finite, x)
 }
 
 #' @export
 #' @rdname type-predicates
 is_integer <- function(x, n = NULL) {
-  .Call(rlang_is_integer, x, n)
+  .Call(ffi_is_integer, x, n)
 }
 #' @export
 #' @rdname type-predicates
 is_double <- function(x, n = NULL, finite = NULL) {
-  .Call(rlang_is_double, x, n, finite)
+  .Call(ffi_is_double, x, n, finite)
+}
+#' @export
+#' @rdname type-predicates
+is_complex <- function(x, n = NULL, finite = NULL) {
+  .Call(ffi_is_complex, x, n, finite)
 }
 #' @export
 #' @rdname type-predicates
 is_character <- function(x, n = NULL) {
-  .Call(rlang_is_character, x, n)
+  .Call(ffi_is_character, x, n, NULL, NULL)
+}
+is_character2 <- function(x,
+                          n = NULL,
+                          ...,
+                          missing = TRUE,
+                          empty = TRUE) {
+  check_dots_empty0(...)
+
+  # FIXME: Change API at C-level so that `TRUE` means no restriction
+  if (is_true(missing)) {
+    missing <- NULL
+  }
+  if (is_true(empty)) {
+    empty <- NULL
+  }
+
+  .Call(ffi_is_character, x, n, missing, empty)
 }
 #' @export
 #' @rdname type-predicates
 is_logical <- function(x, n = NULL) {
-  .Call(rlang_is_logical, x, n)
+  .Call(ffi_is_logical, x, n)
 }
 #' @export
 #' @rdname type-predicates
 is_raw <- function(x, n = NULL) {
-  .Call(rlang_is_raw, x, n)
+  .Call(ffi_is_raw, x, n)
 }
 #' @export
 #' @rdname type-predicates
@@ -104,27 +126,32 @@ NULL
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_list <- function(x) {
-  .Call(rlang_is_list, x, 1L)
+  .Call(ffi_is_list, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_atomic <- function(x) {
-  .Call(rlang_is_atomic, x, 1L)
+  .Call(ffi_is_atomic, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_vector <- function(x) {
-  .Call(rlang_is_vector, x, 1L)
+  .Call(ffi_is_vector, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_integer <- function(x) {
-  .Call(rlang_is_integer, x, 1L)
+  .Call(ffi_is_integer, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_double <- function(x) {
-  .Call(rlang_is_double, x, 1L, NULL)
+  .Call(ffi_is_double, x, 1L, NULL)
+}
+#' @export
+#' @rdname scalar-type-predicates
+is_scalar_complex <- function(x) {
+  .Call(ffi_is_complex, x, 1L, NULL)
 }
 #' @export
 #' @rdname scalar-type-predicates
@@ -134,19 +161,23 @@ is_scalar_character <- function(x) {
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_logical <- function(x) {
-  .Call(rlang_is_logical, x, 1L)
+  .Call(ffi_is_logical, x, 1L)
 }
 #' @export
 #' @rdname scalar-type-predicates
 is_scalar_raw <- function(x) {
-  .Call(rlang_is_raw, x, 1L)
+  .Call(ffi_is_raw, x, 1L)
 }
 #' @export
 #' @param string A string to compare to `x`. If a character vector,
 #'   returns `TRUE` if at least one element is equal to `x`.
 #' @rdname scalar-type-predicates
 is_string <- function(x, string = NULL) {
-  .Call(rlang_is_string, x, string)
+  .Call(ffi_is_string, x, string, NULL)
+}
+is_string2 <- function(x, string = NULL, ..., empty = NULL) {
+  check_dots_empty0(...)
+  .Call(ffi_is_string, x, string, empty)
 }
 #' @export
 #' @rdname scalar-type-predicates
@@ -155,6 +186,10 @@ is_scalar_bytes <- is_scalar_raw
 #' @rdname scalar-type-predicates
 is_bool <- function(x) {
   is_logical(x, n = 1) && !is.na(x)
+}
+
+is_number <- function(x) {
+  is_integerish(x, n = 1, finite = TRUE)
 }
 
 #' Bare type predicates
@@ -195,6 +230,11 @@ is_bare_vector <- function(x, n = NULL) {
 #' @rdname bare-type-predicates
 is_bare_double <- function(x, n = NULL) {
   !is.object(x) && is_double(x, n)
+}
+#' @export
+#' @rdname bare-type-predicates
+is_bare_complex <- function(x, n = NULL) {
+  !is.object(x) && is_complex(x, n)
 }
 #' @export
 #' @rdname bare-type-predicates
@@ -310,7 +350,7 @@ is_false <- function(x) {
 #' is_integerish(10.000001)
 #' is_integerish(TRUE)
 is_integerish <- function(x, n = NULL, finite = NULL) {
-  .Call(rlang_is_integerish, x, n, finite)
+  .Call(ffi_is_integerish, x, n, finite)
 }
 #' @rdname is_integerish
 #' @export
@@ -320,12 +360,12 @@ is_bare_integerish <- function(x, n = NULL, finite = NULL) {
 #' @rdname is_integerish
 #' @export
 is_scalar_integerish <- function(x, finite = NULL) {
-  .Call(rlang_is_integerish, x, 1L, finite)
+  .Call(ffi_is_integerish, x, 1L, finite)
 }
 
 type_of_ <- function(x) {
   type <- typeof(x)
-  if (is_formulaish(x)) {
+  if (is_formula(x)) {
     if (identical(node_car(x), colon_equals_sym)) {
       "definition"
     } else {
@@ -338,26 +378,6 @@ type_of_ <- function(x) {
   } else {
     type
   }
-}
-
-#' Format a type for error messages
-#'
-#' @section Life cycle:
-#'
-#' * `friendly_type()` is experimental.
-#'
-#' @param type A type as returned by [typeof()].
-#' @return A string of the prettified type, qualified with an
-#'   indefinite article.
-#' @export
-#' @keywords internal
-#' @examples
-#' friendly_type("logical")
-#' friendly_type("integer")
-#' friendly_type("string")
-#' @export
-friendly_type <- function(type) {
-  as_friendly_type(type) %||% type
 }
 
 #' Is an object copyable?
@@ -447,7 +467,7 @@ is_equal <- function(x, y) {
 #' vec[[1]] <- 100
 #' is_reference(copy, vec)
 is_reference <- function(x, y) {
-  .Call(rlang_is_reference, x, y)
+  .Call(ffi_is_reference, x, y)
 }
 
 

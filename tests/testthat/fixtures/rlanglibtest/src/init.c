@@ -1,23 +1,23 @@
 #include "lib/rlang.h"
 
 
-extern sexp* rlanglibtest_r_quo_get_expr(sexp*);
-extern sexp* rlanglibtest_r_quo_set_expr(sexp*, sexp*);
-extern sexp* rlanglibtest_r_quo_get_env(sexp*);
-extern sexp* rlanglibtest_r_quo_set_env(sexp*, sexp*);
+extern r_obj* rlanglibtest_r_quo_get_expr(r_obj*);
+extern r_obj* rlanglibtest_r_quo_set_expr(r_obj*, r_obj*);
+extern r_obj* rlanglibtest_r_quo_get_env(r_obj*);
+extern r_obj* rlanglibtest_r_quo_set_env(r_obj*, r_obj*);
 
 
-sexp* rlanglibtest_library_load() {
+r_obj* rlanglibtest_library_load() {
   r_init_library();
   return r_null;
 }
 
 static const r_callable r_callables[] = {
-  {"rlanglibtest_library_load",   (r_fn_ptr) &rlanglibtest_library_load, 0},
-  {"rlanglibtest_r_quo_get_expr", (r_fn_ptr) &rlanglibtest_r_quo_get_expr, 1},
-  {"rlanglibtest_r_quo_set_expr", (r_fn_ptr) &rlanglibtest_r_quo_set_expr, 2},
-  {"rlanglibtest_r_quo_get_env",  (r_fn_ptr) &rlanglibtest_r_quo_get_env, 1},
-  {"rlanglibtest_r_quo_set_env",  (r_fn_ptr) &rlanglibtest_r_quo_set_env, 2},
+  {"rlanglibtest_library_load",   (r_void_fn) &rlanglibtest_library_load, 0},
+  {"rlanglibtest_r_quo_get_expr", (r_void_fn) &rlanglibtest_r_quo_get_expr, 1},
+  {"rlanglibtest_r_quo_set_expr", (r_void_fn) &rlanglibtest_r_quo_set_expr, 2},
+  {"rlanglibtest_r_quo_get_env",  (r_void_fn) &rlanglibtest_r_quo_get_env, 1},
+  {"rlanglibtest_r_quo_set_env",  (r_void_fn) &rlanglibtest_r_quo_set_env, 2},
   {NULL, NULL, 0}
 };
 

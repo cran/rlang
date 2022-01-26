@@ -1,7 +1,7 @@
 #define R_NO_REMAP
 #include <Rinternals.h>
 
-const char* rlang_version = "0.4.12";
+const char* rlang_version = "1.0.0";
 
 /**
  * This file records the expected package version in the shared
@@ -12,7 +12,7 @@ const char* rlang_version = "0.4.12";
  * package was properly installed:
  *
  * - Register the function below as a C callable under the name
- *   "rlang_linked_version".
+ *   "ffi_linked_version".
  *
  * - Call `rlang::check_linked_version(pkg_name)` from your
  *   `.onLoad()` hook. If you don't depend on rlang copy the

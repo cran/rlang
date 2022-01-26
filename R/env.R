@@ -67,8 +67,7 @@
 #' @param ...,data <[dynamic][dyn-dots]> Named values. You can
 #'   supply one unnamed to specify a custom parent, otherwise it
 #'   defaults to the current environment.
-#' @param .parent,parent A parent environment. Can be an object
-#'   supported by [as_environment()].
+#' @param .parent,parent A parent environment.
 #' @seealso [env_has()], [env_bind()].
 #' @export
 #' @examples
@@ -183,13 +182,6 @@ new_environment <- function(data = list(), parent = empty_env()) {
 #' environment is duplicated before being set a new parent. The return
 #' value is therefore a different environment than `x`.
 #'
-#'
-#' @section Life cycle:
-#'
-#' `as_env()` was soft-deprecated and renamed to `as_environment()` in
-#' rlang 0.2.0. This is for consistency as type predicates should not
-#' be abbreviated.
-#'
 #' @param x An object to coerce.
 #' @param parent A parent environment, [empty_env()] by default. This
 #'   argument is only used when `x` is data actually coerced to an
@@ -283,30 +275,30 @@ vec_as_environment <- function(x, parent = NULL) {
 #' fn <- set_env(function() env_parent(), enclos_env)
 #' identical(enclos_env, fn())
 env_parent <- function(env = caller_env(), n = 1) {
-  env_ <- get_env_retired(env, "env_parent()")
+  check_environment(env)
 
   while (n > 0) {
-    if (is_empty_env(env_)) {
-      abort("The empty environment has no parent")
+    if (is_empty_env(env)) {
+      abort("The empty environment has no parent.")
     }
     n <- n - 1
-    env_ <- parent.env(env_)
+    env <- parent.env(env)
   }
 
-  env_
+  env
 }
 #' @rdname env_parent
 #' @export
 env_tail <- function(env = caller_env(), last = global_env()) {
-  env_ <- get_env_retired(env, "env_tail()")
-  parent <- env_parent(env_)
+  check_environment(env)
+  parent <- env_parent(env)
 
-  while (!is_reference(parent, last) && !is_empty_env(parent)) {
-    env_ <- parent
+  while (!identical(parent, last) && !is_empty_env(parent)) {
+    env <- parent
     parent <- env_parent(parent)
   }
 
-  env_
+  env
 }
 #' @rdname env_parent
 #' @export
@@ -318,8 +310,8 @@ env_parents <- function(env = caller_env(), last = global_env()) {
   n <- env_depth(env)
   out <- new_list(n)
 
-  if (!typeof(last) %in% c("environment", "NULL")) {
-    abort("`last` must be `NULL` or an environment")
+  if (!is_null(last)) {
+    check_environment(last, what = "`NULL` or an environment")
   }
 
   i <- 1L
@@ -359,11 +351,11 @@ env_parents <- function(env = caller_env(), last = global_env()) {
 #' env_depth(empty_env())
 #' env_depth(pkg_env("rlang"))
 env_depth <- function(env) {
-  env_ <- get_env_retired(env, "env_depth()")
+  check_environment(env)
 
   n <- 0L
-  while (!is_empty_env(env_)) {
-    env_ <- env_parent(env_)
+  while (!is_empty_env(env)) {
+    env <- env_parent(env)
     n <- n + 1L
   }
 
@@ -378,11 +370,10 @@ is_empty_env <- function(env) {
 #'
 #' These functions dispatch internally with methods for functions,
 #' formulas and frames. If called with a missing argument, the
-#' environment of the current evaluation frame (see [ctxt_stack()]) is
-#' returned. If you call `get_env()` with an environment, it acts as
-#' the identity function and the environment is simply returned (this
-#' helps simplifying code when writing generic functions for
-#' environments).
+#' environment of the current evaluation frame is returned. If you
+#' call `get_env()` with an environment, it acts as the identity
+#' function and the environment is simply returned (this helps
+#' simplifying code when writing generic functions for environments).
 #'
 #' While `set_env()` returns a modified copy and does not have side
 #' effects, `env_poke_parent()` operates changes the environment by
@@ -390,19 +381,6 @@ is_empty_env <- function(env) {
 #' [uncopyable][is_copyable]. Be careful not to change environments
 #' that you don't own, e.g. a parent environment of a function from a
 #' package.
-#'
-#'
-#' @section Life cycle:
-#'
-#' - Using `get_env()` without supplying `env` is deprecated as
-#'   of rlang 0.3.0. Please use [current_env()] to retrieve the
-#'   current environment.
-#'
-#' - Passing environment wrappers like formulas or functions instead
-#'   of bare environments is deprecated as of rlang 0.3.0. This
-#'   internal genericity was causing confusion (see issue #427). You
-#'   should now extract the environment separately before calling
-#'   these functions.
 #'
 #' @param env An environment.
 #' @param default The default environment in case `env` does not wrap
@@ -436,11 +414,6 @@ is_empty_env <- function(env) {
 #' default <- env()
 #' identical(get_env(f, default), default)
 get_env <- function(env, default = NULL) {
-  if (missing(env)) {
-    warn_deprecated("The `env` argument of `get_env()` must now be supplied")
-    env <- caller_env()
-  }
-
   out <- switch(typeof(env),
     environment = env,
     definition = ,
@@ -455,23 +428,10 @@ get_env <- function(env, default = NULL) {
 
   if (is_null(out)) {
     type <- friendly_type_of(env)
-    abort(paste0("Can't extract an environment from ", type))
+    abort(paste0("Can't extract an environment from ", type, "."))
   } else {
     out
   }
-}
-get_env_retired <- function(x, fn) {
-  if (is_environment(x)) {
-    return(x)
-  }
-
-  type <- friendly_type_of(x)
-  warn_deprecated(paste_line(
-    sprintf("Passing an environment wrapper like %s is deprecated.", type),
-    sprintf("Please retrieve the environment before calling `%s`", fn)
-  ))
-
-  get_env(x)
 }
 
 #' @rdname get_env
@@ -499,37 +459,33 @@ get_env_retired <- function(x, fn) {
 #' fn <- set_env(fn, other_env)
 #' identical(get_env(fn), other_env)
 set_env <- function(env, new_env = caller_env()) {
-  new_env <- get_env_retired(new_env, "set_env()")
-
-  if (is_formulaish(env) || is_closure(env)) {
+  if (is_formula(env) || is_closure(env)) {
     environment(env) <- new_env
     return(env)
   }
-  if (is_environment(env)) {
-    return(new_env)
-  }
 
-  abort(paste0(
-    "Can't set environment for ", friendly_type_of(env)
-  ))
+  check_environment(env)
+  new_env
 }
 #' @rdname get_env
 #' @export
 env_poke_parent <- function(env, new_env) {
-  env <- get_env_retired(env, "env_poke_parent()")
-  new_env <- get_env_retired(new_env, "env_poke_parent()")
-  .Call(rlang_env_poke_parent, env, new_env)
+  check_environment(env)
+  check_environment(new_env)
+  .Call(ffi_env_poke_parent, env, new_env)
 }
 `env_parent<-` <- function(x, value) {
-  env <- get_env_retired(x, "env_poke_parent<-")
-  .Call(rlang_env_poke_parent, env, value)
+  check_environment(env)
+  check_environment(value)
+  .Call(ffi_env_poke_parent, env, value)
 }
 
 
 #' Clone an environment
 #'
 #' This creates a new environment containing exactly the same objects,
-#' optionally with a new parent.
+#' optionally with a new parent. Active bindings and promises are
+#' preserved (the latter only on R >= 4.0.0).
 #'
 #' @inheritParams get_env
 #' @param parent The parent of the cloned environment.
@@ -540,8 +496,9 @@ env_poke_parent <- function(env, new_env) {
 #' identical(env, clone)
 #' identical(env$cyl, clone$cyl)
 env_clone <- function(env, parent = env_parent(env)) {
-  env <- get_env_retired(env, "env_clone()")
-  .Call(rlang_env_clone, env, parent)
+  check_environment(env)
+  check_environment(parent)
+  .Call(ffi_env_clone, env, parent)
 }
 
 #' Does environment inherit from another environment?
@@ -552,15 +509,16 @@ env_clone <- function(env, parent = env_parent(env)) {
 #' @param ancestor Another environment from which `x` might inherit.
 #' @export
 env_inherits <- function(env, ancestor) {
-  env <- get_env_retired(env, "env_inherits()")
-  .Call(rlang_env_inherits, env, ancestor)
+  check_environment(env)
+  check_environment(ancestor)
+  .Call(ffi_env_inherits, env, ancestor)
 }
 
 #' Lock an environment
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' Locked environments cannot be modified. An important example is
 #' namespace environments which are locked by R when loaded in a
@@ -617,7 +575,7 @@ env_is_locked <- function(env) {
 #' @keywords internal
 #' @export
 env_unlock <- function(env) {
-  invisible(.Call(rlang_env_unlock, env))
+  invisible(.Call(ffi_env_unlock, env))
 }
 
 
@@ -664,22 +622,23 @@ env_print <- function(env = caller_env()) {
     locked <- ""
   }
 
+  header <- format_cls(sprintf("environment: %s", env_label(env)))
   cat_line(
-    bold(sprintf("<environment: %s>%s", env_label(env), locked)),
-    sprintf("parent: %s", parent)
+    bold(paste0(header, locked)),
+    sprintf("Parent: %s", parent)
   )
 
   class <- attr(env, "class")
   if (is_character(class)) {
     class <- paste(class, collapse = ", ")
-    cat_line(sprintf("class: %s", class))
+    cat_line(sprintf("Class: %s", class))
   }
 
   nms <- env_names(env)
   n <- length(nms)
 
   if (n) {
-    cat_line("bindings:")
+    cat_line("Bindings:")
 
     if (n > 20) {
       other <- nms[seq(21L, n)]
@@ -691,18 +650,20 @@ env_print <- function(env = caller_env()) {
     escaped_nms <- map_chr(syms(nms), deparse, backtick = TRUE)
 
     types <- env_binding_type_sum(env, nms)
-    types <- paste0(" ", bullet(paste0(escaped_nms, ": <", types, ">")))
+    types <- paste0(escaped_nms, ": <", types, ">")
 
     locked <- env_binding_are_locked(env, nms)
     locked <- ifelse(locked, " [L]", "")
     types <- paste0(types, locked)
 
-    cat_line(types)
+    types <- set_names(types, "*")
 
     n_other <- length(other)
     if (n_other) {
-      cat_line(sprintf("   * ... with %s more bindings", n_other))
+      types <- c(types, sprintf("... with %s more bindings", n_other))
     }
+
+    writeLines(format_error_bullets(types))
   }
 
   invisible(env)
@@ -753,7 +714,7 @@ names_tags <- function(nms) {
     return("")
   }
 
-  invalid <- nms_are_invalid(nms)
+  invalid <- detect_void_name(nms)
   if (all(invalid)) {
     return("")
   }
@@ -799,10 +760,10 @@ str.rlang_envs <- function(object, ...) {
 #'   `env_is_browsed()` (a logical), invisibly.
 #' @export
 env_browse <- function(env, value = TRUE) {
-  invisible(.Call(rlang_env_browse, env, value))
+  invisible(.Call(ffi_env_browse, env, value))
 }
 #' @rdname env_browse
 #' @export
 env_is_browsed <- function(env) {
-  .Call(rlang_env_is_browsed, env)
+  .Call(ffi_env_is_browsed, env)
 }

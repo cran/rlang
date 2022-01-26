@@ -5,9 +5,15 @@
 \alias{env_get_list}
 \title{Get an object in an environment}
 \usage{
-env_get(env = caller_env(), nm, default, inherit = FALSE)
+env_get(env = caller_env(), nm, default, inherit = FALSE, last = empty_env())
 
-env_get_list(env = caller_env(), nms, default, inherit = FALSE)
+env_get_list(
+  env = caller_env(),
+  nms,
+  default,
+  inherit = FALSE,
+  last = empty_env()
+)
 }
 \arguments{
 \item{env}{An environment.}
@@ -19,6 +25,9 @@ in \code{env}.}
 
 \item{inherit}{Whether to look for bindings in the parent
 environments.}
+
+\item{last}{Last environment inspected when \code{inherit} is \code{TRUE}.
+Can be useful in conjunction with \code{\link[base:ns-topenv]{base::topenv()}}.}
 }
 \value{
 An object if it exists. Otherwise, throws an error.
@@ -41,4 +50,8 @@ env_get(env, "foo", inherit = TRUE)
 
 # You can also avoid an error by supplying a default value:
 env_get(env, "foo", default = "FOO")
+}
+\seealso{
+\code{\link[=env_cache]{env_cache()}} for a variant of \code{env_get()} designed to
+cache a value in an environment.
 }

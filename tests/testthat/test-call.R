@@ -53,6 +53,81 @@ test_that("can standardise primitive functions (#473)", {
   expect_identical(call_standardise(quote(1 + 2)), quote(1 + 2))
 })
 
+test_that("if `call` is supplied to `call_match()`, `fn` must be supplied", {
+  expect_error(
+    call_match(quote(list())),
+    "`fn` must be supplied."
+  )
+})
+
+test_that("call_match() infers call and definition", {
+  fn <- function(foo) call_match(defaults = TRUE)
+  expect_equal(fn(), quote(fn(foo = )))
+  expect_equal(fn(TRUE), quote(fn(foo = TRUE)))
+
+  # Finds dots
+  dots <- function(...) fn(...)
+  expect_equal(dots(), quote(fn(foo = )))
+  expect_equal(dots(bar), quote(fn(foo = ..1)))
+})
+
+test_that("call_match() returns early with primitive functions", {
+  expect_equal(
+    call_match(quote(x[[1]]), `[[`),
+    quote(x[[1]])
+  )
+})
+
+test_that("call_match() matches defaults", {
+  fn <- function(a, b = TRUE, ..., c = FALSE, d) NULL
+
+  expect_equal(
+    call_match(quote(fn()), fn, defaults = TRUE),
+    quote(fn(a = , b = TRUE, c = FALSE, d = ))
+  )
+  expect_equal(
+    call_match(quote(fn()), fn, defaults = FALSE),
+    quote(fn())
+  )
+
+  expect_equal(
+    call_match(quote(fn(NULL)), fn, defaults = TRUE),
+    quote(fn(a = NULL, b = TRUE, c = FALSE, d = ))
+  )
+  expect_equal(
+    call_match(quote(fn(NULL)), fn, defaults = FALSE),
+    quote(fn(a = NULL))
+  )
+
+  expect_equal(
+    call_match(quote(fn(NULL, foo = TRUE)), fn, defaults = TRUE),
+    quote(fn(a = NULL, b = TRUE, foo = TRUE, c = FALSE, d = ))
+  )
+  expect_equal(
+    call_match(quote(fn(NULL, foo = TRUE)), fn, defaults = FALSE),
+    quote(fn(a = NULL, foo = TRUE))
+  )
+
+  expect_equal(
+    call_match(quote(fn(NULL, foo = TRUE)), fn, dots_expand = FALSE, defaults = TRUE),
+    expr(fn(a = NULL, b = TRUE, ... = !!pairlist(foo = TRUE), c = FALSE, d = ))
+  )
+
+  expect_equal(
+    call_match(quote(fn(NULL, foo = TRUE)), fn, dots_expand = FALSE, defaults = FALSE),
+    quote(fn(a = NULL, ... = !!pairlist(foo = TRUE)))
+  )
+})
+
+test_that("`call_match(dots_expand = TRUE)` handles `...` positional edge cases", {
+  m <- function(fn) call_match(quote(fn(foo = TRUE)), fn, defaults = FALSE)
+
+  expect_equal(m(function(...) NULL), quote(fn(foo = TRUE)))
+  expect_equal(m(function(foo, ...) NULL), quote(fn(foo = TRUE)))
+  expect_equal(m(function(..., foo) NULL), quote(fn(foo = TRUE)))
+  expect_equal(m(function(foo, ..., bar) NULL), quote(fn(foo = TRUE)))
+})
+
 
 # Modification ------------------------------------------------------------
 
@@ -198,32 +273,15 @@ test_that("call_name() handles formulas", {
   expect_identical(call_name(~foo(baz)), "foo")
 })
 
-test_that("call_fn() extracts function", {
-  fn <- function() call_fn(call_frame())
-  expect_identical(fn(), fn)
-
-  expect_identical(call_fn(~matrix()), matrix)
-})
-
-test_that("call_fn() looks up function in `env`", {
-  env <- local({
-    fn <- function() "foo"
-    current_env()
-  })
-  expect_identical(call_fn(quote(fn()), env = env), env$fn)
-})
-
 test_that("Inlined functions return NULL name", {
   call <- quote(fn())
   call[[1]] <- function() {}
   expect_null(call_name(call))
 })
 
-test_that("call_args() and call_args_names()", {
-  expect_identical(call_args(~fn(a, b)), set_names(list(quote(a), quote(b)), c("", "")))
-
-  fn <- function(a, b) call_args_names(call_frame())
-  expect_identical(fn(a = foo, b = bar), c("a", "b"))
+test_that("call_args() and call_args_names() work", {
+  expect_equal(call_args(~fn(a, b)), set_names(list(quote(a), quote(b)), c("", "")))
+  expect_equal(call_args_names(quote(foo(a = , b = ))), c("a", "b"))
 })
 
 test_that("qualified and namespaced symbols are recognised", {
@@ -281,25 +339,25 @@ test_that("precedence of associative ops", {
 })
 
 test_that("call functions type-check their input (#187)", {
-  x <- list(a = 1)
-  expect_error(call_modify(x, NULL), "must be a quoted call")
-  expect_error(call_standardise(x), "must be a quoted call")
-  expect_error(call_fn(x), "must be a quoted call")
-  expect_error(call_name(x), "must be a quoted call")
-  expect_error(call_args(x), "must be a quoted call")
-  expect_error(call_args_names(x), "must be a quoted call")
+  expect_snapshot({
+    x <- list(a = 1)
+    err(call_modify(x, NULL))
+    err(call_standardise(x))
+    err(call_name(x))
+    err(call_args(x))
+    err(call_args_names(x))
 
-  q <- quo(!!x)
-  expect_error(call_modify(q, NULL), "must be a quoted call")
-  expect_error(call_standardise(q), "must be a quoted call")
-  expect_error(call_fn(q), "must be a quoted call")
-  expect_error(call_name(q), "must be a quoted call")
-  expect_error(call_args(q), "must be a quoted call")
-  expect_error(call_args_names(q), "must be a quoted call")
+    q <- quo(!!x)
+    err(call_modify(q, NULL))
+    err(call_standardise(q))
+    err(call_name(q))
+    err(call_args(q))
+    err(call_args_names(q))
+  })
 })
 
 test_that("call_print_type() returns correct enum", {
-  expect_error(call_print_type(""), "must be a call")
+  expect_error(call_print_type(""), "must be a defused call")
   expect_identical(call_print_type(quote(foo())), "prefix")
 
   expect_identical(call_print_type(quote(~a)), "prefix")
@@ -378,7 +436,7 @@ test_that("call_print_type() returns correct enum", {
 })
 
 test_that("call_print_fine_type() returns correct enum", {
-  expect_error(call_print_fine_type(""), "must be a call")
+  expect_error(call_print_fine_type(""), "must be a defused call")
   expect_identical(call_print_fine_type(quote(foo())), "call")
 
   expect_identical(call_print_fine_type(quote(~a)), "prefix")
@@ -464,8 +522,62 @@ test_that("call_name() fails with namespaced objects (#670)", {
 })
 
 test_that("call_ns() retrieves namespaces", {
-  expect_error(call_ns(quote(foo)), "must be a quoted call")
+  expect_error(call_ns(quote(foo)), "must be a defused call")
   expect_null(call_ns(quote(foo())))
   expect_identical(call_ns(quote(foo::bar())), "foo")
   expect_identical(call_ns(quote(foo:::bar())), "foo")
+})
+
+test_that("is_call_infix() detects infix operators", {
+  expect_true(is_call_infix(quote(a %>_>% b)))
+  expect_true(is_call_infix(quote(a + b)))
+  expect_false(is_call_infix(quote(+b)))
+})
+
+test_that("call_zap_inline() works", {
+  expect_equal(
+    call_zap_inline(quote(foo(1:2))),
+    quote(foo(1:2))
+  )
+  expect_equal(
+    call_zap_inline(expr(foo(!!(1:2)))),
+    quote(foo(`<int>`))
+  )
+
+  expect_equal(
+    call_zap_inline(quote(function() 1)),
+    quote(function() 1)
+  )
+
+  call <- expr(function(x = NULL) foo(!!(1:2)))
+  call[[2]]$x <- 1:2
+  expect_equal(
+    call_zap_inline(call),
+    quote(function(x = `<int>`) foo(`<int>`))
+  )
+})
+
+test_that("is_call_simple() works", {
+  expect_false(is_call_simple(quote(foo)))
+  expect_false(is_call_simple(quote(foo()())))
+  expect_false(is_call_simple(quote(foo::bar)))
+
+  expect_true(is_call_simple(quote(foo())))
+  expect_true(is_call_simple(quote(bar::foo())))
+
+  expect_true(is_call_simple(quote(foo()), ns = FALSE))
+  expect_false(is_call_simple(quote(foo()), ns = TRUE))
+  expect_true(is_call_simple(quote(bar::foo()), ns = TRUE))
+  expect_false(is_call_simple(quote(bar::foo()), ns = FALSE))
+
+  expect_true(is_call_simple(~ bar::foo(), ns = TRUE))
+
+  expect_false(is_call_simple(quo()))
+})
+
+test_that("call_name() and call_ns() detect `::` calls (#670)", {
+  expect_null(call_name(quote(foo::bar)))
+  expect_null(call_name(quote(foo:::bar)))
+  expect_null(call_ns(quote(foo::bar)))
+  expect_null(call_ns(quote(foo:::bar)))
 })

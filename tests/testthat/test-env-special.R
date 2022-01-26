@@ -32,7 +32,7 @@ test_that("env_name() returns proper environment name", {
 
 test_that("env_label() returns memory address for anonymous envs", {
   env <- env()
-  expect_identical(env_label(env), sexp_address(env))
+  expect_identical(env_label(env), obj_address(env))
 })
 
 test_that("is_attached() detects environments on the search path", {
@@ -79,18 +79,4 @@ test_that("ns_env() and variants have default argument", {
   expect_true(is_reference(out[[1]], ns_env("rlang")))
   expect_true(is_reference(out[[2]], ns_imports_env("rlang")))
   expect_identical(out[[3]], "rlang")
-})
-
-test_that("is_installed() properly checks multiple packages", {
-  expect_false(is_installed(c("base", "no.notarealpackagename")))
-})
-
-test_that("check_installed() fails if packages are not installed", {
-  local_options(rlang_interactive = FALSE)
-
-  expect_snapshot({
-    (expect_error(check_installed("_foo")))
-    (expect_error(check_installed(c("_foo", "_bar"))))
-    (expect_error(check_installed(c("_foo", "_bar"), "to proceed.")))
-  })
 })

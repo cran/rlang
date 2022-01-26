@@ -2,7 +2,7 @@
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#' `r lifecycle::badge("questioning")`
 #'
 #' Missing values are represented in R with the general symbol
 #' `NA`. They can be inserted in almost all data containers: all
@@ -69,7 +69,7 @@ na_cpl <- NA_complex_
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#' `r lifecycle::badge("questioning")`
 #'
 #' `are_na()` checks for missing values in a vector and is equivalent
 #' to [base::is.na()]. It is a vectorised predicate, meaning that its
@@ -111,7 +111,7 @@ na_cpl <- NA_complex_
 #' @export
 are_na <- function(x) {
   if (!is_atomic(x)) {
-    abort("`x` must be an atomic vector")
+    stop_input_type(x, "an atomic vector")
   }
   is.na(x)
 }
@@ -120,6 +120,8 @@ are_na <- function(x) {
 is_na <- function(x) {
   is_scalar_vector(x) && is.na(x)
 }
+
+detect_na <- are_na
 
 #' @rdname are_na
 #' @export

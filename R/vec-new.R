@@ -2,7 +2,7 @@
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#' `r lifecycle::badge("questioning")`
 #'
 #' The atomic vector constructors are equivalent to [c()] but:
 #'
@@ -58,28 +58,28 @@ NULL
 #' @rdname vector-construction
 #' @export
 lgl <- function(...) {
-  .Call(rlang_squash, dots_values(...), "logical", is_spliced_bare, 1L)
+  .Call(ffi_squash, dots_values(...), "logical", is_spliced_bare, 1L)
 }
 #' @rdname vector-construction
 #' @export
 int <- function(...) {
-  .Call(rlang_squash, dots_values(...), "integer", is_spliced_bare, 1L)
+  .Call(ffi_squash, dots_values(...), "integer", is_spliced_bare, 1L)
 }
 #' @rdname vector-construction
 #' @export
 dbl <- function(...) {
-  .Call(rlang_squash, dots_values(...), "double", is_spliced_bare, 1L)
+  .Call(ffi_squash, dots_values(...), "double", is_spliced_bare, 1L)
 }
 #' @rdname vector-construction
 #' @export
 cpl <- function(...) {
-  .Call(rlang_squash, dots_values(...), "complex", is_spliced_bare, 1L)
+  .Call(ffi_squash, dots_values(...), "complex", is_spliced_bare, 1L)
 }
 #' @rdname vector-construction
 #' @export
 #' @export
 chr <- function(...) {
-  .Call(rlang_squash, dots_values(...), "character", is_spliced_bare, 1L)
+  .Call(ffi_squash, dots_values(...), "character", is_spliced_bare, 1L)
 }
 #' @rdname vector-construction
 #' @export
@@ -91,19 +91,19 @@ chr <- function(...) {
 bytes <- function(...) {
   dots <- map(dots_values(...), function(dot) {
     if (is_bare_list(dot) || is_spliced(dot)) {
-      map(dot, new_bytes)
+      map(dot, cast_raw)
     } else {
-      new_bytes(dot)
+      cast_raw(dot)
     }
   })
-  .Call(rlang_squash, dots, "raw", is_spliced_bare, 1L)
+  .Call(ffi_squash, dots, "raw", is_spliced_bare, 1L)
 }
 
 #' Create vectors matching a given length
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#' `r lifecycle::badge("questioning")`
 #'
 #' These functions construct vectors of a given length, with attributes
 #' specified via dots. Except for `new_list()` and `new_raw()`, the
@@ -194,9 +194,7 @@ rep_along <- function(along, x) {
 #' @rdname rep_along
 rep_named <- function(names, x) {
   names <- names %||% chr()
-  if (!is_character(names)) {
-    abort("`names` must be `NULL` or a character vector")
-  }
+  check_character(names, what = "`NULL` or a character vector")
 
   set_names(rep_len(x, length(names)), names)
 }

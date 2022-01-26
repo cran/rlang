@@ -7,10 +7,10 @@ test_that("cnd_signal() creates muffle restarts", {
 })
 
 test_that("signallers support character vectors as `message` parameter", {
-  expect_message(inform(c("foo", "bar")), "foo\n* bar", fixed = TRUE)
-  expect_warning(warn(c("foo", "bar")), "foo\n* bar", fixed = TRUE)
-  expect_error(abort(c("foo", "bar")), "foo\n* bar", fixed = TRUE)
-  expect_condition(signal(c("foo", "bar"), "quux"), "quux", regex = "foo\n\\* bar")
+  expect_message(inform(c("foo", "*" = "bar")), "foo\n* bar", fixed = TRUE)
+  expect_warning(warn(c("foo", "*" = "bar")), "foo\n* bar", fixed = TRUE)
+  expect_error(abort(c("foo", "*" = "bar")), "foo\n* bar", fixed = TRUE)
+  expect_condition(signal(c("foo", "*" = "bar"), "quux"), "quux", regex = "foo\n\\* bar")
 })
 
 test_that("cnd_signal() and signal() returns NULL invisibly", {
@@ -26,13 +26,13 @@ test_that("signal() accepts character vectors of classes (#195)", {
 })
 
 test_that("can pass condition metadata", {
-  msg <- catch_cnd(inform("type", foo = "bar"))
+  msg <- expect_message(inform("type", foo = "bar"))
   expect_identical(msg$foo, "bar")
 
-  wng <- catch_cnd(warn("type", foo = "bar"))
+  wng <- expect_warning2(warn("type", foo = "bar"))
   expect_identical(wng$foo, "bar")
 
-  err <- catch_cnd(abort("type", foo = "bar"))
+  err <- expect_error(abort("type", foo = "bar"))
   expect_identical(err$foo, "bar")
 })
 
@@ -48,10 +48,10 @@ test_that("can signal interrupts with cnd_signal()", {
 })
 
 test_that("conditions have correct subclasses", {
-  expect_true(inherits_all(catch_cnd(signal("", "foo")), c("foo", "condition", "condition")))
-  expect_true(inherits_all(catch_cnd(inform("", "foo")), c("foo", "message", "condition")))
-  expect_true(inherits_all(catch_cnd(warn("", "foo")), c("foo", "warning", "condition")))
-  expect_true(inherits_all(catch_cnd(abort("", "foo")), c("foo", "rlang_error", "error", "condition")))
+  expect_true(inherits_all(expect_condition(signal("", "foo")), c("foo", "condition", "condition")))
+  expect_true(inherits_all(expect_message(inform("", "foo")), c("foo", "message", "condition")))
+  expect_true(inherits_all(expect_warning2(warn("", "foo")), c("foo", "warning", "condition")))
+  expect_true(inherits_all(expect_error(abort("", "foo")), c("foo", "rlang_error", "error", "condition")))
 })
 
 test_that("cnd_signal() creates a backtrace if needed", {
@@ -69,10 +69,14 @@ test_that("cnd_signal() creates a backtrace if needed", {
   expect_snapshot(print(err))
 })
 
-test_that("`inform()` appends newline to message", {
-  expect_identical(
-    catch_cnd(inform("foo"))$message,
-    "foo\n"
+test_that("`inform()` does not append newlines to message", {
+  expect_equal(
+    expect_message(inform("foo"))$message,
+    "foo"
+  )
+  expect_equal(
+    conditionMessage(expect_message(inform("foo"))),
+    "foo"
   )
 })
 
@@ -85,11 +89,11 @@ test_that("condition signallers can be called without arguments", {
 })
 
 test_that("`inform()` returns invisibly", {
-  expect_invisible(inform("foo"))
+  expect_message(expect_invisible(inform("foo")))
 })
 
 test_that("warn() respects frequency", {
-  local_options(`rlang:::message_always` = FALSE)
+  local_options(rlib_warning_verbosity = "default")
 
   expect_warning(
     warn("foo", .frequency = "always", .frequency_id = "warn_always"),
@@ -118,20 +122,20 @@ test_that("warn() respects frequency", {
 })
 
 test_that("inform() respects frequency", {
-  local_options(`rlang:::message_always` = FALSE)
+  local_options(rlib_message_verbosity = "default")
 
   expect_message(
     inform("foo", .frequency = "always", .frequency_id = "inform_always"),
-    "^foo\n$"
+    "^foo$"
   )
   expect_message(
     inform("foo", .frequency = "always", .frequency_id = "inform_always"),
-    "^foo\n$"
+    "^foo$"
   )
 
   expect_message(
     inform("foo", .frequency = "once", .frequency_id = "inform_once"),
-    "^foo\n.*message is displayed once per session"
+    "^foo.*message is displayed once per session"
   )
   expect_no_message(
     inform("foo", .frequency = "once", .frequency_id = "inform_once")
@@ -147,7 +151,10 @@ test_that("inform() respects frequency", {
 })
 
 test_that("warn() and inform() use different periodicity environments", {
-  local_options(`rlang:::message_always` = FALSE)
+  local_options(
+    rlib_message_verbosity = "default",
+    rlib_warning_verbosity = "default"
+  )
 
   expect_message(
     inform("foo", .frequency = "once", .frequency_id = "warn_inform_different_envs"),
@@ -160,7 +167,7 @@ test_that("warn() and inform() use different periodicity environments", {
 })
 
 test_that("periodic messages can be forced", {
-  local_options(`rlang:::message_always` = TRUE)
+  local_options(rlib_warning_verbosity = "verbose")
   expect_warning(
     warn("foo", .frequency = "once", .frequency_id = "warn_forced"),
     "foo"
@@ -169,6 +176,15 @@ test_that("periodic messages can be forced", {
     warn("foo", .frequency = "once", .frequency_id = "warn_forced"),
     "foo"
   )
+})
+
+test_that("messages can be silenced", {
+  local_options(
+    rlib_message_verbosity = "quiet",
+    rlib_warning_verbosity = "quiet"
+  )
+  expect_message(inform("foo"), NA)
+  expect_warning(warn("foo"), NA)
 })
 
 test_that("`.frequency_id` is mandatory", {
@@ -203,23 +219,102 @@ test_that("`inform()` and `warn()` with recurrent footer handle newlines correct
   })
 })
 
-# Lifecycle ----------------------------------------------------------
+test_that("`warning.length` is increased (#1211)", {
+  code <- 'rlang::with_interactive(rlang::abort(paste0(strrep("_", 1000), "foo")))'
+  out <- Rscript(shQuote(c("--vanilla", "-e", code)))
+  expect_true(any(grepl("foo", out$out)))
 
-test_that("deprecated arguments of cnd_signal() still work", {
-  local_lifecycle_silence()
+  code <- 'rlang::with_interactive(rlang::warn(paste0(strrep("_", 1000), "foo")))'
+  out <- Rscript(shQuote(c("--vanilla", "-e", code)))
+  expect_true(any(grepl("foo", out$out)))
 
-  observed <- catch_cnd(cnd_signal("foo"))
-  expected <- catch_cnd(signal("", "foo"))
-  expect_identical(observed, expected)
-
-  with_handlers(cnd_signal(cnd("foo"), .mufflable = TRUE),
-    foo = calling(function(cnd) expect_true(rst_exists("rlang_muffle")))
-  )
+  # Messages are not controlled by `warning.length`
+  code <- 'rlang::inform(paste0(strrep("_", 1000), "foo"))'
+  out <- Rscript(shQuote(c("--vanilla", "-e", code)))
+  expect_true(any(grepl("foo", out$out)))
 })
 
-test_that("error_cnd() still accepts `.subclass`", {
-  expect_equal(
-    error_cnd(.subclass = "foo"),
-    error_cnd("foo")
+test_that("interrupt() doesn't fail when interrupts are suspended (#1224)", {
+  skip_if_not_installed("base", "3.5.0")
+
+  out <- FALSE
+
+  tryCatch(
+    interrupt = identity,
+    {
+      suspendInterrupts({
+        tryCatch(
+          interrupt = function(x) stop("interrupt!"),
+          interrupt()
+        )
+        out <- TRUE
+      })
+      # Make sure suspended interrupt is processed
+      interrupt()
+    }
   )
+
+  expect_true(out)
+})
+
+test_that("`frequency` has good error messages", {
+  expect_snapshot({
+    (expect_error(inform("foo", .frequency = "once", .frequency_id = NULL)))
+    (expect_error(warn("foo", .frequency = "once", .frequency_id = 1L)))
+  })
+})
+
+test_that("can pass `use_cli_format` as condition field", {
+  signal_lazy_bullets <- function(catcher, signaller) {
+    catch_error(abort(
+      c("Header.", i = "Bullet."),
+      use_cli_format = TRUE
+    ))
+  }
+  expect_lazy_bullets <- function(cnd) {
+    expect_equal(cnd$message, set_names("Header.", ""))
+    expect_equal(cnd$body, c(i = "Bullet."))
+    expect_true(cnd$use_cli_format)
+  }
+
+  expect_lazy_bullets(signal_lazy_bullets(catch_error, abort))
+  expect_lazy_bullets(signal_lazy_bullets(catch_warning, warn))
+  expect_lazy_bullets(signal_lazy_bullets(catch_message, inform))
+})
+
+test_that("signal functions check inputs", {
+  expect_snapshot({
+    (expect_error(abort(error_cnd("foo"))))
+    (expect_error(inform(error_cnd("foo"))))
+    (expect_error(warn(class = error_cnd("foo"))))
+    (expect_error(abort("foo", call = base::call)))
+  })
+})
+
+test_that("cnd_signal() sets call", {
+  f <- function() {
+    cnd_signal(error_cnd(message = "foo", call = current_env()))
+  }
+  cnd <- catch_cnd(f())
+  expect_equal(cnd$call, quote(f()))
+})
+
+
+# Lifecycle ----------------------------------------------------------
+
+test_that("error_cnd() still accepts `.subclass`", {
+  # <deprecatedWarning>
+  skip_if(getRversion() < "3.6.0")
+
+  local_options(
+    lifecycle_disable_warnings = FALSE,
+    force_subclass_deprecation = TRUE
+  )
+  expect_snapshot({
+    expect_equal(
+      error_cnd(.subclass = "foo"),
+      error_cnd("foo")
+    )
+    expect_error(abort("foo", .subclass = "bar"), class = "bar")
+  })
 })

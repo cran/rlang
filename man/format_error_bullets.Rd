@@ -7,8 +7,9 @@
 format_error_bullets(x)
 }
 \arguments{
-\item{x}{A named character vector of messages. Elements named as
-\code{x} or \code{i} are prefixed with the corresponding bullet.}
+\item{x}{A named character vector of messages. Named elements are
+prefixed with the corresponding bullet. Elements named with a
+single space \code{" "} trigger a line break from the previous bullet.}
 }
 \description{
 \code{format_error_bullets()} takes a character vector and returns a single
@@ -16,17 +17,40 @@ string (or an empty vector if the input is empty). The elements of
 the input vector are assembled as a list of bullets, depending on
 their names:
 \itemize{
+\item Unnamed elements are unindented. They act as titles or subtitles.
+\item Elements named \code{"*"} are bulleted with a cyan "bullet" symbol.
 \item Elements named \code{"i"} are bulleted with a blue "info" symbol.
 \item Elements named \code{"x"} are bulleted with a red "cross" symbol.
-\item Unnamed elements are bulleted with a "*" symbol.
+\item Elements named \code{"v"} are bulleted with a green "tick" symbol.
+\item Elements named \code{"!"} are bulleted with a yellow "warning" symbol.
+\item Elements named \code{">"} are bulleted with an "arrow" symbol.
+\item Elements named \code{" "} start with an indented line break.
 }
 
-This experimental infrastructure is based on the idea that
-sentences in error messages are best kept short and simple. From
-this point of view, the best way to present the information is in
-the \code{\link[=cnd_body]{cnd_body()}} method of an error conditon, as a bullet list of
-simple sentences containing a single clause. The info and cross
-symbols of the bullets provide hints on how to interpret the bullet
-relative to the general error issue, which should be supplied as
-\code{\link[=cnd_header]{cnd_header()}}.
+For convenience, if the vector is fully unnamed, the elements are
+formatted as "*" bullets.
+
+The bullet formatting for errors follows the idea that sentences in
+error messages are best kept short and simple. The best way to
+present the information is in the \code{\link[=cnd_body]{cnd_body()}} method of an error
+conditon as a bullet list of simple sentences containing a single
+clause. The info and cross symbols of the bullets provide hints on
+how to interpret the bullet relative to the general error issue,
+which should be supplied as \code{\link[=cnd_header]{cnd_header()}}.
+}
+\examples{
+# All bullets
+writeLines(format_error_bullets(c("foo", "bar")))
+
+# This is equivalent to
+writeLines(format_error_bullets(set_names(c("foo", "bar"), "*")))
+
+# Supply named elements to format info, cross, and tick bullets
+writeLines(format_error_bullets(c(i = "foo", x = "bar", v = "baz", "*" = "quux")))
+
+# An unnamed element breaks the line
+writeLines(format_error_bullets(c(i = "foo\nbar")))
+
+# A " " element breaks the line within a bullet (with indentation)
+writeLines(format_error_bullets(c(i = "foo", " " = "bar")))
 }

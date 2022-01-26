@@ -7,9 +7,17 @@ test_that("names2() fails for environments", {
   expect_error(names2(env()), "Use `env_names()` for environments.", fixed = TRUE)
 })
 
+test_that("names2<- doesn't add missing values (#1301)", {
+  x <- 1:3
+  names2(x)[1:2] <- "foo"
+  expect_equal(names(x), c("foo", "foo", ""))
+})
+
 test_that("inputs must be valid", {
-  expect_error(set_names(environment()), "must be a vector")
-  expect_error(set_names(1:10, letters[1:4]), "same length")
+  expect_snapshot({
+    (expect_error(set_names(environment())))
+    (expect_error(set_names(1:10, letters[1:4])))
+  })
 })
 
 test_that("can supply vector or ...", {
@@ -41,7 +49,7 @@ test_that("set_names() checks length generically", {
   names(expect) <- "a"
 
   expect_identical(set_names(x, "a"), expect)
-  expect_error(set_names(x, c("a", "b")), "the same length")
+  expect_error(set_names(x, c("a", "b")), "must be compatible")
 })
 
 test_that("has_name() works with pairlists", {
@@ -104,6 +112,16 @@ test_that("zap_srcref() works with quosures", {
   expect_null(attributes(quo_get_expr(quo)))
 })
 
+test_that("zap_srcref() preserves attributes", {
+  with_srcref(
+    "fn <- structure(function() NULL, bar = TRUE)"
+  )
+
+  out <- zap_srcref(fn)
+  expect_equal(attributes(out), list(bar = TRUE))
+  expect_null(attributes(body(out)))
+})
+
 test_that("can zap_srcref() on functions with `[[` methods", {
   local_methods(
     `[[.rlang:::not_subsettable` = function(...) stop("Can't subset!"),
@@ -111,4 +129,27 @@ test_that("can zap_srcref() on functions with `[[` methods", {
   )
   fn <- structure(quote(function() NULL), class = "rlang:::not_subsettable")
   expect_error(zap_srcref(fn), NA)
+})
+
+test_that("set_names() recycles names of size 1", {
+  expect_named(
+    set_names(1:3, ""),
+    rep("", 3)
+  )
+  expect_named(
+    set_names(1:3, ~ ""),
+    rep("", 3)
+  )
+  expect_equal(
+    set_names(list(), ""),
+    named(list())
+  )
+})
+
+test_that("is_named2() always returns `TRUE` for empty vectors (#191)", {
+  expect_false(is_named(chr()))
+  expect_false(is_named("a"))
+
+  expect_true(is_named2(chr()))
+  expect_false(is_named2("a"))
 })

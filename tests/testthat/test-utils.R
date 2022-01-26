@@ -31,3 +31,57 @@ test_that("source_refs() creates source references", {
   attrib_names <- names(attributes(x))
   expect_true(all(c("srcref", "srcfile", "wholeSrcref") %in% attrib_names))
 })
+
+test_that("path_trim_prefix() trims path", {
+  expect_equal(
+    path_trim_prefix("foo/bar/baz.R", 2),
+    "bar/baz.R"
+  )
+
+  expect_equal(
+    path_trim_prefix("foo/bar/baz.R", 3),
+    "foo/bar/baz.R"
+  )
+
+  expect_equal(
+    path_trim_prefix("foo/bar/baz.R", 1),
+    "baz.R"
+  )
+})
+
+test_that("detect_run_starts() works", {
+  expect_equal(
+    detect_run_starts(chr()),
+    lgl()
+  )
+  expect_equal(
+    detect_run_starts("a"),
+    TRUE
+  )
+  expect_equal(
+    detect_run_starts(NA),
+    NA
+  )
+
+  expect_equal(
+    detect_run_starts(c("a", "a")),
+    c(TRUE, FALSE)
+  )
+  expect_equal(
+    detect_run_starts(c("a", "b")),
+    c(TRUE, TRUE)
+  )
+
+  expect_equal(
+    detect_run_starts(c("a", "b", NA)),
+    c(TRUE, TRUE, NA)
+  )
+  expect_equal(
+    detect_run_starts(c("a", NA, "b")),
+    c(TRUE, NA, TRUE)
+  )
+  expect_equal(
+    detect_run_starts(c(NA, "a", "b")),
+    c(NA, TRUE, TRUE)
+  )
+})

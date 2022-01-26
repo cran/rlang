@@ -13,8 +13,17 @@
 `%||%` <- function(x, y) {
   if (is_null(x)) y else x
 }
+`%|0|%` <- function(x, y) {
+  if (!length(x)) y else x
+}
 
 #' Replace missing values
+#'
+#' @description
+#' __Note__: This operator is now out of scope for rlang. It will be
+#' replaced by a vctrs-powered operator (probably in the [funs
+#' package](https://github.com/tidyverse/funs)) at which point the
+#' rlang version of `%|%` will be deprecated.
 #'
 #' This infix function is similar to \code{\%||\%} but is vectorised
 #' and provides a default value for missing elements. It is faster
@@ -22,6 +31,7 @@
 #'
 #' @param x The original values.
 #' @param y The replacement values. Must be of length 1 or the same length as `x`.
+#' @keywords internal
 #' @export
 #' @name op-na-default
 #' @seealso [op-null-default]
@@ -29,7 +39,7 @@
 #' c("a", "b", NA, "c") %|% "default"
 #' c(1L, NA, 3L, NA, NA) %|% (6L:10L)
 `%|%` <- function(x, y) {
-  .Call(rlang_replace_na, x, y)
+  .Call(ffi_replace_na, x, y)
 }
 
 #' Infix attribute accessor and setter
@@ -74,68 +84,4 @@
     eval_bare(expr(attr(x, !!name) <- value))
   }
   x
-}
-
-#' Definition operator
-#'
-#' @description
-#'
-#' The definition operator is typically used in DSL packages like
-#' `ggvis` and `data.table`. It is also used in the tidyverse as a way
-#' of unquoting names (see [nse-force]).
-#'
-#' * `is_definition()` returns `TRUE` for calls to `:=`.
-#'
-#' * `is_formulaish()` returns `TRUE` for both formulas and
-#'   colon-equals operators.
-#'
-#'
-#' @details
-#'
-#' The recommended way to use it is to capture arguments as
-#' expressions or quosures. You can then give a special function
-#' definition for the `:=` symbol in an overscope. Note that if you
-#' capture dots with [exprs()] or [quos()], you need to disable
-#' interpretation of `:=` by setting `.unquote_names` to `FALSE`.
-#'
-#' From rlang and data.table perspectives, this operator is not meant
-#' to be evaluated directly at top-level which is why the exported
-#' definitions issue an error.
-#'
-#'
-#' @section Life cycle:
-#'
-#' These functions are experimental.
-#'
-#' @name op-definition
-#' @param x An object to test.
-#' @keywords internal
-#' @export
-#' @examples
-#'
-#' # A predicate is provided to distinguish formulas from the
-#' # colon-equals operator:
-#' is_definition(quote(a := b))
-#' is_definition(a ~ b)
-#'
-#'
-#' # is_formulaish() tests for both definitions and formulas:
-#' is_formulaish(a ~ b)
-#' is_formulaish(quote(a := b))
-is_definition <- function(x) {
-  is_formulaish(x) && identical(node_car(x), colon_equals_sym)
-}
-#' @rdname op-definition
-#' @export
-#' @param lhs,rhs Expressions for the LHS and RHS of the definition.
-#' @param env The evaluation environment bundled with the definition.
-new_definition <- function(lhs, rhs, env = caller_env()) {
-  def <- new_formula(lhs, rhs, env)
-  node_poke_car(def, colon_equals_sym)
-  def
-}
-#' @rdname op-definition
-#' @export
-is_formulaish <- function(x, scoped = NULL, lhs = NULL) {
-  .Call(rlang_is_formulaish, x, scoped, lhs)
 }

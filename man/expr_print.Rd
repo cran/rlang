@@ -5,15 +5,21 @@
 \alias{expr_deparse}
 \title{Print an expression}
 \usage{
-expr_print(x, width = peek_option("width"))
+expr_print(x, ...)
 
-expr_deparse(x, width = peek_option("width"))
+expr_deparse(x, ..., width = peek_option("width"))
 }
 \arguments{
 \item{x}{An object or expression to print.}
 
+\item{...}{Arguments passed to \code{expr_deparse()}.}
+
 \item{width}{The width of the deparsed or printed expression.
 Defaults to the global option \code{width}.}
+}
+\value{
+\code{expr_deparse()} returns a character vector of lines.
+\code{expr_print()} returns its input invisibly.
 }
 \description{
 \code{expr_print()}, powered by \code{expr_deparse()}, is an alternative

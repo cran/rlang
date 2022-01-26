@@ -186,31 +186,14 @@ test_that("assignment methods preserve attributes", {
   expect_identical(attributes(fn), orig_attrs)
 })
 
-test_that("print method for `fn` discards attributes", {
-  fn <- structure(function() NULL, foo = "foo")
-  fn <- new_fn(fn)
-
-  temp <- file()
-  sink(temp)
-  on.exit({
-    sink()
-    close(temp)
-  })
-
-  print(fn)
-
-  output <- paste0(readLines(temp, warn = FALSE), collapse = "\n")
-  expect_false(grepl("attr", output))
-})
-
 test_that("fn_body() requires a closure to extract body", {
-  expect_error(fn_body(c), "`fn` is not a closure")
+  expect_error(fn_body(c), "`fn` must be an R function")
   expect_equal(fn_body(function() { NULL }), quote({ NULL }))
   expect_equal(fn_body(function() NULL), quote({ NULL }))
 })
 
 test_that("fn_env() requires a function to extract env", {
-  expect_error(fn_env(1L), "`fn` is not a function")
+  expect_error(fn_env(1L), "`fn` must be a function")
   expect_identical(fn_env(function() NULL), current_env())
 })
 
@@ -285,7 +268,7 @@ test_that("arguments of closured primitives are matched by name after `...`", {
 })
 
 test_that("transforming defused formula to function causes an informative error (#953)", {
-  expect_error(as_function(quote(~foo)), "defused formula")
+  expect_error(as_function(quote(~foo)), "must carry an environment")
 })
 
 test_that("functions created from quosures with as_function() print properly", {
@@ -315,4 +298,39 @@ test_that("as_function() with a quosure can be serialised", {
     eval_tidy(unserialize(blob)),
     ignore_function_env = TRUE
   )
+})
+
+test_that("as_function() fetches from the global env", {
+  foo <- function() NULL
+  local_bindings(
+    .env = global_env(),
+    foo = function() "foo"
+  )
+  expect_equal(as_function("foo")(), "foo")
+})
+
+test_that("as_function() has nice errors", {
+  my_function <- function(my_arg) {
+    as_function(my_arg)
+  }
+
+  expect_snapshot({
+    (expect_error(as_function(1)))
+
+    (expect_error(as_function(1, arg = "foo")))
+
+    (expect_error(my_function(1 + 2)))
+
+    (expect_error(my_function(1)))
+
+    (expect_error(my_function(a ~ b)))
+  })
+})
+
+test_that("check inputs in function accessors", {
+  expect_snapshot({
+    (expect_error(fn_fmls(1)))
+    (expect_error(fn_body(1)))
+    (expect_error(fn_env(1)))
+  })
 })

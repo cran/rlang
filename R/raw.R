@@ -1,7 +1,8 @@
 #' Serialize a raw vector to a string
 #'
+#' @keywords internal
 #' @description
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' This function converts a raw vector to a hexadecimal string,
 #' optionally adding a prefix and a suffix.
@@ -27,5 +28,5 @@ raw_deparse_str <- function(x, prefix = NULL, suffix = NULL) {
     suffix <- enc2utf8(suffix)
   }
 
-  .Call("rlang_raw_deparse_str", x, prefix, suffix)
+  .Call("ffi_raw_deparse_str", x, prefix, suffix)
 }

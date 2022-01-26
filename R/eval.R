@@ -1,14 +1,11 @@
 #' Evaluate an expression in an environment
 #'
 #' @description
-#'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
-#'
 #' `eval_bare()` is a lower-level version of function [base::eval()].
 #' Technically, it is a simple wrapper around the C function
 #' `Rf_eval()`. You generally don't need to use `eval_bare()` instead
 #' of `eval()`. Its main advantage is that it handles stack-sensitive
-#' (calls such as `return()`, `on.exit()` or `parent.frame()`) more
+#' calls (such as `return()`, `on.exit()` or `parent.frame()`) more
 #' consistently when you pass an enviroment of a frame on the call
 #' stack.
 #'
@@ -96,183 +93,11 @@
 #' # But that's not the case with base::eval():
 #' fn(base::eval)
 eval_bare <- function(expr, env = parent.frame()) {
-  .External2(rlang_ext2_eval, expr, env)
-}
-
-#' Evaluate an expression within a given environment
-#'
-#' These functions evaluate `expr` within a given environment (`env`
-#' for `with_env()`, or the child of the current environment for
-#' `locally`). They rely on [eval_bare()] which features a lighter
-#' evaluation mechanism than base R [base::eval()], and which also has
-#' some subtle implications when evaluting stack sensitive functions
-#' (see help for [eval_bare()]).
-#'
-#' `locally()` is equivalent to the base function
-#' [base::local()] but it produces a much cleaner
-#' evaluation stack, and has stack-consistent semantics. It is thus
-#' more suited for experimenting with the R language.
-#'
-#'
-#' @section Life cycle:
-#'
-#' These functions are experimental. Expect API changes.
-#'
-#'
-#' @inheritParams eval_bare
-#' @param env An environment within which to evaluate `expr`. Can be
-#'   an object with a [get_env()] method.
-#' @keywords internal
-#' @export
-#' @examples
-#' # with_env() is handy to create formulas with a given environment:
-#' env <- child_env("rlang")
-#' f <- with_env(env, ~new_formula())
-#' identical(f_env(f), env)
-#'
-#' # Or functions with a given enclosure:
-#' fn <- with_env(env, function() NULL)
-#' identical(get_env(fn), env)
-#'
-#'
-#' # Unlike eval() it doesn't create duplicates on the evaluation
-#' # stack. You can thus use it e.g. to create non-local returns:
-#' fn <- function() {
-#'   g(current_env())
-#'   "normal return"
-#' }
-#' g <- function(env) {
-#'   with_env(env, return("early return"))
-#' }
-#' fn()
-#'
-#'
-#' # Since env is passed to as_environment(), it can be any object with an
-#' # as_environment() method. For strings, the pkg_env() is returned:
-#' with_env("base", ~mtcars)
-#'
-#' # This can be handy to put dictionaries in scope:
-#' with_env(mtcars, cyl)
-with_env <- function(env, expr) {
-  .External2(rlang_ext2_eval, substitute(expr), as_environment(env, caller_env()))
-}
-#' @rdname with_env
-#' @export
-locally <- function(expr) {
-  .External2(rlang_ext2_eval, substitute(expr), child_env(caller_env()))
-}
-
-#' Invoke a function with a list of arguments
-#'
-#' @description
-#'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("soft-deprecated")}
-#'
-#' Normally, you invoke a R function by typing arguments manually. A
-#' powerful alternative is to call a function with a list of arguments
-#' assembled programmatically. This is the purpose of `invoke()`.
-#'
-#' @details
-#'
-#' Technically, `invoke()` is basically a version of [base::do.call()]
-#' that creates cleaner call traces because it does not inline the
-#' function and the arguments in the call (see examples). To achieve
-#' this, `invoke()` creates a child environment of `.env` with `.fn`
-#' and all arguments bound to new symbols (see [env_bury()]). It then
-#' uses the same strategy as [eval_bare()] to evaluate with minimal
-#' noise.
-#'
-#'
-#' @section Life cycle:
-#'
-#' `invoke()` is soft-deprecated in favour of [exec()]. Now that we
-#' understand better the interaction between unquoting and dots
-#' capture, we can take a simpler approach in `exec()`.
-#'
-#' If you need finer control over the generated call, you should construct
-#' an environment and call yourself, manually burying large objects
-#' or complex expressions.
-#'
-#' @param .fn A function to invoke. Can be a function object or the
-#'   name of a function in scope of `.env`.
-#' @param .args,... List of arguments (possibly named) to be passed to
-#'   `.fn`.
-#' @param .env The environment in which to call `.fn`.
-#' @param .bury A character vector of length 2. The first string
-#'   specifies which name should the function have in the call
-#'   recorded in the evaluation stack. The second string specifies a
-#'   prefix for the argument names. Set `.bury` to `NULL` if you
-#'   prefer to inline the function and its arguments in the call.
-#' @export
-#' @keywords internal
-#' @examples
-#' # invoke() has the same purpose as do.call():
-#' invoke(paste, letters)
-#'
-#' # But it creates much cleaner calls:
-#' invoke(call_inspect, mtcars)
-#'
-#' # and stacktraces:
-#' fn <- function(...) sys.calls()
-#' invoke(fn, list(mtcars))
-#'
-#' # Compare to do.call():
-#' do.call(call_inspect, mtcars)
-#' do.call(fn, list(mtcars))
-#'
-#'
-#' # Specify the function name either by supplying a string
-#' # identifying the function (it should be visible in .env):
-#' invoke("call_inspect", letters)
-#'
-#' # Or by changing the .bury argument, with which you can also change
-#' # the argument prefix:
-#' invoke(call_inspect, mtcars, .bury = c("inspect!", "col"))
-invoke <- function(.fn, .args = list(), ...,
-                   .env = caller_env(), .bury = c(".fn", "")) {
-  signal_soft_deprecated(c(
-    "`invoke()` is deprecated as of rlang 0.4.0.",
-    "Please use `exec()` or `eval(expr())`instead."
-  ))
-
-  args <- c(.args, list(...))
-
-  if (is_null(.bury) || !length(args)) {
-    if (is_scalar_character(.fn)) {
-      .fn <- env_get(.env, .fn, inherit = TRUE)
-    }
-    call <- call2(.fn, !!! args)
-    return(.External2(rlang_ext2_eval, call, .env))
-  }
-
-
-  if (!is_character(.bury, 2L)) {
-    abort("`.bury` must be a character vector of length 2")
-  }
-  arg_prefix <- .bury[[2]]
-  fn_nm <- .bury[[1]]
-
-  buried_nms <- paste0(arg_prefix, seq_along(args))
-  buried_args <- set_names(args, buried_nms)
-  .env <- env_bury(.env, !!! buried_args)
-  args <- set_names(buried_nms, names(args))
-  args <- syms(args)
-
-  if (is_function(.fn)) {
-    env_bind(.env, !! fn_nm := .fn)
-    .fn <- fn_nm
-  }
-
-  call <- call2(.fn, !!! args)
-  .External2(rlang_ext2_eval, call, .env)
-}
-
-value <- function(expr) {
-  eval_bare(enexpr(expr), caller_env())
+  .External2(ffi_eval, expr, env)
 }
 
 eval_top <- function(expr, env = caller_env()) {
-  .Call(rlang_eval_top, expr, env)
+  .Call(ffi_eval_top, expr, env)
 }
 
 
@@ -321,13 +146,15 @@ eval_top <- function(expr, env = caller_env()) {
 #' data_env <- env(data = mtcars)
 #' eval(expr(lm(!!f, data)), data_env)
 exec <- function(.fn, ..., .env = caller_env()) {
-  .External2(rlang_ext2_exec, .fn, .env)
+  .External2(ffi_exec, .fn, .env)
 }
 
 #' Inject objects in an R expression
 #'
+#' @description
+#'
 #' `inject()` evaluates an expression with [injection][quasiquotation]
-#' (unquotation) support. There are three main usages:
+#' support. There are three main usages:
 #'
 #' - [Splicing][!!!] lists of arguments in a function call.
 #'
@@ -365,5 +192,20 @@ exec <- function(.fn, ..., .env = caller_env()) {
 #' args <- list(na.rm = TRUE, finite = 0.2)
 #' inject(mean(1:10, !!!args))
 inject <- function(expr, env = caller_env()) {
-  .External2(rlang_ext2_eval, enexpr(expr), env)
+  .External2(ffi_eval, enexpr(expr), env)
+}
+
+eval_parse <- function(code, env = caller_env()) {
+  file <- tempfile("rlang_eval_parsed_", fileext = ".R")
+  on.exit(if (file.exists(file)) file.remove(file))
+
+  writeLines(code, file)
+  exprs <- parse(file, keep.source = TRUE)
+
+  out <- NULL
+  for (expr in exprs) {
+    out <- eval_bare(expr, env)
+  }
+
+  out
 }

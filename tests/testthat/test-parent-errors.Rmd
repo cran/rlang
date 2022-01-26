@@ -1,0 +1,39 @@
+```{r}
+foo <- error_cnd(
+  "foo",
+  message = "Parent message.",
+  body = c("*" = "Bullet 1.", "*" = "Bullet 2."),
+  call = call("foo"),
+  use_cli_format = TRUE
+)
+```
+
+Error.
+
+```{r, error = TRUE}
+abort(
+  c("Message.", "x" = "Bullet A", "i" = "Bullet B."),
+  parent = foo,
+  call = call("f")
+)
+```
+
+Warning.
+
+```{r}
+warn(
+  c("Message.", "x" = "Bullet A", "i" = "Bullet B."),
+  parent = foo,
+  call = call("f")
+)
+```
+
+Message.
+
+```{r}
+inform(
+  c("Message.", "x" = "Bullet A", "i" = "Bullet B."),
+  parent = foo,
+  call = call("f")
+)
+```

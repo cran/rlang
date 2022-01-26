@@ -48,15 +48,6 @@
 #' Like other side-effecty functions like `par()` and `options()`,
 #' `env_bind()` and variants return the old values invisibly.
 #'
-#'
-#' @section Life cycle:
-#'
-#' Passing an environment wrapper like a formula or a function instead
-#' of an environment is soft-deprecated as of rlang 0.3.0. This
-#' internal genericity was causing confusion (see issue #427). You
-#' should now extract the environment separately before calling these
-#' functions.
-#'
 #' @param .env An environment.
 #' @param ... <[dynamic][dyn-dots]> Named objects (`env_bind()`),
 #'   expressions `env_bind_lazy()`, or functions (`env_bind_active()`).
@@ -111,9 +102,9 @@
 #' # old values back:
 #' env_bind(my_env, !!!old)
 env_bind <- function(.env, ...) {
-  .env <- get_env_retired(.env, "env_bind()")
+  check_environment(.env)
   invisible(.Call(
-    rlang_env_bind,
+    ffi_env_bind,
     env = .env,
     values = list3(...),
     needs_old = TRUE,
@@ -125,7 +116,7 @@ env_bind <- function(.env, ...) {
 # Doesn't return list of old bindings for efficiency
 env_bind0 <- function(.env, values) {
   invisible(.Call(
-    rlang_env_bind,
+    ffi_env_bind,
     env = .env,
     values = values,
     needs_old = FALSE,
@@ -177,9 +168,9 @@ env_bind0 <- function(.env, values) {
 #' env_bind_lazy(env, name = !!quo)
 #' env$name
 env_bind_lazy <- function(.env, ..., .eval_env = caller_env()) {
-  .env <- get_env_retired(.env, "env_bind_lazy()")
+  check_environment(.env)
   invisible(.Call(
-    rlang_env_bind,
+    ffi_env_bind,
     env = .env,
     values = exprs(...),
     needs_old = TRUE,
@@ -213,9 +204,9 @@ env_bind_lazy <- function(.env, ..., .eval_env = caller_env()) {
 #' env$foo
 #' env$foo
 env_bind_active <- function(.env, ...) {
-  .env <- get_env_retired(.env, "env_bind_active()")
+  check_environment(.env)
   invisible(.Call(
-    rlang_env_bind,
+    ffi_env_bind,
     env = .env,
     values = list3(...),
     needs_old = TRUE,
@@ -228,10 +219,14 @@ env_bind_active <- function(.env, ...) {
 #' @param rhs An expression lazily evaluated and assigned to `lhs`.
 #' @export
 `%<~%` <- function(lhs, rhs) {
-  env_bind_lazy(
-    env,
-    !!substitute(lhs) := !!substitute(rhs),
-    .eval_env = caller_env()
+  env <- caller_env()
+  inject(
+    base::delayedAssign(
+      as_string(substitute(lhs)),
+      !!substitute(rhs),
+      eval.env = env,
+      assign.env = env
+    )
   )
 }
 
@@ -266,10 +261,11 @@ env_bind_active <- function(.env, ...) {
 #' with_bindings(paste(foo, bar), foo = "rebinded")
 #' paste(foo, bar)
 local_bindings <- function(..., .env = .frame, .frame = caller_env()) {
-  env <- get_env_retired(.env, "local_bindings()")
+  check_environment(.env)
+  check_environment(.frame)
 
-  old <- env_bind(env, ...)
-  defer(env_bind0(env, old), envir = .frame)
+  old <- env_bind(.env, ...)
+  defer(env_bind0(.env, old), envir = .frame)
 
   invisible(old)
 }
@@ -277,7 +273,7 @@ local_bindings <- function(..., .env = .frame, .frame = caller_env()) {
 #' @param .expr An expression to evaluate with temporary bindings.
 #' @export
 with_bindings <- function(.expr, ..., .env = caller_env()) {
-  env <- get_env_retired(.env, "with_bindings()")
+  check_environment(.env)
   local_bindings(..., .env = .env)
   .expr
 }
@@ -312,7 +308,7 @@ with_bindings <- function(.expr, ..., .env = caller_env()) {
 #' env_has(env, c("foo", "bar"))
 #' env_has(env, c("foo", "bar"), inherit = TRUE)
 env_unbind <- function(env = caller_env(), nms, inherit = FALSE) {
-  .Call(rlang_env_unbind, env, nms, inherit)
+  .Call(ffi_env_unbind, env, nms, inherit)
   invisible(env)
 }
 
@@ -336,8 +332,8 @@ env_unbind <- function(env = caller_env(), nms, inherit = FALSE) {
 #' env_has(env, "foo")
 #' env_has(env, "foo", inherit = TRUE)
 env_has <- function(env = caller_env(), nms, inherit = FALSE) {
-  env <- get_env_retired(env, "env_has()")
-  .Call(rlang_env_has, env, nms, inherit)
+  check_environment(env)
+  .Call(ffi_env_has, env, nms, inherit)
 }
 
 #' Get an object in an environment
@@ -352,7 +348,12 @@ env_has <- function(env = caller_env(), nms, inherit = FALSE) {
 #' @param nm,nms Names of bindings. `nm` must be a single string.
 #' @param default A default value in case there is no binding for `nm`
 #'   in `env`.
+#' @param last Last environment inspected when `inherit` is `TRUE`.
+#'   Can be useful in conjunction with [base::topenv()].
 #' @return An object if it exists. Otherwise, throws an error.
+#'
+#' @seealso [env_cache()] for a variant of `env_get()` designed to
+#'   cache a value in an environment.
 #' @export
 #' @examples
 #' parent <- child_env(NULL, foo = "foo")
@@ -366,27 +367,49 @@ env_has <- function(env = caller_env(), nms, inherit = FALSE) {
 #'
 #' # You can also avoid an error by supplying a default value:
 #' env_get(env, "foo", default = "FOO")
-env_get <- function(env = caller_env(), nm, default, inherit = FALSE) {
-  env <- get_env_retired(env, "env_get()")
+env_get <- function(env = caller_env(),
+                    nm,
+                    default,
+                    inherit = FALSE,
+                    last = empty_env()) {
+  check_environment(env)
+  check_environment(last)
+
+  if (missing(default)) {
+    default %<~% stop_env_get_missing(nm)
+  }
+
   .Call(
-    rlang_env_get,
+    ffi_env_get,
     env = env,
     nm = nm,
     inherit = inherit,
+    last = last,
     closure_env = environment()
   )
 }
 #' @rdname env_get
 #' @export
-env_get_list <- function(env = caller_env(), nms, default, inherit = FALSE) {
-  env <- get_env_retired(env, "env_get_list()")
+env_get_list <- function(env = caller_env(),
+                         nms,
+                         default,
+                         inherit = FALSE,
+                         last = empty_env()) {
+  check_environment(env)
+  check_environment(last)
   .Call(
-    rlang_env_get_list,
+    ffi_env_get_list,
     env = env,
     nms = nms,
     inherit = inherit,
+    last = last,
     closure_env = environment()
   )
+}
+
+stop_env_get_missing <- function(nm) {
+  msg <- sprintf("Can't find %s in environment.", format_arg(nm))
+  abort(msg, call = caller_env())
 }
 
 #' Poke an object in an environment
@@ -419,22 +442,62 @@ env_get_list <- function(env = caller_env(), nms, default, inherit = FALSE) {
 #' @return The old value of `nm` or a [zap sentinel][zap] if the
 #'   binding did not exist yet.
 #'
-#' @seealso [env_bind()] for binding multiple elements.
+#' @seealso [env_bind()] for binding multiple elements. [env_cache()]
+#'   for a variant of `env_poke()` designed to cache values.
 #' @export
 env_poke <- function(env = caller_env(),
                      nm,
                      value,
                      inherit = FALSE,
                      create = !inherit) {
-  env <- get_env_retired(env, "env_poke()")
+  check_environment(env)
   invisible(.Call(
-    rlang_env_poke,
+    ffi_env_poke,
     env = env,
     nm = nm,
     values = value,
     inherit = inherit,
     create = create
   ))
+}
+
+#' Cache a value in an environment
+#'
+#' @description
+#' `env_cache()` is a wrapper around [env_get()] and [env_poke()]
+#' designed to retrieve a cached value from `env`.
+#'
+#' - If the `nm` binding exists, it returns its value.
+#' - Otherwise, it stores the default value in `env` and returns that.
+#'
+#' @inheritParams env_get
+#' @param default The default value to store in `env` if `nm` does not
+#'   exist yet.
+#' @return Either the value of `nm` or `default` if it did not exist
+#'   yet.
+#'
+#' @examples
+#' e <- env(a = "foo")
+#'
+#' # Returns existing binding
+#' env_cache(e, "a", "default")
+#'
+#' # Creates a `b` binding and returns its default value
+#' env_cache(e, "b", "default")
+#'
+#' # Now `b` is defined
+#' e$b
+#' @export
+env_cache <- function(env, nm, default) {
+  check_required(default)
+  check_string(nm)
+
+  if (env_has(env, nm)) {
+    env_get(env, nm)
+  } else {
+    env_poke(env, nm, default)
+    default
+  }
 }
 
 #' Names and numbers of symbols bound in an environment
@@ -474,17 +537,15 @@ env_poke <- function(env = caller_env(),
 #' env <- env(a = 1, b = 2)
 #' env_names(env)
 env_names <- function(env) {
-  env <- get_env_retired(env, "env_names()")
+  check_environment(env)
   nms <- names(env)
-  .Call(rlang_unescape_character, nms)
+  .Call(ffi_unescape_character, nms)
 }
 
 #' @rdname env_names
 #' @export
 env_length <- function(env) {
-  if (!is_environment(env)) {
-    abort("`env` must be an environment")
-  }
+  check_environment(env)
   length(env)
 }
 
@@ -492,7 +553,7 @@ env_length <- function(env) {
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' Locked environment bindings trigger an error when an attempt is
 #' made to redefine the binding.
@@ -554,7 +615,7 @@ env_binding_are_locked <- function(env, nms = NULL) {
 
 #' What kind of environment binding?
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' @inheritParams env_binding_lock
 #'
@@ -569,11 +630,13 @@ env_binding_are_active <- function(env, nms = NULL) {
 env_binding_are_lazy <- function(env, nms = NULL) {
   env_binding_are_type(env, nms, 1L)
 }
-env_binding_are_type <- function(env, nms, type) {
-  if (!is_environment(env)) {
-    abort("`env` must be an environment.")
-  }
-  nms <- env_binding_validate_names(env, nms)
+env_binding_are_type <- function(env,
+                                 nms,
+                                 type,
+                                 error_call = caller_env()) {
+  check_environment(env, call = error_call)
+
+  nms <- env_binding_validate_names(env, nms, call = error_call)
   promise <- env_binding_types(env, nms)
 
   if (is_null(promise)) {
@@ -584,18 +647,20 @@ env_binding_are_type <- function(env, nms, type) {
   set_names(promise, nms)
 }
 
-env_binding_validate_names <- function(env, nms) {
+env_binding_validate_names <- function(env, nms, call = caller_env()) {
   if (is_null(nms)) {
     nms <- env_names(env)
   } else {
-    if (!is_character(nms)) {
-      abort("`nms` must be a character vector of names")
-    }
+    check_character(
+      nms,
+      what = "a character vector of names",
+      call = call
+    )
   }
   nms
 }
 env_binding_types <- function(env, nms = env_names(env)) {
-  .Call(rlang_env_binding_types, env, nms)
+  .Call(ffi_env_binding_types, env, nms)
 }
 
 env_binding_type_sum <- function(env, nms = NULL) {

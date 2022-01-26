@@ -102,12 +102,6 @@ test_that("dots_splice() doesn't squash S3 objects", {
   expect_identical(dots_splice(s, s), named_list(s, s))
 })
 
-test_that("dots_node() doesn't trim attributes from arguments", {
-  x <- ~foo
-  dots <- eval(expr(dots_node(!! x)))
-  expect_identical(node_car(dots), x)
-})
-
 test_that("dots_split() splits named and unnamed dots", {
   dots <- dots_split(1, 2)
   expect_identical(dots$named, list())
@@ -237,10 +231,11 @@ test_that("`.homonyms` = 'error' fails with homonyms", {
   expect_identical(list_error(1, 2), named_list(1, 2))
   expect_identical(list_error(a = 1, b = 2), list(a = 1, b = 2))
 
-  expect_error(list_error(1, a = 2, a = 3), "multiple arguments named `a` at positions 2 and 3")
-
-  expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `a` at positions 2 and 8")
-  expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8), "\\* Multiple arguments named `b` at positions 3, 5, and 6")
+  expect_snapshot({
+    (expect_error(list_error(1, a = 2, a = 3)))
+    (expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8)))
+    (expect_error(list_error(1, a = 2, b = 3, 4, b = 5, b = 6, 7, a = 8)))
+  })
 })
 
 test_that("`.homonyms` works with spliced arguments", {
@@ -304,5 +299,36 @@ test_that("dots_list() optionally auto-names arguments (#957)", {
   expect_identical(
     dots_list(!!!list(1:3, 1:3), .named = TRUE),
     list(`<int>` = 1:3, `<int>` = 1:3)
+  )
+})
+
+test_that("`.ignore_empty` is matched", {
+  # Tests the `r_arg_match()` library function
+  expect_snapshot({
+    (expect_error(dots_list(.ignore_empty = "t")))
+
+    foo <- function() dots_list(.ignore_empty = "t")
+    (expect_error(foo()))
+  })
+})
+
+# Suboptimal but not worth fixing the UI
+test_that("`.named` can be `NULL` (default names) or `FALSE` (minimal names)", {
+  expect_equal(
+    dots_list(.named = FALSE),
+    set_names(list(), "")
+  )
+  expect_equal(
+    exprs(.named = FALSE),
+    set_names(list(), "")
+  )
+
+  expect_equal(
+    dots_list(.named = NULL),
+    list()
+  )
+  expect_equal(
+    exprs(.named = NULL),
+    list()
   )
 })

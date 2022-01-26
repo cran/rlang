@@ -2,67 +2,70 @@
 % Please edit documentation in R/attr.R
 \name{is_named}
 \alias{is_named}
-\alias{is_dictionaryish}
+\alias{is_named2}
 \alias{have_name}
 \title{Is object named?}
 \usage{
 is_named(x)
 
-is_dictionaryish(x)
+is_named2(x)
 
 have_name(x)
 }
 \arguments{
-\item{x}{An object to test.}
+\item{x}{A vector to test.}
 }
 \value{
-\code{is_named()} and \code{is_dictionaryish()} are scalar predicates
-and return \code{TRUE} or \code{FALSE}. \code{have_name()} is vectorised and
-returns a logical vector as long as the input.
+\code{is_named()} and \code{is_named2()} are scalar predicates that
+return \code{TRUE} or \code{FALSE}. \code{have_name()} is vectorised and returns
+a logical vector as long as the input.
 }
 \description{
-\code{is_named()} checks that \code{x} has names attributes, and that none of
-the names are missing or empty (\code{NA} or \code{""}). \code{is_dictionaryish()}
-checks that an object is a dictionary: that it has actual names and
-in addition that there are no duplicated names. \code{have_name()}
-is a vectorised version of \code{is_named()}.
+\itemize{
+\item \code{is_named()} is a scalar predicate that checks that \code{x} has a
+\code{names} attribute and that none of the names are missing or empty
+(\code{NA} or \code{""}).
+\item \code{is_named2()} is like \code{is_named()} but always returns \code{TRUE} for
+empty vectors, even those that don't have a \code{names} attribute.
+In other words, it tests for the property that each element of a
+vector is named. \code{is_named2()} composes well with \code{\link[=names2]{names2()}}
+whereas \code{is_named()} composes with \code{names()}.
+\item \code{have_name()} is a vectorised variant.
+}
+}
+\details{
+\code{is_named()} always returns \code{TRUE} for empty vectors because
 }
 \examples{
-# A data frame usually has valid, unique names
-is_named(mtcars)
-have_name(mtcars)
-is_dictionaryish(mtcars)
+# is_named() is a scalar predicate about the whole vector of names:
+is_named(c(a = 1, b = 2))
+is_named(c(a = 1, 2))
 
-# But data frames can also have duplicated columns:
-dups <- cbind(mtcars, cyl = seq_len(nrow(mtcars)))
-is_dictionaryish(dups)
+# Unlike is_named2(), is_named() returns `FALSE` for empty vectors
+# that don't have a `names` attribute.
+is_named(list())
+is_named2(list())
 
-# The names are still valid:
-is_named(dups)
-have_name(dups)
+# have_name() is a vectorised predicate
+have_name(c(a = 1, b = 2))
+have_name(c(a = 1, 2))
 
+# Empty and missing names are treated as invalid:
+invalid <- set_names(letters[1:5])
+names(invalid)[1] <- ""
+names(invalid)[3] <- NA
 
-# For empty objects the semantics are slightly different.
-# is_dictionaryish() returns TRUE for empty objects:
-is_dictionaryish(list())
-
-# But is_named() will only return TRUE if there is a names
-# attribute (a zero-length character vector in this case):
-x <- set_names(list(), character(0))
-is_named(x)
-
-
-# Empty and missing names are invalid:
-invalid <- dups
-names(invalid)[2] <- ""
-names(invalid)[5] <- NA
-
-# is_named() performs a global check while have_name() can show you
-# where the problem is:
 is_named(invalid)
 have_name(invalid)
 
-# have_name() will work even with vectors that don't have a names
-# attribute:
-have_name(letters)
+# A data frame normally has valid, unique names
+is_named(mtcars)
+have_name(mtcars)
+
+# A matrix usually doesn't because the names are stored in a
+# different attribute
+mat <- matrix(1:4, 2)
+colnames(mat) <- c("a", "b")
+is_named(mat)
+names(mat)
 }

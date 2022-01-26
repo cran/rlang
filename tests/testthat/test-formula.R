@@ -60,33 +60,46 @@ test_that("can modify environment", {
 })
 
 test_that("setting RHS preserves attributes", {
-  attrs <- list(foo = "bar", class = "baz")
+  attrs <- list(foo = "bar", class = "formula")
 
-  f <- structure2(~foo, !!!attrs)
+  f <- inject(structure(~foo, !!!attrs))
   f_rhs(f) <- quote(bar)
 
-  expect_identical(f, structure2(~bar, !!!attrs))
+  expect_identical(f, inject(structure(~bar, !!!attrs)))
 })
 
 test_that("setting LHS preserves attributes", {
-  attrs <- list(foo = "bar", class = "baz")
+  attrs <- list(foo = "bar", class = "formula")
 
-  f <- structure2(~foo, !!!attrs)
+  f <- inject(structure(~foo, !!!attrs))
   f_lhs(f) <- quote(bar)
 
-  expect_identical(f, structure2(bar ~ foo, !!!attrs))
+  expect_identical(f, inject(structure(bar ~ foo, !!!attrs)))
 
   f_lhs(f) <- quote(baz)
-  expect_identical(f, structure2(baz ~ foo, !!!attrs))
+  expect_identical(f, inject(structure(baz ~ foo, !!!attrs)))
 })
 
 test_that("setting environment preserves attributes", {
-  attrs <- list(foo = "bar", class = "baz")
+  attrs <- list(foo = "bar", class = "formula")
   env <- env()
 
-  f <- structure2(~foo, !!!attrs)
+  f <- inject(structure(~foo, !!!attrs))
   f_env(f) <- env
-  expect_identical(f, structure2(~foo, !!!attrs, .Environment = env))
+  expect_identical(f, inject(structure(~foo, !!!attrs, .Environment = env)))
+})
+
+test_that("unevaluated tilde calls are formulas", {
+  f <- quote(~foo)
+  expect_true(is_formula(f))
+  expect_false(is_formula(f, scoped = TRUE))
+  expect_true(is_formula(f, scoped = FALSE))
+  expect_true(is_formula(f, scoped = NULL))
+
+  expect_false(is_bare_formula(f))
+  expect_false(is_bare_formula(f, scoped = TRUE))
+  expect_true(is_bare_formula(f, scoped = FALSE))
+  expect_true(is_bare_formula(f, scoped = NULL))
 })
 
 
@@ -104,14 +117,4 @@ test_that("lhs is inspected", {
 
   expect_true(is_formula(foo ~ bar, lhs = TRUE))
   expect_false(is_formula(foo ~ bar, lhs = FALSE))
-})
-
-test_that("definitions are not formulas but are formulaish", {
-  expect_false(is_formula(quote(foo := bar)))
-  expect_true(is_formulaish(quote(foo := bar), lhs = TRUE))
-  expect_false(is_formulaish(quote(foo := bar), lhs = FALSE))
-
-  `:=` <- `~`
-  expect_false(is_formulaish(foo := bar, scoped = TRUE, lhs = FALSE))
-  expect_false(is_formulaish(foo := bar, scoped = FALSE, lhs = TRUE))
 })

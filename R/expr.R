@@ -1,25 +1,27 @@
 #' Is an object an expression?
 #'
 #' @description
+#' In rlang, an _expression_ is the return type of [parse_expr()], the
+#' set of objects that can be obtained from parsing R code. Under this
+#' definition expressions include numbers, strings, `NULL`, symbols,
+#' and function calls. These objects can be classified as:
 #'
-#' `is_expression()` tests for expressions, the set of objects that can be
-#' obtained from parsing R code. An expression can be one of two
-#' things: either a symbolic object (for which `is_symbolic()` returns
-#' `TRUE`), or a syntactic literal (testable with
-#' `is_syntactic_literal()`). Technically, calls can contain any R
-#' object, not necessarily symbolic objects or syntactic
-#' literals. However, this only happens in artificial
-#' situations. Expressions as we define them only contain numbers,
-#' strings, `NULL`, symbols, and calls: this is the complete set of R
-#' objects that can be created when R parses source code (e.g. from
-#' using [parse_expr()]).
+#' * Symbolic objects, i.e. symbols and function calls (for which
+#'   `is_symbolic()` returns `TRUE`)
+#' * Syntactic literals, i.e. scalar atomic objects and `NULL`
+#'   (testable with `is_syntactic_literal()`)
 #'
-#' Note that we are using the term expression in its colloquial sense
-#' and not to refer to [expression()] vectors, a data type that wraps
-#' expressions in a vector and which isn't used much in modern R code.
+#' `is_expression()` returns `TRUE` if the input is either a symbolic
+#' object or a syntactic literal. If a call, the elements of the call
+#' must all be expressions as well. Unparsable calls are not
+#' considered expressions in this narrow definition.
+#'
+#' Note that in base R, there exists [expression()] vectors, a data
+#' type similar to a list that supports special attributes created by
+#' the parser called source references. This data type is not
+#' supported in rlang.
 #'
 #' @details
-#'
 #' `is_symbolic()` returns `TRUE` for symbols and calls (objects with
 #' type `language`). Symbolic objects are replaced by their value
 #' during evaluation. Literals are the complement of symbolic
@@ -37,16 +39,10 @@
 #' a call. However, the result of evaluating it in [base_env()] is a
 #' literal(in this case an atomic vector).
 #'
-#' Pairlists are also a kind of language objects. However, since they
-#' are mostly an internal data structure, `is_expression()` returns `FALSE`
-#' for pairlists. You can use `is_pairlist()` to explicitly check for
-#' them. Pairlists are the data structure for function arguments. They
-#' usually do not arise from R code because subsetting a call is a
-#' type-preserving operation. However, you can obtain the pairlist of
-#' arguments by taking the CDR of the call object from C code. The
-#' rlang function [node_cdr()] will do it from R. Another way in
-#' which pairlist of arguments arise is by extracting the argument
-#' list of a closure with [base::formals()] or [fn_fmls()].
+#' As the data structure for function arguments, pairlists are also a
+#' kind of language objects. However, since they are mostly an
+#' internal data structure and can't be returned as is by the parser,
+#' `is_expression()` returns `FALSE` for pairlists.
 #'
 #' @param x An object to test.
 #' @seealso [is_call()] for a call predicate.
@@ -97,7 +93,24 @@
 #' is_expression(fmls)
 #' is_pairlist(fmls)
 is_expression <- function(x) {
-  is_symbolic(x) || is_syntactic_literal(x)
+  stack <- new_stack()
+  stack$push(x)
+
+  while (!is_exhausted(elt <- stack$pop())) {
+    if (is_missing(elt)) {
+      return(FALSE)
+    }
+
+    switch(
+      typeof(elt),
+      language = stack$push(!!!as.list(elt)),
+      if (!is_symbol(elt) && !is_syntactic_literal(elt)) {
+        return(FALSE)
+      }
+    )
+  }
+
+  TRUE
 }
 #' @export
 #' @rdname is_expression
@@ -133,9 +146,10 @@ is_symbolic <- function(x) {
 
 #' Turn an expression to a label
 #'
+#' @keywords internal
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("questioning")}
+#' `r lifecycle::badge("questioning")`
 #'
 #' `expr_text()` turns the expression into a single string, which
 #' might be multi-line. `expr_name()` is suitable for formatting
@@ -144,11 +158,6 @@ is_symbolic <- function(x) {
 #' in messages.
 #'
 #' @param expr An expression to labellise.
-#'
-#' @section Life cycle:
-#'
-#' These functions are in the questioning stage because they are
-#' redundant with the `quo_` variants and do not handle quosures.
 #'
 #' @examples
 #' # To labellise a function argument, first capture it with
@@ -213,7 +222,10 @@ expr_name <- function(expr) {
     return(name)
   }
 
-  abort("`expr` must quote a symbol, scalar, or call")
+  abort(sprintf(
+    "%s must be a symbol, scalar, or call.",
+    format_arg("expr")
+  ))
 }
 #' @rdname expr_label
 #' @export
@@ -264,6 +276,9 @@ deparse_one <- function(expr) {
 
 #' Set and get an expression
 #'
+#' @keywords internal
+#' @description
+#'
 #' These helpers are useful to make your function work generically
 #' with quosures and raw expressions. First call `get_expr()` to
 #' extract an expression. Once you're done processing the expression,
@@ -309,7 +324,7 @@ set_expr <- function(x, value) {
 #' @rdname set_expr
 #' @export
 get_expr <- function(x, default = x) {
-  .Call(rlang_get_expression, x, default)
+  .Call(ffi_get_expression, x, default)
 }
 
 expr_type_of <- function(x) {
@@ -354,6 +369,10 @@ switch_expr <- function(.x, ...) {
 #' @param x An object or expression to print.
 #' @param width The width of the deparsed or printed expression.
 #'   Defaults to the global option `width`.
+#' @param ... Arguments passed to `expr_deparse()`.
+#'
+#' @return `expr_deparse()` returns a character vector of lines.
+#'   `expr_print()` returns its input invisibly.
 #'
 #' @export
 #' @examples
@@ -382,12 +401,16 @@ switch_expr <- function(.x, ...) {
 #'
 #' wrapper_quo <- local(quo(bar(!!local_quo, baz)))
 #' expr_print(wrapper_quo)
-expr_print <- function(x, width = peek_option("width")) {
-  cat_line(expr_deparse(x, width = width))
+expr_print <- function(x, ...) {
+  cat_line(expr_deparse(x, ...))
+  invisible(x)
 }
 #' @rdname expr_print
 #' @export
-expr_deparse <- function(x, width = peek_option("width")) {
+expr_deparse <- function(x,
+                         ...,
+                         width = peek_option("width")) {
+  check_dots_empty0(...)
   deparser <- new_quo_deparser(width = width)
   quo_deparse(x, deparser)
 }

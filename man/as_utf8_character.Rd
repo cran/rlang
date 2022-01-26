@@ -10,7 +10,7 @@ as_utf8_character(x)
 \item{x}{An object to coerce.}
 }
 \description{
-\Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
 
 Unlike specifying the \code{encoding} argument in \code{as_string()} and
 \code{as_character()}, which is only declarative, these functions
@@ -41,6 +41,6 @@ non-UTF-8 native encoding.
 # Unicode escaping in the string):
 utf8 <- "caf\uE9"
 Encoding(utf8)
-as_bytes(utf8)
+charToRaw(utf8)
 }
 \keyword{internal}

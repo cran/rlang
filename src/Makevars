@@ -1,65 +1,85 @@
-PKG_CPPFLAGS = -I./lib/
+PKG_CPPFLAGS = -I./rlang/
 PKG_CFLAGS = $(C_VISIBILITY)
 
 lib-files = \
-        lib/rlang.h \
-        lib/attrs.c \
-        lib/cnd.c \
-        lib/debug.c \
-        lib/env.c \
-        lib/env-binding.c \
-        lib/eval.c \
-        lib/export.c \
-        lib/fn.c \
-        lib/formula.c \
-        lib/lang.c \
-        lib/node.c \
-        lib/parse.c \
-        lib/quo.c \
-        lib/replace-na.c \
-        lib/rlang.c \
-        lib/sexp.c \
-        lib/squash.c \
-        lib/stack.c \
-        lib/sym.c \
-        lib/sym-unescape.c \
-        lib/vec.c \
-        lib/vec-chr.c \
-        lib/vec-lgl.c \
-        lib/vec-list.c \
-        lib/weakref.c
+        rlang/rlang.h \
+        rlang/arg.c \
+        rlang/attrib.c \
+        rlang/call.c \
+        rlang/cnd.c \
+        rlang/c-utils.c \
+        rlang/debug.c \
+        rlang/dict.c \
+        rlang/df.c \
+        rlang/dyn-array.c \
+        rlang/dyn-list-of.c \
+        rlang/env.c \
+        rlang/env-binding.c \
+        rlang/eval.c \
+        rlang/export.c \
+        rlang/fn.c \
+        rlang/formula.c \
+        rlang/globals.c \
+        rlang/node.c \
+        rlang/parse.c \
+        rlang/quo.c \
+        rlang/rlang.c \
+        rlang/obj.c \
+        rlang/stack.c \
+        rlang/sym.c \
+        rlang/vec.c \
+        rlang/vec-chr.c \
+        rlang/vec-lgl.c \
+        rlang/vendor.c \
+        rlang/walk.c
+
+lib-cpp-files = \
+        rlang/cpp/rlang.cpp \
+        rlang/cpp/vec.cpp
 
 internal-files = \
         internal/arg.c \
+        internal/ast-rotate.c \
         internal/attr.c \
-        internal/dots.c \
         internal/call.c \
+        internal/cnd.c \
+        internal/cnd-handlers.c \
+        internal/dots.c \
+        internal/dots-ellipsis.c \
+        internal/encoding.c \
         internal/env.c \
         internal/env-binding.c \
         internal/eval.c \
         internal/eval-tidy.c \
-        internal/expr-interp.c \
-        internal/expr-interp-rotate.c \
+        internal/exported.c \
+        internal/file.c \
         internal/fn.c \
         internal/hash.c \
+        internal/init.c \
         internal/internal.c \
+        internal/names.c \
         internal/nse-defuse.c \
+        internal/nse-inject.c \
+        internal/parse.c \
         internal/quo.c \
+        internal/replace-na.c \
+        internal/squash.c \
+        internal/sym-unescape.c \
+        internal/tests.c \
         internal/utils.c \
-        internal/vec-raw.c
-
-export-files = \
-        export/exported.c \
-        export/exported-tests.c \
-        export/init.c
+        internal/vec.c \
+        internal/vec-raw.c \
+        internal/weakref.c
 
 
 all: $(SHLIB)
 
-$(SHLIB): lib.o internal.o export.o
+$(SHLIB): rlang.o internal.o
 
-lib.c: $(lib-files)
-	touch lib.c
+rlang.c: $(lib-files)
+	touch rlang.c
+rlang-rcc.cpp: $(lib-cpp-files)
+	touch rlang-rcc.cpp
 internal.c: $(internal-files)
 	touch internal.c
 export.c: $(export-files)

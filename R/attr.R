@@ -1,64 +1,60 @@
-
-structure2 <- function(.x, ...) {
-  exec("structure", .Data = .x, ...)
-}
-
-set_class <- function(x, class) {
-  attr(x, "class") <- class
-  x
-}
-
 #' Is object named?
 #'
-#' `is_named()` checks that `x` has names attributes, and that none of
-#' the names are missing or empty (`NA` or `""`). `is_dictionaryish()`
-#' checks that an object is a dictionary: that it has actual names and
-#' in addition that there are no duplicated names. `have_name()`
-#' is a vectorised version of `is_named()`.
+#' @description
 #'
-#' @param x An object to test.
-#' @return `is_named()` and `is_dictionaryish()` are scalar predicates
-#'   and return `TRUE` or `FALSE`. `have_name()` is vectorised and
-#'   returns a logical vector as long as the input.
-#' @export
+#' * `is_named()` is a scalar predicate that checks that `x` has a
+#'   `names` attribute and that none of the names are missing or empty
+#'   (`NA` or `""`).
+#'
+#' * `is_named2()` is like `is_named()` but always returns `TRUE` for
+#'   empty vectors, even those that don't have a `names` attribute.
+#'   In other words, it tests for the property that each element of a
+#'   vector is named. `is_named2()` composes well with [names2()]
+#'   whereas `is_named()` composes with `names()`.
+#'
+#' * `have_name()` is a vectorised variant.
+#'
+#' @param x A vector to test.
+#' @return `is_named()` and `is_named2()` are scalar predicates that
+#'   return `TRUE` or `FALSE`. `have_name()` is vectorised and returns
+#'   a logical vector as long as the input.
+#'
+#' @details
+#' `is_named()` always returns `TRUE` for empty vectors because 
+#'
 #' @examples
-#' # A data frame usually has valid, unique names
-#' is_named(mtcars)
-#' have_name(mtcars)
-#' is_dictionaryish(mtcars)
+#' # is_named() is a scalar predicate about the whole vector of names:
+#' is_named(c(a = 1, b = 2))
+#' is_named(c(a = 1, 2))
 #'
-#' # But data frames can also have duplicated columns:
-#' dups <- cbind(mtcars, cyl = seq_len(nrow(mtcars)))
-#' is_dictionaryish(dups)
+#' # Unlike is_named2(), is_named() returns `FALSE` for empty vectors
+#' # that don't have a `names` attribute.
+#' is_named(list())
+#' is_named2(list())
 #'
-#' # The names are still valid:
-#' is_named(dups)
-#' have_name(dups)
+#' # have_name() is a vectorised predicate
+#' have_name(c(a = 1, b = 2))
+#' have_name(c(a = 1, 2))
 #'
+#' # Empty and missing names are treated as invalid:
+#' invalid <- set_names(letters[1:5])
+#' names(invalid)[1] <- ""
+#' names(invalid)[3] <- NA
 #'
-#' # For empty objects the semantics are slightly different.
-#' # is_dictionaryish() returns TRUE for empty objects:
-#' is_dictionaryish(list())
-#'
-#' # But is_named() will only return TRUE if there is a names
-#' # attribute (a zero-length character vector in this case):
-#' x <- set_names(list(), character(0))
-#' is_named(x)
-#'
-#'
-#' # Empty and missing names are invalid:
-#' invalid <- dups
-#' names(invalid)[2] <- ""
-#' names(invalid)[5] <- NA
-#'
-#' # is_named() performs a global check while have_name() can show you
-#' # where the problem is:
 #' is_named(invalid)
 #' have_name(invalid)
 #'
-#' # have_name() will work even with vectors that don't have a names
-#' # attribute:
-#' have_name(letters)
+#' # A data frame normally has valid, unique names
+#' is_named(mtcars)
+#' have_name(mtcars)
+#'
+#' # A matrix usually doesn't because the names are stored in a
+#' # different attribute
+#' mat <- matrix(1:4, 2)
+#' colnames(mat) <- c("a", "b")
+#' is_named(mat)
+#' names(mat)
+#' @export
 is_named <- function(x) {
   nms <- names(x)
 
@@ -66,7 +62,7 @@ is_named <- function(x) {
     return(FALSE)
   }
 
-  if (any(nms_are_invalid(nms))) {
+  if (any(detect_void_name(nms))) {
     return(FALSE)
   }
 
@@ -74,13 +70,21 @@ is_named <- function(x) {
 }
 #' @rdname is_named
 #' @export
-is_dictionaryish <- function(x) {
-  if (!length(x)) {
-    return(!is.null(x))
+is_named2 <- function(x) {
+  nms <- names(x)
+
+  if (is_null(nms)) {
+    # Empty vectors are always named
+    return(!length(x))
   }
 
-  is_named(x) && !any(duplicated(names(x)))
+  if (any(detect_void_name(nms))) {
+    return(FALSE)
+  }
+
+  TRUE
 }
+
 #' @rdname is_named
 #' @export
 have_name <- function(x) {
@@ -88,13 +92,31 @@ have_name <- function(x) {
   if (is.null(nms)) {
     rep(FALSE, length(x))
   } else {
-    !nms_are_invalid(nms)
+    !detect_void_name(nms)
   }
 }
+detect_named <- have_name
 
-nms_are_invalid <- function(x) {
+detect_void_name <- function(x) {
   x == "" | is.na(x)
 }
+
+#' Is a vector uniquely named?
+#'
+#' Like [is_named()] but also checks that names are unique.
+#' @param x A vector.
+#' @keywords internal
+#' @export
+is_dictionaryish <- function(x) {
+  # 2022-01: Used in many packages. Don't deprecate without a
+  # replacement.
+  if (!length(x)) {
+    return(!is.null(x))
+  }
+
+  is_named(x) && !any(duplicated(names(x)))
+}
+
 
 #' Does an object have an element with this name?
 #'
@@ -121,8 +143,6 @@ has_name <- function(x, name) {
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
-#'
 #' This is equivalent to [stats::setNames()], with more features and
 #' stricter argument checking.
 #'
@@ -132,20 +152,21 @@ has_name <- function(x, name) {
 #' `set_names()` is stable and exported in purrr.
 #'
 #' @param x Vector to name.
-#' @param nm,... Vector of names, the same length as `x`.
+#' @param nm,... Vector of names, the same length as `x`. If length 1,
+#'   `nm` is recycled to the length of `x` following the recycling
+#'   rules of the tidyverse..
 #'
 #'   You can specify names in the following ways:
 #'
-#'   * If you do nothing, `x` will be named with itself.
+#'   * If not supplied, `x` will be named to `as.character(x)`.
 #'
 #'   * If `x` already has names, you can provide a function or formula
 #'     to transform the existing names. In that case, `...` is passed
 #'     to the function.
 #'
+#'   * Otherwise if `...` is supplied, `x` is named to `c(nm, ...)`.
+#'
 #'   * If `nm` is `NULL`, the names are removed (if present).
-#'
-#'   * In all other cases, `nm` and `...` are coerced to character.
-#'
 #' @export
 #' @examples
 #' set_names(1:4, c("a", "b", "c", "d"))
@@ -165,40 +186,53 @@ has_name <- function(x, name) {
 #'
 #' # `...` is passed to the function:
 #' set_names(head(mtcars), paste0, "_foo")
+#'
+#' # If length 1, the second argument is recycled to the length of the first:
+#' set_names(1:3, "foo")
+#' set_names(list(), "")
 set_names <- function(x, nm = x, ...) {
   mold <- x
-  .Call(rlang_set_names, x, mold, nm, environment())
+  .Call(ffi_set_names, x, mold, nm, environment())
 }
 
 #' Get names of a vector
 #'
 #' @description
-#'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
-#'
-#' This names getter always returns a character vector, even when an
+#' `names2()` always returns a character vector, even when an
 #' object does not have a `names` attribute. In this case, it returns
 #' a vector of empty names `""`. It also standardises missing names to
 #' `""`.
 #'
-#'
-#' @section Life cycle:
-#'
-#' `names2()` is stable.
+#' The replacement variant `names2<-` never adds `NA` names and
+#' instead fills unnamed vectors with `""`.
 #'
 #' @param x A vector.
-#' @export
+#'
 #' @examples
 #' names2(letters)
 #'
 #' # It also takes care of standardising missing names:
 #' x <- set_names(1:3, c("a", NA, "b"))
 #' names2(x)
+#'
+#' # Replacing names with the base `names<-` function may introduce
+#' # `NA` values when the vector is unnamed:
+#' x <- 1:3
+#' names(x)[1:2] <- "foo"
+#' names(x)
+#'
+#' # Use the `names2<-` variant to avoid this
+#' x <- 1:3
+#' names2(x)[1:2] <- "foo"
+#' names(x)
+#'
+#' @export
 names2 <- function(x) {
-  .Call(rlang_names2, x, environment())
+  .Call(ffi_names2, x, environment())
 }
-
-# Avoids `NA` names on subset-assign with unnamed vectors
+#' @rdname names2
+#' @param value New names.
+#' @export
 `names2<-` <- function(x, value) {
   if (is_null(names(x))) {
     names(x) <- names2(x)
@@ -208,7 +242,7 @@ names2 <- function(x) {
 }
 
 length_ <- function(x) {
-  .Call(rlang_length, x)
+  .Call(ffi_length, x)
 }
 
 #' How long is an object?
@@ -231,7 +265,7 @@ length_ <- function(x) {
 #' has_length(letters, 20)
 #' has_length(letters, 26)
 has_length <- function(x, n = NULL) {
-  len <- .Call(rlang_length, x)
+  len <- .Call(ffi_length, x)
 
   if (is_null(n)) {
     as.logical(len)
@@ -241,7 +275,7 @@ has_length <- function(x, n = NULL) {
 }
 
 poke_attributes <- function(x, attrs) {
-  .Call(rlang_poke_attrib, x, attrs)
+  .Call(ffi_poke_attrib, x, attrs)
 }
 
 #' Zap source references
@@ -265,16 +299,22 @@ poke_attributes <- function(x, attrs) {
 #' @export
 zap_srcref <- function(x) {
   if (is_closure(x)) {
+    # `body<-` zaps attributes
+    old <- attributes(x)
+
     body(x) <- zap_srcref(body(x))
+    attributes(x) <- old[names(old) != "srcref"]
+
     return(x)
   }
+
   if (!is_call(x)) {
     return(x)
   }
 
   x <- duplicate(x, shallow = TRUE)
 
-  if (!is_null(sexp_attrib(x))) {
+  if (!is_null(obj_attrib(x))) {
     attr(x, "srcref") <- NULL
     attr(x, "wholeSrcref") <- NULL
     attr(x, "srcfile") <- NULL

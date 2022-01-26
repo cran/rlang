@@ -429,10 +429,8 @@ test_that("`.env` pronoun is constructed", {
 
 test_that("the `.env` pronoun is not an environment", {
   pronoun <- eval_tidy(quote(.env), mtcars)
-  expect_error(length(pronoun), "Can't take the")
-
-  skip_if(getRversion() < "3.2")
-  expect_error(names(pronoun), "Can't take the")
+  expect_length(pronoun, 0L)
+  expect_named(pronoun, chr())
 })
 
 test_that("subsetting `.env` evaluates", {
@@ -451,8 +449,8 @@ test_that("mask inherits from `env` after evaluation", {
 
 test_that("can't take the names() and length() of the `.data` pronoun", {
   pronoun <- as_data_pronoun(mtcars)
-  expect_error(names(pronoun), "Can't take")
-  expect_error(length(pronoun), "Can't take")
+  expect_length(pronoun, 0L)
+  expect_named(pronoun, chr())
 })
 
 test_that("eval_tidy() does not infloop when the quosure inherits from the mask", {
@@ -487,6 +485,73 @@ test_that("eval_tidy() propagates visibility", {
   expect_visible(eval_tidy(quo(list(invisible(list())))))
   expect_invisible(eval_tidy(quo(invisible(list()))))
   expect_invisible(eval_tidy(quo(identity(!!local(quo(invisible(list())))))))
+})
+
+test_that("quosures that inherit from the mask are not rechained", {
+  local_data <- "bar"
+  mask <- new_data_mask(env(mask_data = "foo"))
+
+  q1 <- eval_tidy(quote(rlang::quo(letters)), mask, base_env())
+
+  expr <- quote(paste(letters[[1]], mask_data, local_data))
+  q2 <- eval_tidy(quote(local(rlang::quo(!!expr))), mask)
+
+  expect_equal(eval_tidy(q1, mask, base_env()), letters)
+
+  # This used to hang (tidyverse/dplyr#5927)
+  expect_equal(eval_tidy(q2, mask, base_env()), "a foo bar")
+})
+
+test_that("eval_tidy() has dimnames method (#1265)", {
+  expect_equal(
+    eval_tidy(quote(dimnames(.data)), mtcars),
+    list(chr(), chr())
+  )
+})
+
+test_that("fake pronoun fails informatively", {
+  expect_snapshot({
+    "Fake pronouns"
+
+    f <- function() .data$foo
+    (expect_error(f(), "subset"))
+
+    f <- function() .data[["foo"]]
+    (expect_error(f(), "subset"))
+  })
+})
+
+test_that("`.data` pronoun fails informatively", {
+  f <- function(data = NULL) g(data)
+  g <- function(data) h(.data$foo, data = data)
+  h <- function(x, data) i({{ x }}, data)
+  i <- function(x, data) eval_tidy(enquo(x), data)
+
+  expect_snapshot({
+    (expect_error(f()))
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.data[[2]], data)
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.data["foo"], data = data)
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.data[["foo"]] <- 1, data = data)
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.data$foo <- 1, data = data)
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.env["foo"], data = data)
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.env$foo <- 1, data = data)
+    (expect_error(f(mtcars)))
+
+    g <- function(data) h(.env[["foo"]] <- 1, data = data)
+    (expect_error(f(mtcars)))
+  })
 })
 
 

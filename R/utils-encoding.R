@@ -2,7 +2,7 @@
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' Unlike specifying the `encoding` argument in `as_string()` and
 #' `as_character()`, which is only declarative, these functions
@@ -36,16 +36,19 @@
 #' # Unicode escaping in the string):
 #' utf8 <- "caf\uE9"
 #' Encoding(utf8)
-#' as_bytes(utf8)
+#' charToRaw(utf8)
 as_utf8_character <- function(x) {
-  .Call(rlang_unescape_character, as_character(x))
+  .Call(ffi_unescape_character, as.character(x))
 }
+
+# `as_utf8_character()` is currently used in dplyr and tidyr as an
+# interface for `chr_unserialise_unicode()`
 
 #' Translate unicode points to UTF-8
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' For historical reasons, R translates strings to the native encoding
 #' when they are converted to symbols. This string-to-symbol
@@ -77,14 +80,14 @@ as_utf8_character <- function(x) {
 #' identical(chr_unserialise_unicode(ascii), "\u5e78")
 chr_unserialise_unicode <- function(chr) {
   stopifnot(is_character(chr))
-  .Call(rlang_unescape_character, chr)
+  .Call(ffi_unescape_character, chr)
 }
 
 #' Create a string
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' These base-type constructors allow more control over the creation
 #' of strings in R. They take character vectors or string-like objects
@@ -104,7 +107,7 @@ chr_unserialise_unicode <- function(chr) {
 #' # automatically:
 #' cafe <- string("caf\uE9")
 #' Encoding(cafe)
-#' as_bytes(cafe)
+#' charToRaw(cafe)
 #'
 #' # In addition, string() provides useful conversions to let
 #' # programmers control how the string is represented in memory. For
@@ -113,14 +116,14 @@ chr_unserialise_unicode <- function(chr) {
 #' # string explicitly:
 #' cafe_latin1 <- string(c(0x63, 0x61, 0x66, 0xE9), "latin1")
 #' Encoding(cafe_latin1)
-#' as_bytes(cafe_latin1)
+#' charToRaw(cafe_latin1)
 string <- function(x, encoding = NULL) {
   if (is_integerish(x)) {
     x <- rawToChar(as.raw(x))
   } else if (is_raw(x)) {
     x <- rawToChar(x)
   } else if (!is_string(x)) {
-    abort("`x` must be a string or raw vector")
+    stop_input_type(x, "a string or a raw vector")
   }
 
   if (!is_null(encoding)) {
@@ -130,37 +133,21 @@ string <- function(x, encoding = NULL) {
   x
 }
 
-#' Coerce to a raw vector
-#'
-#' @description
-#'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
-#'
-#' This currently only works with strings, and returns its hexadecimal
-#' representation.
-#'
-#'
-#' @section Life cycle:
-#'
-#' Raw vector functions are experimental.
-#'
-#' @param x A string.
-#' @return A raw vector of bytes.
-#' @keywords internal
-#' @export
-as_bytes <- function(x) {
-  switch(typeof(x),
-    raw = return(x),
-    character = if (is_string(x)) return(charToRaw(x))
-  )
-  abort("`x` must be a string or raw vector")
-}
-new_bytes <- function(x) {
+cast_raw <- function(x, call = caller_env()) {
   if (is_integerish(x)) {
     as.raw(x)
   } else if (is_raw(x)) {
     x
   } else {
-    abort("input should be integerish")
+    abort("`...` must be numbers.", call = call)
   }
+}
+
+# Used in internal/vec.c
+legacy_as_raw <- function(x) {
+  switch(typeof(x),
+    raw = return(x),
+    character = if (is_string(x)) return(charToRaw(x))
+  )
+  stop_input_type(x, "a string or a raw vector", call = NULL)
 }

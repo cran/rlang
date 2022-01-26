@@ -3,14 +3,17 @@
 \name{as_function}
 \alias{as_function}
 \alias{is_lambda}
-\alias{as_closure}
-\title{Convert to function or closure}
+\title{Convert to function}
 \usage{
-as_function(x, env = caller_env())
+as_function(
+  x,
+  env = global_env(),
+  ...,
+  arg = caller_arg(x),
+  call = caller_env()
+)
 
 is_lambda(x)
-
-as_closure(x, env = caller_env())
 }
 \arguments{
 \item{x}{A function or formula.
@@ -24,23 +27,28 @@ This allows you to create very compact anonymous functions (lambdas) with up
 to two inputs. Functions created from formulas have a special
 class. Use \code{is_lambda()} to test for it.
 
-Lambdas currently do not support \link{nse-force},
-due to the way the arguments are handled internally.}
+If a \strong{string}, the function is looked up in \code{env}. Note that
+this interface is strictly for user convenience because of the
+scoping issues involved. Package developers should avoid
+supplying functions by name and instead supply them by value.}
 
 \item{env}{Environment in which to fetch the function in case \code{x}
 is a string.}
+
+\item{...}{These dots are for future extensions and must be empty.}
+
+\item{arg}{An argument name as a string. This argument
+will be mentioned in error messages as the input that is at the
+origin of a problem.}
+
+\item{call}{The execution environment of a currently
+running function, e.g. \code{caller_env()}. The function will be
+mentioned in error messages as the source of the error. See the
+\code{call} argument of \code{\link[=abort]{abort()}} for more information.}
 }
 \description{
-\Sexpr[results=rd, stage=render]{rlang:::lifecycle("stable")}
-\itemize{
-\item \code{as_function()} transforms a one-sided formula into a function.
+\code{as_function()} transforms a one-sided formula into a function.
 This powers the lambda syntax in packages like purrr.
-\item \code{as_closure()} first passes its argument to \code{as_function()}. If
-the result is a primitive function, it regularises it to a proper
-\link{closure} (see \code{\link[=is_function]{is_function()}} about primitive functions). Some
-special control flow primitives like \code{if}, \code{for}, or \code{break}
-can't be coerced to a closure.
-}
 }
 \examples{
 f <- as_function(~ .x + 1)
@@ -55,22 +63,4 @@ h(6, 3)
 # Functions created from a formula have a special class:
 is_lambda(f)
 is_lambda(as_function(function() "foo"))
-
-# Primitive functions are regularised as closures
-as_closure(list)
-as_closure("list")
-
-# Operators have `.x` and `.y` as arguments, just like lambda
-# functions created with the formula syntax:
-as_closure(`+`)
-as_closure(`~`)
-
-# Use a regular function for tidy evaluation, also when calling functions
-# that use tidy evaluation:
-## Bad:
-e <- as_function(~ as_label(ensym(.x)))
-## Good:
-e <- as_function(function(x) as_label(ensym(x)))
-
-e(y)
 }

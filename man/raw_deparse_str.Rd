@@ -15,7 +15,7 @@ raw_deparse_str(x, prefix = NULL, suffix = NULL)
 A string.
 }
 \description{
-\Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#experimental}{\figure{lifecycle-experimental.svg}{options: alt='[Experimental]'}}}{\strong{[Experimental]}}
 
 This function converts a raw vector to a hexadecimal string,
 optionally adding a prefix and a suffix.
@@ -28,3 +28,4 @@ raw_deparse_str(raw())
 raw_deparse_str(charToRaw("string"))
 raw_deparse_str(raw(10), prefix = "'0x", suffix = "'")
 }
+\keyword{internal}

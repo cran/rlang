@@ -1,46 +1,83 @@
 #include <rlang.h>
 #include "internal.h"
 
+#include "arg.c"
+#include "attr.c"
+#include "call.c"
+#include "cnd.c"
+#include "cnd-handlers.c"
+#include "dots.c"
+#include "dots-ellipsis.c"
+#include "encoding.c"
+#include "env.c"
+#include "env-binding.c"
+#include "eval.c"
+#include "eval-tidy.c"
+#include "exported.c"
+#include "nse-inject.c"
+#include "ast-rotate.c"
+#include "file.c"
+#include "fn.c"
+#include "hash.c"
+#include "names.c"
+#include "nse-defuse.c"
+#include "parse.c"
+#include "quo.c"
+#include "replace-na.c"
+#include "squash.c"
+#include "sym-unescape.c"
+#include "tests.c"
+#include "utils.c"
+#include "vec.c"
+#include "vec-raw.c"
+#include "weakref.c"
+#include "init.c"
 
-sexp* rlang_zap = NULL;
 
-sexp* rlang_as_list_call = NULL;
+struct rlang_globals_syms rlang_syms;
 
-sexp* rlang_objs_keep = NULL;
-sexp* rlang_objs_trailing = NULL;
+r_obj* rlang_zap = NULL;
+r_obj* rlang_as_list_call = NULL;
+r_obj* rlang_objs_keep = NULL;
+r_obj* rlang_objs_trailing = NULL;
+r_obj* fns_function = NULL;
+r_obj* fns_quote = NULL;
 
-sexp* fns_function = NULL;
-sexp* fns_quote = NULL;
+void rlang_init_arg(r_obj* ns);
 
-void rlang_init_utils();
-void rlang_init_dots(sexp* ns);
-void rlang_init_expr_interp();
-void rlang_init_eval_tidy();
-void rlang_init_attr(sexp* ns);
-
-void rlang_init_internal(sexp* ns) {
+void rlang_init_internal(r_obj* ns) {
   rlang_init_utils();
+  rlang_init_arg(ns);
+  rlang_init_attr(ns);
+  rlang_init_cnd(ns);
+  rlang_init_cnd_handlers(ns);
   rlang_init_dots(ns);
   rlang_init_expr_interp();
   rlang_init_eval_tidy();
-  rlang_init_attr(ns);
+  rlang_init_fn();
+  rlang_init_tests();
+
+  rlang_syms.c_null = r_sym(".__C_NULL__.");
+  rlang_syms.handlers = r_sym("handlers");
+  rlang_syms.tryCatch = r_sym("tryCatch");
+  rlang_syms.withCallingHandlers = r_sym("withCallingHandlers");
 
   rlang_zap = rlang_ns_get("zap!");
 
   rlang_as_list_call = r_parse("rlang_as_list(x)");
-  r_mark_precious(rlang_as_list_call);
+  r_preserve(rlang_as_list_call);
 
 
   rlang_objs_keep = r_chr("keep");
-  r_mark_precious(rlang_objs_keep);
+  r_preserve(rlang_objs_keep);
 
   rlang_objs_trailing = r_chr("trailing");
-  r_mark_precious(rlang_objs_trailing);
+  r_preserve(rlang_objs_trailing);
 
 
-  fns_function = r_eval(r_sym("function"), r_base_env);
-  fns_quote = r_eval(r_sym("quote"), r_base_env);
+  fns_function = r_eval(r_sym("function"), r_envs.base);
+  fns_quote = r_eval(r_sym("quote"), r_envs.base);
 
-  /* dots.c - enum dots_expansion_op */
-  RLANG_ASSERT(OP_DOTS_MAX == DOTS_CAPTURE_TYPE_MAX * EXPANSION_OP_MAX);
+  /* dots.c - enum dots_op */
+  RLANG_ASSERT(DOTS_OP_MAX == DOTS_COLLECT_MAX * INJECTION_OP_MAX);
 }

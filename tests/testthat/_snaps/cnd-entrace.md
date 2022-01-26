@@ -1,52 +1,3 @@
-# with_abort() promotes base errors to rlang errors
-
-    Code
-      print(err)
-    Output
-      x
-      +-<error/rlang_error>
-      | High-level message
-      \-<error/rlang_error>
-        Low-level message
-      Backtrace:
-        1. base::identity(catch_cnd(a()))
-        9. rlang:::a()
-       10. rlang:::b()
-       11. rlang:::c()
-       18. rlang:::f()
-       19. rlang:::g()
-       20. rlang:::h()
-    Code
-      summary(err)
-    Output
-      x
-      +-<error/rlang_error>
-      | High-level message
-      \-<error/rlang_error>
-        Low-level message
-      Backtrace:
-           x
-        1. +-base::identity(catch_cnd(a()))
-        2. +-rlang::catch_cnd(a())
-        3. | +-rlang::eval_bare(...)
-        4. | +-base::tryCatch(...)
-        5. | | \-base:::tryCatchList(expr, classes, parentenv, handlers)
-        6. | |   \-base:::tryCatchOne(expr, names, parentenv, handlers[[1L]])
-        7. | |     \-base:::doTryCatch(return(expr), name, parentenv, handler)
-        8. | \-base::force(expr)
-        9. \-rlang:::a()
-       10.   \-rlang:::b()
-       11.     \-rlang:::c()
-       12.       +-base::tryCatch(...)
-       13.       | \-base:::tryCatchList(expr, classes, parentenv, handlers)
-       14.       |   \-base:::tryCatchOne(expr, names, parentenv, handlers[[1L]])
-       15.       |     \-base:::doTryCatch(return(expr), name, parentenv, handler)
-       16.       +-rlang::with_abort(f())
-       17.       | \-base::withCallingHandlers(...)
-       18.       \-rlang:::f()
-       19.         \-rlang:::g()
-       20.           \-rlang:::h()
-
 # rlang and base errors are properly entraced
 
     Code
@@ -56,36 +7,152 @@
       Calls: f -> g -> h
       Run `rlang::last_error()` to see where the error occurred.
       <error/rlang_error>
-      foo
+      Error:
+      ! foo
       Backtrace:
-       1. global::f()
-       2. global::g()
-       3. global::h()
+       1. global f()
+       2. global g()
+       3. global h()
       Run `rlang::last_trace()` to see the full context.
       <error/rlang_error>
-      foo
+      Error:
+      ! foo
       Backtrace:
-          █
-       1. └─global::f()
-       2.   └─global::g()
-       3.     └─global::h()
+          x
+       1. \-global f()
+       2.   \-global g()
+       3.     \-global h()
     Code
       cat_line(rlang)
     Output
-      Error: foo
+      Error in `h()`:
+      ! foo
       Run `rlang::last_error()` to see where the error occurred.
       <error/rlang_error>
-      foo
+      Error in `h()`:
+      ! foo
       Backtrace:
-       1. global::f()
-       2. global::g()
-       3. global::h()
+       1. global f()
+       2. global g()
+       3. global h()
       Run `rlang::last_trace()` to see the full context.
       <error/rlang_error>
-      foo
+      Error in `h()`:
+      ! foo
       Backtrace:
-          █
-       1. └─global::f()
-       2.   └─global::g()
-       3.     └─global::h()
+          x
+       1. \-global f()
+       2.   \-global g()
+       3.     \-global h()
+       4.       \-rlang::abort("foo")
+
+# can supply handler environment as `bottom`
+
+    Code
+      print(err)
+    Output
+      <error/rlang_error>
+      Error in `1 + ""`:
+      ! non-numeric argument to binary operator
+      Backtrace:
+        1. rlang::catch_cnd(...)
+        9. rlang f()
+       10. rlang g()
+       11. rlang h()
+       12. base::identity(1 + "")
+
+# can set `entrace()` as a global handler
+
+    Error in `1 + ""`:
+    ! non-numeric argument to binary operator
+    Backtrace:
+        x
+     1. \-global f()
+     2.   \-global g()
+     3.     \-global h()
+    Execution halted
+
+---
+
+    Error in `1 + ""`:
+    ! non-numeric argument to binary operator
+    Backtrace:
+        x
+     1. \-global f()
+     2.   \-global g()
+     3.     \-global h()
+    Execution halted
+
+---
+
+    FOO
+    Warning in g() : bar
+    baz
+    > rlang::last_warnings()
+    [[1]]
+    <warning/rlang_warning>
+    Warning in `f()`:
+    foo
+    Backtrace:
+     1. global f()
+    
+    [[2]]
+    <warning/rlang_warning>
+    Warning in `g()`:
+    bar
+    Backtrace:
+     1. global f()
+     2. global g()
+    
+    
+    > rlang::last_warnings(2)
+    [[1]]
+    <warning/rlang_warning>
+    Warning in `f()`:
+    foo
+    Backtrace:
+     1. global f()
+    
+    [[2]]
+    <warning/rlang_warning>
+    Warning in `g()`:
+    bar
+    Backtrace:
+     1. global f()
+     2. global g()
+    
+    
+    > summary(rlang::last_messages())
+    [[1]]
+    <message/rlang_message>
+    Message in `message()`:
+    FOO
+    Backtrace:
+        x
+     1. \-global f()
+    
+    [[2]]
+    <message/rlang_message>
+    Message in `message()`:
+    baz
+    Backtrace:
+        x
+     1. \-global f()
+     2.   \-global g()
+     3.     \-global h()
+    
+    
+    > summary(rlang::last_messages(1))
+    [[1]]
+    <message/rlang_message>
+    Message in `message()`:
+    baz
+    Backtrace:
+        x
+     1. \-global f()
+     2.   \-global g()
+     3.     \-global h()
+    
+    Warning message:
+    In f() : foo
 

@@ -3,26 +3,72 @@
 \name{sym}
 \alias{sym}
 \alias{syms}
+\alias{data_sym}
+\alias{data_syms}
 \title{Create a symbol or list of symbols}
 \usage{
 sym(x)
 
 syms(x)
+
+data_sym(x)
+
+data_syms(x)
 }
 \arguments{
-\item{x}{A string or list of strings.}
+\item{x}{For \code{sym()} and \code{data_sym()}, a string. For \code{syms()} and
+\code{data_syms()}, a list of strings.}
 }
 \value{
-A symbol for \code{sym()} and a list of symbols for \code{syms()}.
+For \code{sym()} and \code{syms()}, a symbol or list of symbols. For
+\code{data_sym()} and \code{data_syms()}, calls of the form \code{.data$foo}.
 }
 \description{
-These functions take strings as input and turn them into symbols.
+Symbols are a kind of \link[=topic-defuse]{defused expression} that
+represent objects in environments.
+\itemize{
+\item \code{sym()} and \code{syms()} take strings as input and turn them into
+symbols.
+\item \code{data_sym()} and \code{data_syms()} create calls of the form
+\code{.data$foo} instead of symbols. Subsetting the \code{\link{.data}} pronoun
+is more robust when you expect a data-variable. See
+\ifelse{html}{\link[=topic-data-mask-ambiguity]{The data mask ambiguity}}{\link[=topic-data-mask-ambiguity]{The data mask ambiguity}}.
+}
+
+Only tidy eval APIs support the \code{\link{.data}} pronoun. With base R
+functions, use simple symbols created with \code{sym()} or \code{syms()}.
 }
 \examples{
+# Create a symbol
+sym("cyl")
+
+# Create a list of symbols
+syms(c("cyl", "am"))
+
+# Symbolised names refer to variables
+eval(sym("cyl"), mtcars)
+
+# Beware of scoping issues
+Cyl <- "wrong"
+eval(sym("Cyl"), mtcars)
+
+# Data symbols are explicitly scoped in the data mask
+try(eval_tidy(data_sym("Cyl"), mtcars))
+
+# These can only be used with tidy eval functions
+try(eval(data_sym("Cyl"), mtcars))
+
 # The empty string returns the missing argument:
 sym("")
 
 # This way sym() and as_string() are inverse of each other:
 as_string(missing_arg())
 sym(as_string(missing_arg()))
+
+}
+\seealso{
+\itemize{
+\item \ifelse{html}{\link[=topic-defuse]{Defusing R expressions}}{\link[=topic-defuse]{Defusing R expressions}}
+\item \ifelse{html}{\link[=topic-metaprogramming]{Metaprogramming patterns}}{\link[=topic-metaprogramming]{Metaprogramming patterns}}
+}
 }

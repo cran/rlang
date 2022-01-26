@@ -66,7 +66,7 @@ test_that("env_get_list() retrieves multiple bindings", {
   expect_identical(env_get_list(env, c("foo", "bar")), list(foo = 1L, bar =2L))
 
   baz <- 0L
-  expect_error(env_get_list(env, "baz"), "missing")
+  expect_error(env_get_list(env, "baz"), "Can't find")
   expect_identical(env_get_list(env, c("foo", "baz"), inherit = TRUE), list(foo = 1L, baz =0L))
 })
 
@@ -145,18 +145,21 @@ test_that("env_unbind() doesn't warn if binding doesn't exist (#177)", {
 test_that("env_get() and env_get_list() accept default value", {
   env <- env(a = 1)
 
-  expect_error(env_get(env, "b"), "missing")
-  expect_error(env_get_list(env, "b"), "missing")
+  expect_error(env_get(env, "b"), "Can't find")
+  expect_error(env_get_list(env, "b"), "Can't find")
 
   expect_identical(env_get(env, "b", default = "foo"), "foo")
   expect_identical(env_get_list(env, c("a", "b"), default = "foo"), list(a = 1, b = "foo"))
 })
 
 test_that("env_get() without default fails", {
-  expect_error(env_get(env(), "_foobar"), "argument .* is missing")
+  expect_snapshot({
+    (expect_error(env_get(env(), "foobar")))
+    (expect_error(env_get_list(env(), "foobar")))
+  })
 
   fn <- function(env, default) env_get(env, "_foobar", default = default)
-  expect_error(fn(env()), "argument .* is missing")
+  expect_error(fn(env()), "Can't find")
 })
 
 test_that("env_get() evaluates `default` lazily", {
@@ -364,17 +367,17 @@ test_that("`env_binding_are_lazy()` type-checks `env` (#923)", {
 })
 
 test_that("env_poke() zaps (#1012)", {
-  env <- env(foo = 1)
-  env_poke(env, "foo", zap())
-  expect_false(env_has(env, "foo"))
+  env <- env(zapzap = 1)
+  env_poke(env, "zapzap", zap())
+  expect_false(env_has(env, "zapzap"))
 
-  env <- env(env(foo = 1))
-  env_poke(env, "foo", zap())
-  expect_false(env_has(env, "foo"))
-  expect_true(env_has(env, "foo", inherit = TRUE))
+  env <- env(env(zapzap = 1))
+  env_poke(env, "zapzap", zap())
+  expect_false(env_has(env, "zapzap"))
+  expect_true(env_has(env, "zapzap", inherit = TRUE))
 
-  env_poke(env, "foo", zap(), inherit = TRUE)
-  expect_false(env_has(env, "foo", inherit = TRUE))
+  env_poke(env, "zapzap", zap(), inherit = TRUE)
+  expect_false(env_has(env, "zapzap", inherit = TRUE))
 })
 
 test_that("env_poke() doesn't warn when unrepresentable characters are serialised", {
@@ -395,18 +398,77 @@ test_that("new_environment() supports non-list data", {
   expect_equal(env$a, 1)
 })
 
+test_that("`%<~%` assigns lazily", {
+  x %<~% 1
+  expect_equal(x, 1)
 
-# Lifecycle ----------------------------------------------------------
+  x %<~% stop("foo")
+  expect_error(x, "foo")
 
-test_that("env_bind_exprs() and env_bind_fns() still work", {
-  local_options(lifecycle_disable_warnings = TRUE)
-  e <- env()
+  # Can reassign over a throwing promise
+  x %<~% stop("bar")
+  expect_error(x, "bar")
+})
 
-  env_bind_exprs(e, foo = cat("foo\n"))
-  expect_output(e$foo, "foo")
-  expect_null(e$foo)
+test_that("env_get() and env_get_list() handle `last` argument", {
+  top <- env(foo = "foo")
+  mid <- env(top)
+  low <- env(mid)
 
-  env_bind_fns(e, bar = ~ cat("foo\n"))
-  expect_output(e$bar, "foo")
-  expect_output(e$bar, "foo")
+  expect_equal(
+    env_get(low, "foo", inherit = TRUE, default = "null"),
+    "foo"
+  )
+  expect_equal(
+    env_get(low, "foo", inherit = TRUE, last = mid, default = "null"),
+    "null"
+  )
+  expect_equal(
+    env_get(low, "foo", inherit = TRUE, last = low, default = "null"),
+    "null"
+  )
+
+  expect_equal(
+    env_get_list(low, "foo", inherit = TRUE, default = "null"),
+    list(foo = "foo")
+  )
+  expect_equal(
+    env_get_list(low, "foo", inherit = TRUE, last = mid, default = "null"),
+    list(foo = "null")
+  )
+  expect_equal(
+    env_get_list(low, "foo", inherit = TRUE, last = low, default = "null"),
+    list(foo = "null")
+  )
+})
+
+test_that("env_cache() works (#1081)", {
+ e <- env(a = "foo")
+
+ # Returns existing binding
+ expect_equal(
+   env_cache(e, "a", "default"),
+   "foo"
+ )
+
+ # Creates a `b` binding and returns its default value
+ expect_equal(
+   env_cache(e, "b", "default"),
+   "default"
+ )
+
+ # Now `b` is defined
+ expect_equal(e$b, "default")
+ expect_equal(e$a, "foo")
+})
+
+test_that("env_get(last = ) checks for empty env when last is disconnected (#1208)", {
+  out <- env_get(
+    emptyenv(),
+    "_foobar",
+    default = "_fallback",
+    inherit = TRUE,
+    last = globalenv()
+  )
+  expect_equal(out, "_fallback")
 })

@@ -1,185 +1,209 @@
-#' Establish handlers on the stack
+#' Register default global handlers
 #'
 #' @description
+#' `global_handle()` sets up a default configuration for error,
+#' warning, and message handling. It calls:
 #'
-#' Condition handlers are functions established on the evaluation
-#' stack (see [ctxt_stack()]) that are called by R when a condition is
-#' signalled (see [cnd_signal()] and [abort()] for two common signal
-#' functions). They come in two types:
+#' * [global_entrace()] to enable rlang errors and warnings globally.
 #'
-#' * Exiting handlers aborts all code currently run between
-#'   `with_handlers()` and the point where the condition has been
-#'   raised. `with_handlers()` passes the return value of the handler
-#'   to its caller.
+#' * [global_prompt_install()] to recover from `packageNotFoundError`s
+#'   with a user prompt to install the missing package. Note that at
+#'   the time of writing (R 4.1), there are only very limited
+#'   situations where this handler works.
 #'
-#' * Calling handlers, which are executed from inside the signalling
-#'   functions. Their return values are ignored, only their side
-#'   effects matters. Valid side effects are writing a log message, or
-#'   jumping out of the signalling context by [invoking a
-#'   restart][with_restarts] or using [return_from()]. If the raised
-#'   condition was an error, this interrupts the aborting process.
+#' @param entrace Passed as `enable` argument to [global_entrace()].
+#' @param prompt_install Passed as `enable` argument to
+#'   [global_prompt_install()].
 #'
-#'   If a calling handler returns normally, it effectively declines to
-#'   handle the condition and other handlers on the stack (calling or
-#'   exiting) are given a chance to handle the condition.
-#'
-#' Handlers are exiting by default, use [calling()] to create a
-#' calling handler.
-#'
-#' @param .expr An expression to execute in a context where new
-#'   handlers are established. The underscored version takes a quoted
-#'   expression or a quoted formula.
-#' @param ... <[dynamic][dyn-dots]> Named handlers. These should be
-#'   functions of one argument, or [formula functions][as_function].
-#'   The handlers are considered exiting by default, use [calling()]
-#'   to specify a calling handler.
-#'
-#' @section Life cycle: `exiting()` is soft-deprecated as of rlang
-#'   0.4.0 because [with_handlers()] now treats handlers as exiting by
-#'   default.
-#'
-#' @examples
-#' # Signal a condition with signal():
-#' fn <- function() {
-#'   g()
-#'   cat("called?\n")
-#'   "fn() return value"
-#' }
-#' g <- function() {
-#'   h()
-#'   cat("called?\n")
-#' }
-#' h <- function() {
-#'   signal("A foobar condition occurred", "foo")
-#'   cat("called?\n")
-#' }
-#'
-#' # Exiting handlers jump to with_handlers() before being
-#' # executed. Their return value is handed over:
-#' handler <- function(c) "handler return value"
-#' with_handlers(fn(), foo = handler)
-#'
-#' # Calling handlers are called in turn and their return value is
-#' # ignored. Returning just means they are declining to take charge of
-#' # the condition. However, they can produce side-effects such as
-#' # displaying a message:
-#' some_handler <- function(c) cat("some handler!\n")
-#' other_handler <- function(c) cat("other handler!\n")
-#' with_handlers(fn(), foo = calling(some_handler), foo = calling(other_handler))
-#'
-#' # If a calling handler jumps to an earlier context, it takes
-#' # charge of the condition and no other handler gets a chance to
-#' # deal with it. The canonical way of transferring control is by
-#' # jumping to a restart. See with_restarts() and restarting()
-#' # documentation for more on this:
-#' exiting_handler <- function(c) rst_jump("rst_foo")
-#' fn2 <- function() {
-#'   with_restarts(g(), rst_foo = function() "restart value")
-#' }
-#' with_handlers(fn2(), foo = calling(exiting_handler), foo = calling(other_handler))
 #' @export
-with_handlers <- function(.expr, ...) {
-  handlers <- list2(...)
+global_handle <- function(entrace = TRUE,
+                          prompt_install = TRUE) {
+  check_bool(entrace)
+  check_bool(prompt_install)
 
-  is_calling <- map_lgl(handlers, inherits, "rlang_box_calling_handler")
-  handlers <- map_if(handlers, is_calling, unbox)
-  handlers <- map(handlers, as_function)
+  global_entrace(entrace)
+  global_prompt_install(prompt_install)
 
-  calling <- handlers[is_calling]
-  exiting <- handlers[!is_calling]
-
-  expr <- quote(.expr)
-  if (length(calling)) {
-    expr <- expr(withCallingHandlers(!!expr, !!!calling))
-  }
-  if (length(exiting)) {
-    expr <- expr(tryCatch(!!expr, !!!exiting))
-  }
-
-  .External2(rlang_ext2_eval, expr, environment())
+  invisible(NULL)
 }
 
-#' @rdname with_handlers
-#' @param handler A handler function that takes a condition as
-#'   argument. This is passed to [as_function()] and can thus be a
-#'   formula describing a lambda function.
+#' Prompt user to install missing packages
+#'
+#' @description
+#' When enabled, `packageNotFoundError` thrown by [loadNamespace()]
+#' cause a user prompt to install the missing package and continue
+#' without interrupting the current program.
+#'
+#' This is similar to how [check_installed()] prompts users to install
+#' required packages. It uses the same install strategy, using pak if
+#' available and [install.packages()] otherwise.
+#'
+#' @inheritParams global_entrace
 #' @export
-calling <- function(handler) {
-  handler <- as_function(handler)
-  new_box(handler, "rlang_box_calling_handler")
-}
+global_prompt_install <- function(enable = TRUE) {
+  check_bool(enable)
 
-#' Create a restarting handler
-#'
-#' This constructor automates the common task of creating an
-#' [calling()] handler that invokes a restart.
-#'
-#' Jumping to a restart point from a calling handler has two
-#' effects. First, the control flow jumps to wherever the restart was
-#' established, and the restart function is called (with `...`, or
-#' `.fields` as arguments). Execution resumes from the
-#' [with_restarts()] call. Secondly, the transfer of the control flow
-#' out of the function that signalled the condition means that the
-#' handler has dealt with the condition. Thus the condition will not
-#' be passed on to other potential handlers established on the stack.
-#'
-#' @param .restart The name of a restart.
-#' @param .fields A character vector specifying the fields of the
-#'   condition that should be passed as arguments to the restart. If
-#'   named, the names (except empty names `""`) are used as
-#'   argument names for calling the restart function. Otherwise the
-#'   the fields themselves are used as argument names.
-#' @param ... <[dynamic][dyn-dots]> Additional arguments passed on
-#'   the restart function. These arguments are evaluated only once
-#'   and immediately, when creating the restarting handler.
-#' @keywords internal
-#' @export
-#' @seealso [calling()] and [exiting()].
-#' @examples
-#' # This is a restart that takes a data frame and names as arguments
-#' rst_bar <- function(df, nms) {
-#'   stats::setNames(df, nms)
-#' }
-#'
-#' # This restart is simpler and does not take arguments
-#' rst_baz <- function() "baz"
-#'
-#' # Signalling a condition parameterised with a data frame
-#' fn <- function() {
-#'   with_restarts(signal("A foobar condition occurred", "foo", foo_field = mtcars),
-#'     rst_bar = rst_bar,
-#'     rst_baz = rst_baz
-#'   )
-#' }
-#'
-#' # Creating a restarting handler that passes arguments `nms` and
-#' # `df`, the latter taken from a data field of the condition object
-#' restart_bar <- restarting("rst_bar",
-#'   nms = LETTERS[1:11], .fields = c(df = "foo_field")
-#' )
-#'
-#' # The restarting handlers jumps to `rst_bar` when `foo` is signalled:
-#' with_handlers(fn(), foo = restart_bar)
-#'
-#' # The restarting() constructor is especially nice to use with
-#' # restarts that do not need arguments:
-#' with_handlers(fn(), foo = restarting("rst_baz"))
-restarting <- function(.restart, ..., .fields = NULL) {
-  stopifnot(is_scalar_character(.restart))
-  if (!is_null(.fields)) {
-    .fields <- set_names2(.fields)
-    stopifnot(is_character(.fields) && is_dictionaryish(.fields))
+  if (getRversion() <= "4.0") {
+    return(invisible(NULL))
   }
 
-  args <- list2(...)
-  handler <- function(c) {
-    fields <- set_names(c[.fields], names(.fields))
-    rst_args <- c(fields, args)
-    do.call("rst_jump", c(list(.restart = .restart), rst_args))
+  poke_global_handlers(
+    enable,
+    packageNotFoundError = hnd_prompt_install
+  )
+}
+
+# To help with `load_all()`, hard-code to base env with `rlang::`
+# indirection
+hnd_prompt_install <- function(cnd) {
+  if (!rlang::is_interactive()) {
+    return(rlang::zap())
   }
 
-  calling(handler)
+  # Be defensive to avoid weird errors
+  if (!rlang::is_string(cnd$package) ||
+      is.null(findRestart("retry_loadNamespace"))) {
+    return(rlang::zap())
+  }
+
+  rlang::check_installed(cnd$package)
+  invokeRestart("retry_loadNamespace")
 }
+environment(hnd_prompt_install) <- baseenv()
+
+
+#' Try an expression with condition handlers
+#'
+#' @description
+#' `r lifecycle::badge("experimental")`
+#'
+#' `try_fetch()` establishes handlers for conditions of a given class
+#' (`"error"`, `"warning"`, `"message"`, ...). Handlers are functions
+#' that take a condition object as argument and are called when the
+#' corresponding condition class has been signalled.
+#'
+#' A condition handler can:
+#'
+#' -   **Recover from conditions** with a value. In this case the computation of
+#'     `expr` is aborted and the recovery value is returned from
+#'     `try_fetch()`. Error recovery is useful when you don't want
+#'     errors to abruptly interrupt your program but resume at the
+#'     catching site instead.
+#'
+#'     ```
+#'     # Recover with the value 0
+#'     try_fetch(1 + "", error = function(cnd) 0)
+#'     ```
+#'
+#' -   **Rethrow conditions**, e.g. using `abort(msg, parent = cnd)`.
+#'     See the `parent` argument of [abort()]. This is typically done to
+#'     add information to low-level errors about the high-level context
+#'     in which they occurred.
+#'
+#'     ```
+#'     try_fetch(1 + "", error = function(cnd) abort("Failed.", parent = cnd))
+#'     ```
+#'
+#' -   **Inspect conditions**, for instance to log data about warnings
+#'     or errors. In this case, the handler must return the [zap()]
+#'     sentinel to instruct `try_fetch()` to ignore (or zap) that
+#'     particular handler. The next matching handler is called if any,
+#'     and errors bubble up to the user if no handler remains.
+#'
+#'     ```
+#'     log <- NULL
+#'     try_fetch(1 + "", error = function(cnd) {
+#'       log <<- cnd
+#'       zap()
+#'     })
+#'     ```
+#'
+#' Whereas `tryCatch()` catches conditions (discarding any running
+#' code along the way) and then calls the handler, `try_fetch()` first
+#' calls the handler with the condition on top of the currently
+#' running code (fetches it where it stands) and then catches the
+#' return value . This is a subtle difference that has implications
+#' for the debuggability of your functions. See the comparison with
+#' `tryCatch()` section below.
+#'
+#' @param expr An R expression.
+#' @param ... <[`dynamic-dots`][rlang::dyn-dots]> Named condition
+#'   handlers. The names specify the condition class for which a
+#'   handler will be called.
+#'
+#' @section Stack overflows:
+#'
+#' A stack overflow occurs when a program keeps adding to itself until
+#' the stack memory (whose size is very limited unlike heap memory) is
+#' exhausted.
+#'
+#' ```
+#' # A function that calls itself indefinitely causes stack overflows
+#' f <- function() f()
+#' f()
+#' #> Error: C stack usage  9525680 is too close to the limit
+#' ```
+#'
+#' Because memory is very limited when these errors happen, it is not
+#' possible to call the handlers on the existing program stack.
+#' Instead, error conditions are first caught by `try_fetch()` and only
+#' then error handlers are called. Catching the error interrupts the
+#' program up to the `try_fetch()` context, which allows R to reclaim
+#' stack memory.
+#'
+#' The practical implication is that error handlers should never
+#' assume that the whole call stack is preserved. For instance a
+#' [trace_back()] capture might miss frames.
+#'
+#' Note that error handlers are only run for stack overflows on R >=
+#' 4.2 (unreleased at the time of writing). On older versions of R the
+#' handlers are simply not run. This is because these errors do not
+#' inherit from the class `stackOverflowError` before R 4.2. Consider
+#' using [tryCatch()] instead with critical error handlers that need
+#' to capture all errors on old versions of R.
+#'
+#' @section Comparison with `tryCatch()`:
+#'
+#' `try_fetch()` generalises `tryCatch()` and `withCallingHandlers()`
+#' in a single function. It reproduces the behaviour of both calling
+#' and exiting handlers depending the on the return value of the
+#' handler. If the handler returns the [zap()] sentinel, it is taken
+#' as a calling handler that declines to recover from a condition.
+#' Otherwise, it is taken as an exiting handler which returns a value
+#' from the catching site.
+#'
+#' The important difference between `tryCatch()` and `try_fetch()` is
+#' that the program in `expr` is still fully running when an error
+#' handler is called. Because the call stack is preserved, this makes
+#' it possible to capture a full backtrace from within the handler,
+#' e.g. when rethrowing the error with `abort(parent = cnd)`.
+#' Technically, `try_fetch()` is more similar to (and implemented on
+#' top of) [base::withCallingHandlers()] than `tryCatch().`
+#'
+#' @export
+try_fetch <- function(expr, ...) {
+  frame <- environment()
+
+  catch <- value <- NULL
+  delayedAssign("catch", return(value), frame, frame)
+
+  throw <- function(x) {
+    value <<- x
+    catch
+  }
+
+  .External(ffi_try_fetch, frame)
+}
+
+handler_call <- quote(function(cnd) {
+  {
+    .__handler_frame__. <- TRUE
+    .__setup_frame__. <- frame
+  }
+  out <- handlers[[i]](cnd)
+  if (!inherits(out, "rlang_zap")) throw(out)
+})
+
 
 #' Catch a condition
 #'
@@ -193,11 +217,11 @@ restarting <- function(.restart, ..., .fields = NULL) {
 #' @param classes A character vector of condition classes to catch. By
 #'   default, catches all conditions.
 #' @return A condition if any was signalled, `NULL` otherwise.
-#' @export
 #' @examples
 #' catch_cnd(10)
 #' catch_cnd(abort("an error"))
 #' catch_cnd(signal("my_condition", message = "a condition"))
+#' @export
 catch_cnd <- function(expr, classes = "condition") {
   stopifnot(is_character(classes))
   handlers <- rep_named(classes, list(identity))
@@ -253,8 +277,6 @@ catch_cnd <- function(expr, classes = "condition") {
 #' @return If `cnd` is mufflable, `cnd_muffle()` jumps to the muffle
 #'   restart and doesn't return. Otherwise, it returns `FALSE`.
 #'
-#' @keywords internal
-#' @export
 #' @examples
 #' fn <- function() {
 #'   inform("Beware!", "my_particular_msg")
@@ -280,6 +302,8 @@ catch_cnd <- function(expr, classes = "condition") {
 #' with_handlers(fn(),
 #'   my_particular_msg = calling(cnd_muffle)
 #' )
+#' @keywords internal
+#' @export
 cnd_muffle <- function(cnd) {
   restart <- switch(cnd_type(cnd),
     message = "muffleMessage",
@@ -293,4 +317,36 @@ cnd_muffle <- function(cnd) {
   }
 
   FALSE
+}
+
+if (getRversion() < "4.0") {
+  utils::globalVariables("globalCallingHandlers")
+}
+
+
+poke_global_handlers <- function(enable, ...) {
+  check_bool(enable)
+  handlers <- list2(...)
+
+  if (enable) {
+    inject(globalCallingHandlers(!!!handlers))
+  } else {
+    inject(drop_global_handlers(!!!handlers))
+  }
+}
+
+drop_global_handlers <- function(...) {
+  to_pop <- list(...)
+  handlers <- globalCallingHandlers()
+
+  for (i in seq_along(to_pop)) {
+    if (loc <- detect_index(handlers, identical, to_pop[[i]])) {
+      if (is_string(names(to_pop)[[i]], names(handlers)[[loc]])) {
+        handlers[[loc]] <- NULL
+      }
+    }
+  }
+
+  globalCallingHandlers(NULL)
+  globalCallingHandlers(handlers)
 }

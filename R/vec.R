@@ -20,10 +20,10 @@
 #' seq2_along(10, letters)
 seq2 <- function(from, to) {
   if (length(from) != 1) {
-    abort("`from` must be length one")
+    abort(sprintf("%s must be length one.", format_arg("from")))
   }
   if (length(to) != 1) {
-    abort("`to` must be length one")
+    abort(sprintf("%s must be length one.", format_arg("to")))
   }
 
   if (from > to) {
@@ -54,7 +54,7 @@ validate_index <- function(i, n) {
 #'
 #' @description
 #'
-#' \Sexpr[results=rd, stage=render]{rlang:::lifecycle("experimental")}
+#' `r lifecycle::badge("experimental")`
 #'
 #' These tools are for R experts only. They copy elements from `y`
 #' into `x` by mutation. You should only do this if you own `x`,
@@ -79,7 +79,7 @@ vec_poke_n <- function(x, start, y,
     is_integerish(from),
     is_integerish(n)
   )
-  .Call(rlang_vec_poke_n, x, start, y, from, n)
+  .Call(ffi_vec_poke_n, x, start, y, from, n)
 }
 #' @rdname vec_poke_n
 #' @export
@@ -91,5 +91,5 @@ vec_poke_range <- function(x, start, y,
     is_integerish(from),
     is_integerish(to)
   )
-  .Call(rlang_vec_poke_range, x, start, y, from, to)
+  .Call(ffi_vec_poke_range, x, start, y, from, to)
 }
