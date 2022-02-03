@@ -108,8 +108,14 @@ trace_back <- function(top = NULL, bottom = NULL) {
   calls <- map(calls, call_fix_car)
   calls <- map(calls, call_zap_inline)
 
-  context <- map2(calls, seq_along(calls), call_trace_context)
-  context <- inject(vec_rbind(empty_trace_context(), !!!context))
+  context <- empty_trace_context()
+
+  if (length(calls)) {
+    context_data <- map2(calls, seq_along(calls), call_trace_context)
+    context$namespace <- do.call(base::c, map(context_data, `[[`, "namespace"))
+    context$scope <- do.call(base::c, map(context_data, `[[`, "scope"))
+  }
+  context <- new_data_frame(context)
 
   parents <- normalise_parents(parents)
 
@@ -240,7 +246,7 @@ call_trace_context <- function(call, fn) {
 }
 
 trace_context <- function(namespace = NA, scope = NA) {
-  data_frame(
+  list(
     namespace = namespace,
     scope = scope
   )
@@ -550,57 +556,6 @@ summary.rlang_trace <- function(object,
     srcrefs = srcrefs
   ))
   invisible(object)
-}
-
-# Subsets sibling nodes, at the level of the rightmost leaf by
-# default. Supports full vector subsetting semantics (negative values,
-# missing index, etc).
-trace_subset_across <- function(trace, i, n = NULL) {
-  level <- trace_level(trace, n)
-  level_n <- length(level)
-  i <- validate_index(i, level_n)
-
-  indices <- unlist(map(level[i], chain_indices, trace$parent))
-  trace_slice(trace, indices)
-}
-trace_level <- function(trace, n = NULL) {
-  n <- n %||% trace_length(trace)
-  parents <- trace$parent
-  which(parents == parents[[n]])
-}
-
-chain_indices <- function(i, parents) {
-  c(
-    parents_indices(i, parents),
-    children_indices(i, parents)
-  )
-}
-children_indices <- function(i, parents) {
-  n <- length(parents)
-  age <- parents[[i]]
-  ages <- parents[1:n]
-
-  non_children <- parents <= age
-  non_children[seq(1, i)] <- FALSE
-  non_children <- which(non_children)
-
-  if (length(non_children)) {
-    end <- non_children[[1]] - 1
-  } else {
-    end <- n
-  }
-
-  seq2(i + 1L, end)
-}
-parents_indices <- function(i, parents) {
-  path <- int()
-
-  while (i != 0) {
-    path <- c(path, i)
-    i <- parents[i]
-  }
-
-  rev(path)
 }
 
 

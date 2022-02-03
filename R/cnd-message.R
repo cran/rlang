@@ -146,7 +146,7 @@ local_cli_indent <- function(frame = caller_env()) {
 #' @rdname cnd_message
 #' @export
 cnd_header <- function(cnd, ...) {
-  if (is_null(cnd$header)) {
+  if (is_null(cnd[["header"]])) {
     UseMethod("cnd_header")
   } else {
     exec_cnd_method("header", cnd)
@@ -160,7 +160,7 @@ cnd_header.default <- function(cnd, ...) {
 #' @rdname cnd_message
 #' @export
 cnd_body <- function(cnd, ...) {
-  if (is_null(cnd$body)) {
+  if (is_null(cnd[["body"]])) {
     UseMethod("cnd_body")
   } else {
     exec_cnd_method("body", cnd)
@@ -174,7 +174,7 @@ cnd_body.default <- function(cnd, ...) {
 #' @rdname cnd_message
 #' @export
 cnd_footer <- function(cnd, ...) {
-  if (is_null(cnd$footer)) {
+  if (is_null(cnd[["footer"]])) {
     UseMethod("cnd_footer")
   } else {
     exec_cnd_method("footer", cnd)
@@ -236,7 +236,7 @@ cnd_message_format_prefixed <- function(cnd,
     prefix <- sprintf("%s:", prefix)
   } else {
     src_loc <- src_loc(attr(cnd$call, "srcref"))
-    if (nzchar(src_loc) && !is_testing()) {
+    if (nzchar(src_loc) && peek_call_format_srcref()) {
       prefix <- sprintf("%s in %s at %s:", prefix, call, src_loc)
       has_loc <- TRUE
     } else {
@@ -246,6 +246,16 @@ cnd_message_format_prefixed <- function(cnd,
   prefix <- style_bold(prefix)
 
   paste0(prefix, "\n", message)
+}
+
+peek_call_format_srcref <- function() {
+  opt <- peek_option("rlang_call_format_srcrefs")
+  if (is_null(opt)) {
+    !is_testing()
+  } else {
+    check_bool(opt, arg = "rlang_call_format_srcrefs")
+    opt
+  }
 }
 
 #' @export

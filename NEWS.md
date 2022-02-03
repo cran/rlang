@@ -1,3 +1,35 @@
+# rlang 1.0.1
+
+* New `rlang_call_format_srcrefs` global option (#1349). Similar to
+  `rlang_trace_format_srcrefs`, this option allows turning off the
+  display of srcrefs in error calls. This can be useful for
+  reproducibility but note that srcrefs are already disabled
+  within testthat by default.
+
+* `abort(parent = NA)` is now supported to indicate an unchained
+  rethrow. This helps `abort()` detect the condition handling context
+  to create simpler backtraces where this context is hidden by
+  default.
+
+* When `parent` is supplied, `abort()` now loops over callers to
+  detect the condition handler frame. This makes it easier to wrap or
+  extract condition handlers in functions without supplying `.frame`.
+
+* When `parent` is supplied and `call` points to the condition setup
+  frame (e.g. `withCallingHandlers()` or `try_fetch()`), `call` is
+  replaced with the caller of that setup frame. This provides a more
+  helpful default call.
+
+* `is_call()` is now implemented in C for performance.
+
+* Fixed performance regression in `trace_back()`.
+
+* Fixed a partial matching issue with `header`, `body`, and `footer`
+  condition fields.
+
+* `eval_tidy()` calls are no longer mentioned in error messages.
+
+
 # rlang 1.0.0
 
 ## Major changes
@@ -529,6 +561,11 @@ extensive changes to the display of error messages.
 
 * `XXH3_64bits()` from the XXHash library is now exposed as C callable
   under the name `rlang_xxh3_64bits()`.
+
+
+# rlang 0.4.12
+
+* Fix for CRAN checks.
 
 
 # rlang 0.4.11

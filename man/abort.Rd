@@ -88,7 +88,22 @@ respectively not display any call or hard-code a code to display.}
 
 \item{trace}{A \code{trace} object created by \code{\link[=trace_back]{trace_back()}}.}
 
-\item{parent}{A parent condition object created by \code{\link[=abort]{abort()}}.}
+\item{parent}{Supply \code{parent} when you rethrow an error from a
+condition handler (e.g. with \code{\link[=try_fetch]{try_fetch()}}).
+\itemize{
+\item If \code{parent} is a condition object, a \emph{chained error} is
+created, which is useful when you want to enhance an error with
+more details, while still retaining the original information.
+\item If \code{parent} is \code{NA}, it indicates an unchained rethrow, which
+is useful when you want to take ownership over an error and
+rethrow it with a custom message that better fits the
+surrounding context.
+
+Technically, supplying \code{NA} lets \code{abort()} know it is called
+from a condition handler. This helps it create simpler
+backtraces where the condition handling context is hidden by
+default.
+}}
 
 \item{use_cli_format}{Whether to format \code{message} lazily using
 \href{https://cli.r-lib.org/}{cli} if available. This results in

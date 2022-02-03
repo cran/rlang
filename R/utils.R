@@ -221,7 +221,17 @@ unstructure <- function(x) {
 stop_internal <- function(message, ..., call = caller_env(2)) {
   abort(message, ..., call = call, .internal = TRUE)
 }
-stop_internal_c_lib <- function(fn, message) {
+
+stop_internal_c_lib <- function(file, line, call, message) {
+  if (nzchar(file)) {
+    message <- c(
+      message,
+      "i" = sprintf(
+        "In file %s at line %d.",
+        format_file(file),
+        line
+      ))
+  }
   if (!is_installed("winch") && is_interactive()) {
     message <- c(
       message,
@@ -232,7 +242,7 @@ stop_internal_c_lib <- function(fn, message) {
     )
   }
 
-  abort(message, call = call(fn), .internal = TRUE)
+  abort(message, call = call, .internal = TRUE)
 }
 
 with_srcref <- function(src, env = caller_env(), file = NULL) {
@@ -253,14 +263,14 @@ new_stack <- function() {
 
   push <- function(...) {
     for (obj in list2(...)) {
-      arr_push_back(stack, maybe_missing(obj))
+      dyn_push_back(stack, maybe_missing(obj))
     }
   }
 
   # Can be used as a coro generator
   pop <- function() {
-    if (arr_count(stack)) {
-      arr_pop_back(stack)
+    if (dyn_count(stack)) {
+      dyn_pop_back(stack)
     } else {
       exhausted()
     }

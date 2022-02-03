@@ -119,7 +119,7 @@ bool has_curly(const char* str) {
 
 r_obj* ffi_chr_has_curly(r_obj* x) {
   if (r_typeof(x) != R_TYPE_character) {
-    r_stop_internal("ffi_chr_has_curly", "Expected a character vector.");
+    r_stop_internal("Expected a character vector.");
   }
 
   r_ssize n = r_length(x);
@@ -489,7 +489,7 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
         expr = r_eval(expr, env);
       }
 
-      r_keep_t i;
+      r_keep_loc i;
       KEEP_HERE(expr, &i);
 
       if (is_splice_box(expr)) {
@@ -744,7 +744,7 @@ void dots_check_homonyms(r_obj* dots, r_obj* nms) {
              args,
              R_ARR_SIZEOF(args),
              env);
-    r_stop_unreached("dots_check_homonyms");
+    r_stop_unreachable();
   }
 
   FREE(1);
@@ -794,7 +794,7 @@ r_obj* dots_finalise(struct dots_capture_info* capture_info, r_obj* dots) {
     case DOTS_HOMONYMS_first: dots = dots_keep(dots, nms, true); break;
     case DOTS_HOMONYMS_last: dots = dots_keep(dots, nms, false); break;
     case DOTS_HOMONYMS_error: dots_check_homonyms(dots, nms); break;
-    default: r_stop_unreached("dots_finalise");
+    default: r_stop_unreachable();
     }
 
     FREE(2);
@@ -1065,7 +1065,7 @@ void rlang_init_dots(r_obj* ns) {
     r_preserve(splice_box_attrib);
     r_mark_shared(splice_box_attrib);
 
-    r_node_poke_tag(splice_box_attrib, r_syms.class);
+    r_node_poke_tag(splice_box_attrib, r_syms.class_);
     FREE(1);
   }
 
@@ -1086,7 +1086,7 @@ void rlang_init_dots(r_obj* ns) {
     r_preserve(quosures_attrib);
     r_mark_shared(quosures_attrib);
 
-    r_node_poke_tag(quosures_attrib, r_syms.class);
+    r_node_poke_tag(quosures_attrib, r_syms.class_);
     FREE(1);
   }
 

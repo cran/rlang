@@ -9,6 +9,15 @@ void r_vec_poke_range(r_obj* x, r_ssize offset,
                       r_obj* y, r_ssize from, r_ssize to);
 
 
+r_obj* ffi_compiled_by_gcc() {
+#if defined(__GNUC__) && !defined(__clang__)
+  return r_true;
+  #else
+  return r_false;
+  #endif
+}
+
+
 // cnd.c
 
 r_obj* ffi_cnd_signal(r_obj* cnd) {
@@ -173,12 +182,12 @@ r_obj* ffi_new_dyn_array(r_obj* elt_byte_size,
 }
 
 // [[ register() ]]
-r_obj* ffi_arr_unwrap(r_obj* arr) {
-  return r_arr_unwrap(r_shelter_deref(arr));
+r_obj* ffi_dyn_unwrap(r_obj* arr) {
+  return r_dyn_unwrap(r_shelter_deref(arr));
 }
 
 // [[ register() ]]
-r_obj* ffi_arr_info(r_obj* arr_sexp) {
+r_obj* ffi_dyn_info(r_obj* arr_sexp) {
   struct r_dyn_array* arr = r_shelter_deref(arr_sexp);
 
   const char* names_c_strs[] = {
@@ -206,12 +215,11 @@ r_obj* ffi_arr_info(r_obj* arr_sexp) {
 }
 
 // [[ register() ]]
-r_obj* ffi_arr_push_back(r_obj* arr_sexp, r_obj* x) {
+r_obj* ffi_dyn_push_back(r_obj* arr_sexp, r_obj* x) {
   struct r_dyn_array* p_arr = r_shelter_deref(arr_sexp);
 
   if (!p_arr->barrier_set && r_vec_elt_sizeof(x) != p_arr->elt_byte_size) {
-    r_stop_internal("ffi_arr_push_back",
-                    "Incompatible byte sizes %d/%d.",
+    r_stop_internal("Incompatible byte sizes %d/%d.",
                     r_vec_elt_sizeof(x),
                     p_arr->elt_byte_size);
   }
@@ -219,24 +227,24 @@ r_obj* ffi_arr_push_back(r_obj* arr_sexp, r_obj* x) {
   switch (p_arr->type) {
   case R_TYPE_character:
   case R_TYPE_list:
-    r_arr_push_back(p_arr, &x);
+    r_dyn_push_back(p_arr, &x);
     return r_null;
   default:
-    r_arr_push_back(p_arr, r_vec_cbegin(x));
+    r_dyn_push_back(p_arr, r_vec_cbegin(x));
     return r_null;
   }
 }
 // [[ register() ]]
-r_obj* ffi_arr_push_back_bool(r_obj* arr_sexp, r_obj* x_sexp) {
+r_obj* ffi_dyn_push_back_bool(r_obj* arr_sexp, r_obj* x_sexp) {
   struct r_dyn_array* arr = r_shelter_deref(arr_sexp);
   bool x = r_as_bool(x_sexp);
-  r_arr_push_back(arr, &x);
+  r_dyn_push_back(arr, &x);
   return r_null;
 }
 // [[ register() ]]
-r_obj* ffi_arr_pop_back(r_obj* arr_sexp) {
+r_obj* ffi_dyn_pop_back(r_obj* arr_sexp) {
   struct r_dyn_array* arr = r_shelter_deref(arr_sexp);
-  void* const * out = r_arr_pop_back(arr);
+  void* const * out = r_dyn_pop_back(arr);
 
   if (arr->type == R_TYPE_list) {
     return *((r_obj* const *) out);
@@ -245,9 +253,74 @@ r_obj* ffi_arr_pop_back(r_obj* arr_sexp) {
   }
 }
 // [[ register() ]]
-r_obj* ffi_arr_resize(r_obj* arr_sexp, r_obj* capacity_sexp) {
+r_obj* ffi_dyn_resize(r_obj* arr_sexp, r_obj* capacity_sexp) {
   struct r_dyn_array* arr = r_shelter_deref(arr_sexp);
-  r_arr_resize(arr, r_arg_as_ssize(capacity_sexp, "capacity"));
+  r_dyn_resize(arr, r_arg_as_ssize(capacity_sexp, "capacity"));
+  return r_null;
+}
+
+// [[ register() ]]
+r_obj* ffi_dyn_lgl_get(r_obj* x, r_obj* i) {
+  return r_lgl(r_dyn_lgl_get(r_shelter_deref(x), r_arg_as_ssize(i, "i")));
+}
+// [[ register() ]]
+r_obj* ffi_dyn_int_get(r_obj* x, r_obj* i) {
+  return r_int(r_dyn_int_get(r_shelter_deref(x), r_arg_as_ssize(i, "i")));
+}
+// [[ register() ]]
+r_obj* ffi_dyn_dbl_get(r_obj* x, r_obj* i) {
+  return r_dbl(r_dyn_dbl_get(r_shelter_deref(x), r_arg_as_ssize(i, "i")));
+}
+// [[ register() ]]
+r_obj* ffi_dyn_cpl_get(r_obj* x, r_obj* i) {
+  return r_cpl(r_dyn_cpl_get(r_shelter_deref(x), r_arg_as_ssize(i, "i")));
+}
+// [[ register() ]]
+r_obj* ffi_dyn_raw_get(r_obj* x, r_obj* i) {
+  return r_raw(r_dyn_raw_get(r_shelter_deref(x), r_arg_as_ssize(i, "i")));
+}
+// [[ register() ]]
+r_obj* ffi_dyn_chr_get(r_obj* x, r_obj* i) {
+  return r_dyn_chr_get(r_shelter_deref(x), r_arg_as_ssize(i, "i"));
+}
+// [[ register() ]]
+r_obj* ffi_dyn_list_get(r_obj* x, r_obj* i) {
+  return r_dyn_list_get(r_shelter_deref(x), r_arg_as_ssize(i, "i"));
+}
+
+// [[ register() ]]
+r_obj* ffi_dyn_lgl_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_lgl_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), r_as_bool(value));
+  return r_null;
+}
+// [[ register() ]]
+r_obj* ffi_dyn_int_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_int_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), r_as_int(value));
+  return r_null;
+}
+// [[ register() ]]
+r_obj* ffi_dyn_dbl_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_dbl_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), r_as_double(value));
+  return r_null;
+}
+// [[ register() ]]
+r_obj* ffi_dyn_cpl_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_cpl_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), r_as_complex(value));
+  return r_null;
+}
+// [[ register() ]]
+r_obj* ffi_dyn_raw_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_raw_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), r_as_char(value));
+  return r_null;
+}
+// [[ register() ]]
+r_obj* ffi_dyn_chr_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_chr_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), value);
+  return r_null;
+}
+// [[ register() ]]
+r_obj* ffi_dyn_list_poke(r_obj* x, r_obj* i, r_obj* value) {
+  r_dyn_list_poke(r_shelter_deref(x), r_arg_as_ssize(i, "i"), value);
   return r_null;
 }
 
@@ -498,7 +571,7 @@ r_obj* ffi_call_has_precedence(r_obj* x, r_obj* y, r_obj* side) {
     has_predence = r_rhs_call_has_precedence(x, y);
     break;
   default:
-    r_stop_internal("ffi_call_has_precedence", "Unexpected `side` value.");
+    r_stop_internal("Unexpected `side` value.");
   }
   return r_lgl(has_predence);
 }
@@ -776,25 +849,6 @@ r_obj* ffi_vec_poke_range(r_obj* x, r_obj* offset,
   return x;
 }
 
-static r_ssize validate_n(r_obj* n) {
-  if (n == r_null) {
-    return -1;
-  }
-
-  switch (r_typeof(n)) {
-  case R_TYPE_integer:
-  case R_TYPE_double:
-    if (r_length(n) == 1) {
-      break;
-    }
-    // fallthrough
-  default:
-    r_abort("`n` must be NULL or a scalar integer");
-  }
-
-  return r_arg_as_ssize(n, "n");
-}
-
 static int validate_finite(r_obj* finite) {
   switch (r_typeof(finite)) {
   case R_TYPE_null:
@@ -814,7 +868,7 @@ static int validate_finite(r_obj* finite) {
 }
 
 r_obj* ffi_is_finite(r_obj* x) {
-  return r_shared_lgl(r_is_finite(x));
+  return r_shared_lgl(_r_is_finite(x));
 }
 
 r_obj* ffi_is_list(r_obj* x, r_obj* n_) {
@@ -948,7 +1002,7 @@ r_obj* ffi_vec_resize(r_obj* x, r_obj* n) {
   case R_TYPE_raw: return r_raw_resize(x, n_ssize);
   case R_TYPE_character: return r_chr_resize(x, n_ssize);
   case R_TYPE_list: return r_list_resize(x, n_ssize);
-  default: r_stop_unimplemented_type("ffi_vec_resize", r_typeof(x));
+  default: r_stop_unimplemented_type(r_typeof(x));
   }
 }
 
@@ -1023,10 +1077,10 @@ r_obj* ffi_sexp_iterate(r_obj* x, r_obj* fn) {
                                     R_ARR_SIZEOF(args),
                                     r_envs.base));
 
-    r_list_push_back(p_out, out);
+    r_dyn_list_push_back(p_out, out);
     FREE(9);
   }
 
   FREE(3);
-  return r_arr_unwrap(p_out);
+  return r_dyn_unwrap(p_out);
 }

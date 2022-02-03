@@ -14,25 +14,25 @@ r_obj* r_false = NULL;
 
 
 void r_init_library_globals(r_obj* ns) {
-  r_classes.data_frame = r_preserve_global(r_chr("data.frame"));
+  r_preserve_global(r_classes.data_frame = r_chr("data.frame"));
 
   const char* v_tibble_class[] = { "tbl_df", "tbl", "data.frame" };
-  r_globals.empty_lgl = r_preserve_global(r_alloc_logical(0));
-  r_globals.empty_int = r_preserve_global(r_alloc_integer(0));
-  r_globals.empty_dbl = r_preserve_global(r_alloc_double(0));
-  r_globals.empty_cpl = r_preserve_global(r_alloc_complex(0));
-  r_globals.empty_raw = r_preserve_global(r_alloc_raw(0));
-  r_globals.empty_chr = r_preserve_global(r_alloc_character(0));
-  r_globals.empty_list = r_preserve_global(r_alloc_list(0));
+  r_preserve_global(r_globals.empty_lgl = r_alloc_logical(0));
+  r_preserve_global(r_globals.empty_int = r_alloc_integer(0));
+  r_preserve_global(r_globals.empty_dbl = r_alloc_double(0));
+  r_preserve_global(r_globals.empty_cpl = r_alloc_complex(0));
+  r_preserve_global(r_globals.empty_raw = r_alloc_raw(0));
+  r_preserve_global(r_globals.empty_chr = r_alloc_character(0));
+  r_preserve_global(r_globals.empty_list = r_alloc_list(0));
 
   r_globals.na_lgl = NA_LOGICAL;
   r_globals.na_int = NA_INTEGER;
   r_globals.na_dbl = NA_REAL;
-  r_globals.na_cpl = (r_complex_t) { NA_REAL, NA_REAL };
+  r_globals.na_cpl = (r_complex) { NA_REAL, NA_REAL };
   r_globals.na_str = NA_STRING;
 
-  r_chrs.empty_string = r_preserve_global(r_chr(""));
-  r_chrs.full = r_preserve_global(r_chr("full"));
+  r_preserve_global(r_chrs.empty_string = r_chr(""));
+  r_preserve_global(r_chrs.full = r_chr("full"));
 
   r_classes.tibble = r_chr_n(v_tibble_class, R_ARR_SIZEOF(v_tibble_class));
   r_preserve_global(r_classes.tibble);
@@ -46,8 +46,8 @@ void r_init_library_globals(r_obj* ns) {
   r_strs.message = r_sym_string(r_syms.message);
   r_strs.warning = r_sym_string(r_syms.warning);
 
-  r_false = r_preserve_global(r_lgl(0));
-  r_true = r_preserve_global(r_lgl(1));
+  r_preserve_global(r_false = r_lgl(0));
+  r_preserve_global(r_true = r_lgl(1));
 
   r_envs.empty = R_EmptyEnv;
   r_envs.base = R_BaseEnv;
@@ -59,7 +59,8 @@ void r_init_library_globals_syms() {
   r_syms.abort = r_sym("abort");
   r_syms.brackets = R_BracketSymbol;
   r_syms.brackets2 = R_Bracket2Symbol;
-  r_syms.class = R_ClassSymbol;
+  r_syms.call = r_sym("call");
+  r_syms.class_ = R_ClassSymbol;
   r_syms.colon2 = R_DoubleColonSymbol;
   r_syms.colon3 = R_TripleColonSymbol;
   r_syms.condition = r_sym("condition");
