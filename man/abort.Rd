@@ -55,7 +55,7 @@ signal(message, class, ..., .subclass = deprecated())
 list}. The first element is displayed as an \emph{alert} bullet
 prefixed with \code{!} by default. Elements named \code{"*"}, \code{"i"}, and
 \code{"x"} are formatted as regular, info, and cross bullets
-respectively. Se\ifelse{html}{\link[=topic-condition-formatting]{Formatting condition messages}}{\link[=topic-condition-formatting]{Formatting condition messages}})` for more
+respectively. Se\ifelse{html}{\link[=topic-condition-formatting]{Formatting messages with cli}}{\link[=topic-condition-formatting]{Formatting messages with cli}})` for more
 about bulleted messaging.
 
 If a message is not supplied, it is expected that the message is
@@ -82,7 +82,9 @@ helper function which wouldn't be relevant to mention in the
 message.
 
 Can also be \code{NULL} or a \link[=topic-defuse]{defused function call} to
-respectively not display any call or hard-code a code to display.}
+respectively not display any call or hard-code a code to display.
+
+For more information about error calls, see \ifelse{html}{\link[=topic-error-call]{Including function calls in error messages}}{\link[=topic-error-call]{Including function calls in error messages}}.}
 
 \item{body, footer}{Additional bullets.}
 
@@ -103,7 +105,9 @@ Technically, supplying \code{NA} lets \code{abort()} know it is called
 from a condition handler. This helps it create simpler
 backtraces where the condition handling context is hidden by
 default.
-}}
+}
+
+For more information about error calls, see \ifelse{html}{\link[=topic-error-chaining]{Including contextual information with error chains}}{\link[=topic-error-chaining]{Including contextual information with error chains}}.}
 
 \item{use_cli_format}{Whether to format \code{message} lazily using
 \href{https://cli.r-lib.org/}{cli} if available. This results in
@@ -114,7 +118,7 @@ package namespace.
 If set to \code{TRUE}, \code{message} should be a character vector of
 individual and unformatted lines. Any newline character \code{"\\\\n"}
 already present in \code{message} is reformatted by cli's paragraph
-formatter. See \ifelse{html}{\link[=topic-condition-formatting]{Formatting condition messages}}{\link[=topic-condition-formatting]{Formatting condition messages}}.}
+formatter. See \ifelse{html}{\link[=topic-condition-formatting]{Formatting messages with cli}}{\link[=topic-condition-formatting]{Formatting messages with cli}}.}
 
 \item{.internal}{If \code{TRUE}, a footer bullet is added to \code{message}
 to let the user know that the error is internal and that they
@@ -160,8 +164,7 @@ handling.
 in the condition object and can be examined by handlers.
 \item Supply \code{call} to inform users about which function the error
 occurred in.
-\item Supply another condition as \code{parent} to create a chained
-condition.
+\item Supply another condition as \code{parent} to create a \link[=topic-error-chaining]{chained condition}.
 }
 
 Certain components of condition messages are formatted with unicode
@@ -306,5 +309,11 @@ try(
   })
 )
 
+}
+}
+\seealso{
+\itemize{
+\item \ifelse{html}{\link[=topic-error-call]{Including function calls in error messages}}{\link[=topic-error-call]{Including function calls in error messages}}
+\item \ifelse{html}{\link[=topic-error-chaining]{Including contextual information with error chains}}{\link[=topic-error-chaining]{Including contextual information with error chains}}
 }
 }

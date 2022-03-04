@@ -756,7 +756,7 @@ test_that("`parent = NA` signals a non-chained rethrow", {
 })
 
 test_that("can rethrow outside handler", {
-  options(rlang_trace_format_srcrefs = FALSE)
+  local_options(rlang_trace_format_srcrefs = FALSE)
 
   parent <- error_cnd(message = "Low-level", call = call("low"))
 
@@ -766,5 +766,66 @@ test_that("can rethrow outside handler", {
 
   expect_snapshot({
     print(err(foo()))
+  })
+})
+
+test_that("if `call` is older than handler caller, use that as bottom", {
+  local_options(
+    rlang_trace_format_srcrefs = FALSE
+  )
+  f <- function() helper()
+  helper <- function(call = caller_env()) {
+    try_fetch(
+      low_level(call),
+      error = function(cnd) abort(
+        "Problem.",
+        parent = cnd,
+        call = call
+      )
+    )
+  }
+
+  expect_snapshot({
+    low_level <- function(call) {
+      abort("Tilt.", call = call)
+    }
+    print(expect_error(f()))
+
+    low_level <- function(call) {
+      abort("Tilt.", call = list(NULL, frame = call))
+    }
+    print(expect_error(f()))
+  })
+})
+
+test_that("is_calling_handler_inlined_call() doesn't fail with OOB subsetting", {
+  expect_false(is_calling_handler_inlined_call(call2(function() NULL)))
+})
+
+test_that("base causal errors include full user backtrace", {
+  local_options(
+    rlang_trace_format_srcrefs = FALSE,
+    rlang_trace_top_env = current_env()
+  )
+
+  my_verb <- function(expr) {
+    with_chained_errors(expr)
+  }
+  with_chained_errors <- function(expr, call = caller_env()) {
+    try_fetch(
+      expr,
+      error = function(cnd) {
+        abort(
+          "Problem during step.",
+          parent = cnd,
+          call = call
+        )
+      }
+    )
+  }
+
+  add <- function(x, y) x + y
+  expect_snapshot({
+    print(expect_error(my_verb(add(1, ""))))
   })
 })

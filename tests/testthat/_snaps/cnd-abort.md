@@ -179,6 +179,7 @@
       <error/rlang_error>
       Error in `h()`:
       ! foo
+      ---
       Backtrace:
         1. rlang:::catch_error(f())
         9. rlang f()
@@ -191,6 +192,7 @@
       <error/rlang_error>
       Error in `h()`:
       ! foo
+      ---
       Backtrace:
         1. rlang:::catch_error(f())
         9. rlang f()
@@ -207,6 +209,7 @@
       <error/rlang_error>
       Error in `h()`:
       ! foo
+      ---
       Backtrace:
         1. rlang:::catch_error(f())
         9. rlang f()
@@ -223,6 +226,7 @@
       <error/rlang_error>
       Error in `h()`:
       ! foo
+      ---
       Backtrace:
         1. rlang:::catch_error(f())
         9. rlang f()
@@ -240,6 +244,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -253,6 +258,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -266,6 +272,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -279,6 +286,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -295,6 +303,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -312,6 +321,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -329,6 +339,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -346,6 +357,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -366,6 +378,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -383,6 +396,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -400,6 +414,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -417,6 +432,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -435,13 +451,9 @@
       <error/rlang_error>
       Error in `high3()`:
       ! high-level
-      Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -456,13 +468,9 @@
       <error/rlang_error>
       Error in `high3()`:
       ! high-level
-      Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -477,13 +485,9 @@
       <error/rlang_error>
       Error in `high3()`:
       ! high-level
-      Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -498,13 +502,9 @@
       <error/rlang_error>
       Error in `high3()`:
       ! high-level
-      Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -524,6 +524,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -540,6 +541,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -556,6 +558,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -572,6 +575,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -591,6 +595,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -607,6 +612,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -623,6 +629,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -639,6 +646,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -658,6 +666,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -671,6 +680,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -684,6 +694,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -697,6 +708,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -713,6 +725,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -730,6 +743,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -747,6 +761,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -764,6 +779,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -784,6 +800,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
        10. rlang high1(chain = TRUE, stop_helper = TRUE)
@@ -801,6 +818,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
        10. rlang high1(chain = TRUE, stop_helper = FALSE)
@@ -818,6 +836,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
        10. rlang high1(chain = FALSE, stop_helper = TRUE)
@@ -835,6 +854,7 @@
       ! high-level
       Caused by error in `low3()`:
       ! (converted from warning) low-level
+      ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
        10. rlang high1(chain = FALSE, stop_helper = FALSE)
@@ -967,7 +987,7 @@
     Code
       format_error_call(quote(`%||%`()))
     Output
-      [1] "``%||%`()`"
+      [1] "`` `%||%`() ``"
 
 # `abort()` uses older bullets formatting by default
 
@@ -1112,7 +1132,7 @@
       Error:
       ! foo
       x bar
-      i This is an internal error, please report it to the package authors.
+      i This is an internal error in the rlang package, please report it to the package authors.
     Code
       err(abort("foo", body = c(x = "bar"), .internal = TRUE))
     Output
@@ -1120,7 +1140,7 @@
       Error:
       ! foo
       x bar
-      i This is an internal error, please report it to the package authors.
+      i This is an internal error in the rlang package, please report it to the package authors.
 
 # setting `.internal` adds footer bullet (fallback)
 
@@ -1131,7 +1151,7 @@
       Error:
       ! foo
       x bar
-      i This is an internal error, please report it to the package authors.
+      i This is an internal error in the rlang package, please report it to the package authors.
     Code
       err(abort("foo", body = c(x = "bar"), .internal = TRUE))
     Output
@@ -1139,7 +1159,7 @@
       Error:
       ! foo
       x bar
-      i This is an internal error, please report it to the package authors.
+      i This is an internal error in the rlang package, please report it to the package authors.
 
 # must pass character `body` when `message` is > 1
 
@@ -1223,7 +1243,7 @@
       <error/rlang_error>
       Error in `f()`:
       ! foo
-      i This is an internal error, please report it to the package authors.
+      i This is an internal error in the rlang package, please report it to the package authors.
     Code
       err(abort("foo", footer = "bar", .internal = TRUE, call = quote(f())))
     Output
@@ -1246,9 +1266,58 @@
       ! High-level
       Caused by error in `low()`:
       ! Low-level
+      ---
       Backtrace:
         1. base::print(err(foo()))
         9. rlang foo()
        10. rlang bar()
        11. rlang baz()
+
+# if `call` is older than handler caller, use that as bottom
+
+    Code
+      low_level <- (function(call) {
+        abort("Tilt.", call = call)
+      })
+      print(expect_error(f()))
+    Output
+      <error/rlang_error>
+      Error in `f()`:
+      ! Problem.
+      Caused by error in `f()`:
+      ! Tilt.
+      ---
+      Backtrace:
+       1. base::print(expect_error(f()))
+       8. rlang f()
+    Code
+      low_level <- (function(call) {
+        abort("Tilt.", call = list(NULL, frame = call))
+      })
+      print(expect_error(f()))
+    Output
+      <error/rlang_error>
+      Error in `f()`:
+      ! Problem.
+      Caused by error:
+      ! Tilt.
+      ---
+      Backtrace:
+       1. base::print(expect_error(f()))
+       8. rlang f()
+
+# base causal errors include full user backtrace
+
+    Code
+      print(expect_error(my_verb(add(1, ""))))
+    Output
+      <error/rlang_error>
+      Error in `my_verb()`:
+      ! Problem during step.
+      Caused by error in `x + y`:
+      ! non-numeric argument to binary operator
+      ---
+      Backtrace:
+        1. base::print(expect_error(my_verb(add(1, ""))))
+       16. rlang add(1, "")
 

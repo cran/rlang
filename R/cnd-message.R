@@ -127,12 +127,12 @@ cnd_message_format <- function(cnd, ..., alert = FALSE) {
 
   cli_format <- switch(
     cnd_type(cnd),
-    error = cli::format_error,
-    warning = cli::format_warning,
-    cli::format_message
+    error = format_error,
+    warning = format_warning,
+    format_message
   )
 
-  cli_format(glue_escape(lines), .envir = emptyenv())
+  cli_format(glue_escape(lines))
 }
 
 local_cli_indent <- function(frame = caller_env()) {
@@ -358,41 +358,6 @@ format_error_bullets <- function(x) {
 
   # Always use fallback for now
   .rlang_cli_format_fallback(x)
-}
-
-# FIXME: These won't be needed after warnings and messages have been
-# switched to print-time formatting
-rlang_format_warning <- function(x, env = caller_env()) {
-  rlang_format(x, env, format_warning, cli::format_warning)
-}
-rlang_format_message <- function(x, env = caller_env()) {
-  rlang_format(x, env, format_message, cli::format_message)
-}
-rlang_format <- function(x, env, partial_format, cli_format) {
-  if (!can_format(x)) {
-    return(x)
-  }
-
-  use_cli <- use_cli(env)
-  inline <- use_cli[["inline"]]
-  format <- use_cli[["format"]]
-
-  # Full
-  if (inline && format) {
-    return(.rlang_cli_str_restore(cli_format(x, env), x))
-  }
-
-  # Partial
-  if (format) {
-    if (has_cli_format) {
-      return(partial_format(cli_escape(x)))
-    } else {
-      return(.rlang_cli_format_fallback(x))
-    }
-  }
-
-  # None
-  x
 }
 
 # No-op for the empty string, e.g. for `abort("", class = "foo")` and

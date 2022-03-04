@@ -7,6 +7,23 @@
 #
 # Changelog:
 #
+# 2022-02-23:
+#
+# * Bullet formatting now ignores unknown bullet names, consistently
+#   with cli. This increases resiliency against hard-to-detect errors
+#   and improves forward compatibility.
+#
+#
+# 2022-02-22:
+#
+# * `format_error()` and variants now call cli even when ANSI colours
+#   are disabled.
+#
+# * The fallback formatting for `.emph` and `.strong` no longer
+#   surrounds in `_` or `*` characters. This is consistent with cli
+#   formatting.
+#
+#
 # 2021-07-06:
 #
 # * Added missing `col_`, `bg_`, and `style_` functions.
@@ -156,8 +173,8 @@ mark_cls <- function(x) {
   .rlang_cli_style_inline(x, "cls", fallback)
 }
 
-format_emph   <- function(x) .rlang_cli_format_inline(x, "emph", "_%s_")
-format_strong <- function(x) .rlang_cli_format_inline(x, "strong", "*%s*")
+format_emph   <- function(x) .rlang_cli_format_inline(x, "emph", "%s")
+format_strong <- function(x) .rlang_cli_format_inline(x, "strong", "%s")
 format_code   <- function(x) .rlang_cli_format_inline(x, "code", "`%s`")
 format_q      <- function(x) .rlang_cli_format_inline(x, "q", NULL)
 format_pkg    <- function(x) .rlang_cli_format_inline(x, "pkg", NULL)
@@ -179,7 +196,7 @@ format_cls <- function(x) {
 }
 
 .rlang_cli_style_inline <- function(x, span, fallback = "`%s`") {
-  if (.rlang_cli_has_ansi()) {
+  if (.rlang_cli_has_cli()) {
     paste0("{.", span, " {\"", encodeString(x), "\"}}")
   } else if (is.null(fallback)) {
     x
@@ -190,7 +207,7 @@ format_cls <- function(x) {
   }
 }
 .rlang_cli_format_inline <- function(x, span, fallback = "`%s`") {
-  if (.rlang_cli_has_ansi()) {
+  if (.rlang_cli_has_cli()) {
     cli::format_message(paste0("{.", span, " {x}}"))
   } else {
     .rlang_cli_style_inline(x, span, fallback = fallback)
@@ -234,7 +251,7 @@ format_message <- function(x) {
 }
 
 .rlang_cli_format <- function(x, cli_format) {
-  if (.rlang_cli_has_ansi()) {
+  if (.rlang_cli_has_cli()) {
     out <- cli_format(x, .envir = emptyenv())
     .rlang_cli_str_restore(out, unname(x))
   } else {
@@ -253,9 +270,6 @@ format_message <- function(x) {
   }
 
   abort <- .rlang_cli_compat("abort")
-  if (!all(nms %in% c("i", "x", "v", "*", "!", ">", " ", ""))) {
-    abort('Bullet names must be one of "i", "x", "v", "*", "!", ">", or " ".')
-  }
 
   bullets <- local({
     unicode_opt <- getOption("cli.condition_unicode_bullets")
@@ -264,6 +278,10 @@ format_message <- function(x) {
       on.exit(options(old))
     }
 
+    # For consistency with `cli::format_error()` and for resiliency
+    # against hard-to-detect errors (see #1364), unknown names are
+    # silently ignored. This also makes it easier to add new bullet
+    # names in the future with forward-compatibility.
     ifelse(nms == "i", ansi_info(),
     ifelse(nms == "x", ansi_cross(),
     ifelse(nms == "v", ansi_tick(),
@@ -272,7 +290,7 @@ format_message <- function(x) {
     ifelse(nms == ">", ansi_arrow(),
     ifelse(nms == "", "",
     ifelse(nms == " ", " ",
-      "*"))))))))
+      ""))))))))
   })
 
   bullets <-
@@ -333,7 +351,7 @@ format_message <- function(x) {
 #'
 #' @noRd
 cli_escape <- function(x) {
-  if (.rlang_cli_has_ansi()) {
+  if (.rlang_cli_has_cli()) {
     gsub("\\}", "}}", gsub("\\{", "{{", x))
   } else {
     x

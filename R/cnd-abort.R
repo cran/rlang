@@ -16,8 +16,8 @@
 #' * Supply `call` to inform users about which function the error
 #'   occurred in.
 #'
-#' * Supply another condition as `parent` to create a chained
-#'   condition.
+#' * Supply another condition as `parent` to create a [chained
+#'   condition][topic-error-chaining].
 #'
 #' Certain components of condition messages are formatted with unicode
 #' symbols and terminal colours by default. These aspects can be
@@ -54,6 +54,8 @@
 #'
 #'   Can also be `NULL` or a [defused function call][topic-defuse] to
 #'   respectively not display any call or hard-code a code to display.
+#'
+#'   For more information about error calls, see `r link("topic_error_call")`.
 #' @param parent Supply `parent` when you rethrow an error from a
 #'   condition handler (e.g. with [try_fetch()]).
 #'
@@ -70,6 +72,8 @@
 #'     from a condition handler. This helps it create simpler
 #'     backtraces where the condition handling context is hidden by
 #'     default.
+#'
+#'   For more information about error calls, see `r link("topic_error_chaining")`.
 #' @param use_cli_format Whether to format `message` lazily using
 #'   [cli](https://cli.r-lib.org/) if available. This results in
 #'   prettier and more accurate formatting of messages. See
@@ -167,6 +171,10 @@
 #'   especially easy to hit when the message contains a lot of ANSI
 #'   escapes, as created by the crayon or cli packages
 #'
+#' @seealso
+#' - `r link("topic_error_call")`
+#' - `r link("topic_error_chaining")`
+#'
 #' @examples
 #' # These examples are guarded to avoid throwing errors
 #' if (FALSE) {
@@ -249,6 +257,15 @@ abort <- function(message = NULL,
     parent <- NULL
   }
 
+  if (is_list(maybe_missing(call))) {
+    if (!identical(names(call), c("call", "frame")) &&
+        !identical(names(call), c("", "frame"))) {
+      abort("When a list, `call` must have \"call\" and \"frame\" names.")
+    }
+    .frame <- call[["frame"]] %||% .frame
+    call <- call[["call"]]
+  }
+
   # `.frame` is used to soft-truncate the backtrace
   if (is_null(.frame)) {
     if (rethrowing) {
@@ -265,7 +282,7 @@ abort <- function(message = NULL,
     check_environment(.frame)
   }
 
-  info <- abort_context(.frame, rethrowing)
+  info <- abort_context(.frame, rethrowing, maybe_missing(call))
 
   if (is_missing(call)) {
     if (is_null(info$from_handler)) {
@@ -292,6 +309,9 @@ abort <- function(message = NULL,
   extra_fields <- message_info$extra_fields
   use_cli_format <- message_info$use_cli_format
 
+  if (rethrowing) {
+    trace <- trace %||% parent[["trace"]]
+  }
   if (is_null(trace) && is_null(peek_option("rlang:::disable_trace_capture"))) {
     with_options(
       # Prevents infloops when rlang throws during trace capture
@@ -314,7 +334,10 @@ abort <- function(message = NULL,
   signal_abort(cnd, .file)
 }
 
-abort_context <- function(frame, rethrowing, call = caller_env()) {
+abort_context <- function(frame,
+                          rethrowing,
+                          abort_call,
+                          call = caller_env()) {
   calls <- sys.calls()
   frames <- sys.frames()
   parents <- sys.parents()
@@ -384,6 +407,12 @@ abort_context <- function(frame, rethrowing, call = caller_env()) {
     # Skip frames marked with the sentinel `.__signal_frame__.`
     bottom_loc <- skip_signal_frames(bottom_loc, frames)
     bottom_frame <- frames[[bottom_loc]]
+    if (!rethrowing && !is_missing(abort_call) && is_environment(abort_call)) {
+      abort_call_loc <- detect_index(frames, identical, abort_call)
+      if (abort_call_loc && abort_call_loc < bottom_loc) {
+        bottom_frame <- frames[[abort_call_loc]]
+      }
+    }
   } else {
     bottom_frame <- NULL
   }
@@ -503,7 +532,7 @@ skip_signal_frames <- function(loc, frames) {
 }
 
 is_calling_handler_inlined_call <- function(call) {
-  is_call(call) && is_function(call[[1]]) && is_condition(call[[2]])
+  is_call(call) && length(call) >= 2 && is_function(call[[1]]) && is_condition(call[[2]])
 }
 is_calling_handler_simple_error_call <- function(call1, call2) {
   identical(call1, quote(h(simpleError(msg, call)))) && is_call(call2, ".handleSimpleError")
@@ -555,7 +584,7 @@ cnd_message_info <- function(message,
       fields$footer <- footer
     }
     if (internal) {
-      fields$footer <- footer_internal
+      fields$footer <- footer_internal(env)
     }
   } else {
     # Compatibility with older bullets formatting
@@ -573,7 +602,7 @@ cnd_message_info <- function(message,
       fields$footer <- footer
     }
     if (internal) {
-      message <- c(message, footer_internal)
+      message <- c(message, footer_internal(env))
     }
     message <- .rlang_cli_format_fallback(message)
   }
@@ -586,9 +615,20 @@ cnd_message_info <- function(message,
 }
 utils::globalVariables(".internal")
 
-footer_internal <- c(
-  "i" = "This is an internal error, please report it to the package authors."
-)
+footer_internal <- function(env) {
+  top <- topenv(env)
+  if (is_namespace(top)) {
+    pkg <- sprintf(" in the %s package", ns_env_name(top))
+  } else {
+    pkg <- ""
+  }
+  footer <- sprintf(
+    "This is an internal error%s, please report it to the package authors.",
+    pkg
+  )
+
+  c(i = footer)
+}
 
 stop_multiple_body <- function(body, call) {
   msg <- c(
@@ -708,7 +748,7 @@ check_use_cli_flag <- function(flag, error_call) {
   }
 
   if (flag[["inline"]]) {
-    if (!has_cli_format || !has_cli_inline) {
+    if (!has_cli_format) {
       msg <- c(
         "`.__rlang_use_cli__.[[\"inline\"]]` is set to `TRUE` but cli is not installed or is too old.",
         "i" = "The package author should add a recent version of `cli` to their `Imports`."
