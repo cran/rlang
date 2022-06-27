@@ -47,7 +47,7 @@ test_that("rlang_error.print() calls cnd_message() methods", {
 test_that("Overlapping backtraces are printed separately", {
   # Test low-level error can use conditionMessage()
   local_bindings(.env = global_env(),
-    cnd_header.foobar = function(c) c$foobar_msg
+    cnd_header.foobar = function(c, ...) c$foobar_msg
   )
 
   f <- function() g()
@@ -386,4 +386,22 @@ test_that("picks up caller frame", {
     get_call(cnd2),
     quote(get_call(cnd2))
   )
+})
+
+test_that("tree display option is picked up when printing errors", {
+  local_options(rlang_trace_format_srcrefs = FALSE)
+
+  f <- function() g()
+  g <- function() h()
+  h <- function() abort("foo")
+  cnd <- catch_cnd(f())
+
+  expect_snapshot({
+    print(cnd)
+
+    local({
+      local_options("rlang:::trace_display_tree_override" = TRUE)
+      print(cnd)
+    })
+  })
 })

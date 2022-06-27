@@ -5,7 +5,7 @@ abort_coercion <- function(x,
                            x_type = NULL,
                            arg = NULL,
                            call = caller_env()) {
-  x_type <- x_type %||% friendly_type_of(x, value = TRUE)
+  x_type <- x_type %||% obj_type_friendly(x, value = TRUE)
 
   if (is_null(arg)) {
     msg <- sprintf("Can't convert %s to %s.", x_type, to_type)
@@ -169,6 +169,7 @@ pad_spaces <- function(x, left = TRUE) {
 on_load({
   has_cli <- is_installed("cli")
   has_cli_format <- is_installed("cli", version = "3.0.0")
+  has_cli_start_app <- is_installed("cli", version = "2.0.0")
 })
 
 info <- function() {
@@ -198,6 +199,14 @@ arrow_right <- function() {
   if (has_cli) cli::symbol$arrow_right else ">"
 }
 
+style_dim_soft <- function(x) {
+  if (cli::num_ansi_colors() >= 256) {
+    crayon::make_style(grDevices::grey(0.6), colors =  256)(x)
+  } else {
+    silver(x)
+  }
+}
+
 strip_trailing_newline <- function(x) {
   n <- nchar(x)
   if (substr(x, n, n) == "\n") {
@@ -221,7 +230,7 @@ stop_internal <- function(message, ..., call = caller_env(2)) {
   abort(message, ..., call = call, .internal = TRUE)
 }
 
-stop_internal_c_lib <- function(file, line, call, message) {
+stop_internal_c_lib <- function(file, line, call, message, frame) {
   if (nzchar(file)) {
     message <- c(
       message,
@@ -241,7 +250,7 @@ stop_internal_c_lib <- function(file, line, call, message) {
     )
   }
 
-  abort(message, call = call, .internal = TRUE)
+  abort(message, call = call, .internal = TRUE, .frame = frame)
 }
 
 with_srcref <- function(src, env = caller_env(), file = NULL) {
@@ -357,4 +366,24 @@ cli_with_whiteline_escapes <- function(x, fn) {
   x <- gsub("__SPACE__", " ", x, fixed = TRUE)
   x <- gsub("__NEW_LINE__", "\n", x, fixed = TRUE)
   x
+}
+
+style_rlang_run <- function(code) {
+  style_hyperlink(
+    paste0("rlang::", code),
+    paste0("rstudio:run:rlang::", code)
+  )
+}
+
+vec_remove <- function(x, values) {
+  loc <- match(values, x, nomatch = 0)
+  if (sum(loc) == 0) {
+    x
+  } else {
+    x[-loc]
+  }
+}
+
+str_nzchar <- function(x) {
+  is_string(x) && nzchar(x)
 }

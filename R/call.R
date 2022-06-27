@@ -728,7 +728,7 @@ call_match <- function(call = NULL,
     fn <- fn %||% sys.function(sys.parent())
     dots_env <- dots_env %||% caller_env(2)
   } else {
-    dots_env <- dots_env %||% empty_env()
+    dots_env <- dots_env %||% env(empty_env(), ... = NULL)
   }
 
   if (is_null(fn)) {
@@ -898,6 +898,48 @@ is_call_simple <- function(x, ns = NULL) {
   }
 
   namespaced || is_symbol(head)
+}
+
+is_call_index <- function(x, ns = NULL) {
+  check_required(x)
+
+  if (!is_call(x)) {
+    return(FALSE)
+  }
+
+  out <- FALSE
+
+  while (is_call(fn <- x[[1]])) {
+    if (!is_call(fn, c("$", "@", "[", "[["))) {
+      return(FALSE)
+    }
+
+    if (!every(fn[-1], is_arg_index, ns)) {
+      return(FALSE)
+    }
+
+    out <- TRUE
+    x <- fn
+  }
+
+  out
+}
+
+is_arg_index <- function(arg, ns) {
+  if (!is_call(arg)) {
+    return(TRUE)
+  }
+
+  namespaced <- is_call(arg, c("::", ":::"))
+  if (namespaced) {
+    if (!is_null(ns) && !identical(namespaced, ns)) {
+      return(FALSE)
+    } else {
+      return(TRUE)
+    }
+  }
+
+  is_call_simple(arg)
 }
 
 #' Extract arguments from a call

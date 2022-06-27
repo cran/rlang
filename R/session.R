@@ -74,7 +74,13 @@ detect_installed <- function(info) {
   }
 
   flatten_lgl(pmap(info, function(pkg, cmp, ver) {
-    if (requireNamespace(pkg, quietly = TRUE)) {
+    # Check for sealed namespaces to protect against `is_installed()`
+    # being called from user hooks of `pkg` (#1378)
+    is_fully_loaded <-
+      requireNamespace(pkg, quietly = TRUE) &&
+      env_is_locked(ns_env(pkg))
+
+    if (is_fully_loaded) {
       is_na(ver) || exec(cmp, utils::packageVersion(pkg), ver)
     } else {
       FALSE
@@ -149,9 +155,16 @@ as_version_info <- function(pkg, call = caller_env()) {
   ver <- sub(version_regex, "\\2", pkg)
   ver <- strsplit(ver, " ")
 
-  if (!every(ver, is_character2, n = 2, missing = FALSE, empty = FALSE)) {
+  ok <- map_lgl(ver, is_character2, n = 2, missing = FALSE, empty = FALSE)
+
+  if (!all(ok)) {
     abort(
-      sprintf("Can't parse version in %s.", format_arg("pkg")),
+      c(
+        sprintf("Can't parse version in %s.", format_arg("pkg")),
+        "x" = "Problematic versions:",
+        set_names(pkg[!ok], "*"),
+        "i" = "Example of expected version format: `rlang (>= 1.0.0)`."
+      ),
       call = call
     )
   }
@@ -231,12 +244,17 @@ check_installed <- function(pkg,
     "Would you like to install it?",
     "Would you like to install them?"
   )
-
-  cat(paste_line(
+  question <- paste_line(
     paste0(info(), " ", header),
     paste0(cross(), " ", question),
     .trailing = TRUE
-  ))
+  )
+
+  if (is_true(peek_option("rlang:::check_installed_test_hook"))) {
+    return(question)
+  }
+
+  cat(question)
 
   if (utils::menu(c("Yes", "No")) != 1) {
     # Pass condition in case caller sets up an `abort` restart
@@ -358,6 +376,8 @@ cnd_header.rlib_error_package_not_found <- function(cnd, ...) {
 }
 
 signal_package_not_found <- function(cnd) {
+  class(cnd) <- vec_remove(class(cnd), "error")
+
   withRestarts({
     signalCondition(cnd)
     FALSE

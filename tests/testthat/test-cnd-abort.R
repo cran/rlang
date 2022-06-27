@@ -363,9 +363,12 @@ test_that("NSE doesn't interfere with error call contexts", {
 })
 
 test_that("error_call() requires a symbol in function position", {
-  expect_null(format_error_call(quote(foo$bar())))
   expect_null(format_error_call(quote((function() NULL)())))
   expect_null(format_error_call(call2(function() NULL)))
+})
+
+test_that("error_call() preserves index calls", {
+  expect_equal(format_error_call(quote(foo$bar(...))), "`foo$bar()`")
 })
 
 test_that("error_call() preserves `if` (r-lib/testthat#1429)", {
@@ -594,7 +597,7 @@ test_that("setting `.internal` adds footer bullet (fallback)", {
 test_that("must pass character `body` when `message` is > 1", {
   expect_snapshot({
     # This is ok because `message` is length 1
-    err(abort("foo", body = function(cnd) c("i" = "bar")))
+    err(abort("foo", body = function(cnd, ...) c("i" = "bar")))
 
     # This is an internal error
     err(abort(c("foo", "bar"), body = function() "baz"))
@@ -605,7 +608,7 @@ test_that("must pass character `body` when `message` is > 1 (non-cli case)", {
   local_use_cli(format = FALSE)
   expect_snapshot({
     # This is ok because `message` is length 1
-    err(abort("foo", body = function(cnd) c("i" = "bar")))
+    err(abort("foo", body = function(cnd, ...) c("i" = "bar")))
 
     # This is an internal error
     err(abort(c("foo", "bar"), body = function() "baz"))
@@ -616,7 +619,7 @@ test_that("can supply `footer`", {
   local_error_call(call("f"))
   expect_snapshot({
     err(abort("foo", body = c("i" = "bar"), footer = c("i" = "baz")))
-    err(abort("foo", body = function(cnd) c("i" = "bar"), footer = function(cnd) c("i" = "baz")))
+    err(abort("foo", body = function(cnd, ...) c("i" = "bar"), footer = function(cnd, ...) c("i" = "baz")))
   })
 })
 
@@ -625,7 +628,7 @@ test_that("can supply `footer` (non-cli case)", {
   local_error_call(call("f"))
   expect_snapshot({
     err(abort("foo", body = c("i" = "bar"), footer = c("i" = "baz")))
-    err(abort("foo", body = function(cnd) c("i" = "bar"), footer = function(cnd) c("i" = "baz")))
+    err(abort("foo", body = function(cnd, ...) c("i" = "bar"), footer = function(cnd, ...) c("i" = "baz")))
   })
 })
 
@@ -828,4 +831,46 @@ test_that("base causal errors include full user backtrace", {
   expect_snapshot({
     print(expect_error(my_verb(add(1, ""))))
   })
+})
+
+test_that("can chain errors at top-level (#1405)", {
+  out <- run_code("
+    tryCatch(
+      error = function(err) rlang::abort('bar', parent = err),
+      rlang::abort('foo')
+    )
+  ")
+  expect_true(any(grepl("foo", out$output)))
+  expect_true(any(grepl("bar", out$output)))
+
+  out <- run_code("
+    withCallingHandlers(
+      error = function(err) rlang::abort('bar', parent = err),
+      rlang::abort('foo')
+    )
+  ")
+  expect_true(any(grepl("foo", out$output)))
+  expect_true(any(grepl("bar", out$output)))
+})
+
+test_that("backtrace_on_error = 'collapse' is deprecated.", {
+  local_options("rlang_backtrace_on_error" = "collapse")
+  expect_warning(peek_backtrace_on_error(), "deprecated")
+  expect_equal(peek_option("rlang_backtrace_on_error"), "none")
+})
+
+test_that("can supply header method via `message`", {
+  expect_snapshot(error = TRUE, {
+    abort(~ "foo")
+    abort(function(cnd, ...) "foo")
+  })
+
+  msg <- function(cnd, ...) "foo"
+  cnd <- catch_error(abort(msg))
+  expect_identical(cnd$header, msg)
+
+  expect_error(
+    abort(function(cnd) "foo"),
+    "must take"
+  )
 })

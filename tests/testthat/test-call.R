@@ -592,3 +592,22 @@ test_that("call_name() and call_ns() detect `::` calls (#670)", {
   expect_null(call_ns(quote(foo::bar)))
   expect_null(call_ns(quote(foo:::bar)))
 })
+
+test_that("is_call_index() works", {
+  expect_true(is_call_index(quote(a$b(...))))
+  expect_true(is_call_index(quote(a@b$c[[d]](...))))
+  expect_true(is_call_index(quote(a@b$c[[d]](...))))
+  expect_true(is_call_index(quote(foo::a$b(...))))
+
+  expect_false(is_call_index(quote(a@b$c[[d]])))
+  expect_false(is_call_index(quote(1 + a@b$c[[d]])))
+  expect_false(is_call_index(quote((a@b$c[[d]])())))
+})
+
+test_that("call_match() supports `...` in arg list when `dots_expand = FALSE`", {
+  f <- function(x, ...) NULL
+  expect_equal(
+    call_match(quote(f(...)), f, dots_expand = FALSE),
+    quote(f())
+  )
+})

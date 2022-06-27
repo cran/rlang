@@ -127,6 +127,7 @@ test_that("trace picks up option `rlang_trace_top_env` for trimming trace", {
   )
 })
 
+# This test used to be about `simplify = "collapse"`
 test_that("collapsed formatting doesn't collapse single frame siblings", {
   e <- current_env()
   f <- function() eval_bare(quote(g()))
@@ -134,8 +135,8 @@ test_that("collapsed formatting doesn't collapse single frame siblings", {
   trace <- f()
 
   expect_snapshot({
-    print(trace, simplify = "none", srcrefs = FALSE)
-    print(trace, simplify = "collapse", srcrefs = FALSE)
+    print(trace, simplify = "none", drop = TRUE, srcrefs = FALSE)
+    print(trace, simplify = "none", drop = FALSE, srcrefs = FALSE)
   })
 })
 
@@ -172,7 +173,6 @@ test_that("long backtrace branches are truncated", {
   })
 
   expect_error(print(trace, simplify = "none", max_frames = 5), "currently only supported with")
-  expect_error(print(trace, simplify = "collapse", max_frames = 5), "currently only supported with")
 })
 
 test_that("eval() frames are collapsed", {
@@ -193,50 +193,6 @@ test_that("eval() frames are collapsed", {
   expect_snapshot_trace(trace)
 })
 
-test_that("%>% frames are collapsed", {
-  skip_if_not_installed("magrittr", "1.5.0.9000")
-  skip_on_cran()
-
-  # Fake eval() call does not have same signature on old R
-  skip_if(getRversion() < "3.4")
-
-  `%>%` <- magrittr::`%>%`
-
-  e <- current_env()
-  f <- function(x, ...) x
-  g <- function(x, ...) x
-  h <- function(x, ...) trace_back(e)
-
-  trace <- NULL %>% f() %>% g(1, 2) %>% h(3, ., 4)
-  expect_snapshot_trace(trace)
-
-  trace <- f(NULL) %>% g(list(.)) %>% h(3, ., list(.))
-  expect_snapshot_trace(trace)
-
-  trace <- f(g(NULL %>% f()) %>% h())
-  expect_snapshot_trace(trace)
-})
-
-test_that("children of collapsed %>% frames have correct parent", {
-  skip_if_not_installed("magrittr", "1.5.0.9000")
-  skip_on_cran()
-
-  # Fake eval() call does not have same signature on old R
-  skip_if(getRversion() < "3.4")
-
-  `%>%` <- magrittr::`%>%`
-
-  e <- current_env()
-  F <- function(x, ...) x
-  G <- function(x, ...) x
-  H <- function(x) f()
-  f <- function() h()
-  h <- function() trace_back(e)
-
-  trace <- NA %>% F() %>% G() %>% H()
-  expect_snapshot_trace(trace)
-})
-
 test_that("children of collapsed frames are rechained to correct parent", {
   # Fake eval() call does not have same signature on old R
   skip_if(getRversion() < "3.4")
@@ -247,10 +203,10 @@ test_that("children of collapsed frames are rechained to correct parent", {
   trace <- f()
 
   expect_snapshot({
-    cat("Full:\n")
-    print(trace, simplify = "none", srcrefs = FALSE)
-    cat("\nCollapsed:\n")
-    print(trace, simplify = "collapse", srcrefs = FALSE)
+    cat("Full + drop:\n")
+    print(trace, simplify = "none", drop = TRUE, srcrefs = FALSE)
+    cat("Full - drop:\n")
+    print(trace, simplify = "none", drop = FALSE, srcrefs = FALSE)
     cat("\nBranch:\n")
     print(trace, simplify = "branch", srcrefs = FALSE)
   })
@@ -672,4 +628,107 @@ test_that("can create empty trace with trace_back()", {
 test_that("can format empty traces", {
   trace <- new_trace(list(), int())
   expect_snapshot_trace(trace)
+})
+
+test_that("backtrace is formatted with sources (#1396)", {
+  file <- tempfile("my_source", fileext = ".R")
+  with_srcref(file = file, "
+    f <- function() g()
+    g <- function() abort('foo')
+  ")
+  err <- catch_cnd(f(), "error")
+
+  rlang_cli_local_hyperlinks()
+
+  lines <- format(err$trace)
+  n_links <- sum(grepl("\033]8;.*my_source.*\\.R:", lines))
+  expect_true(n_links > 0)
+})
+
+test_that("sibling streaks in tree backtraces", {
+  f <- function(x) identity(identity(x))
+  g <- function() f(f(h()))
+  h <- function() abort("foo")
+  err <- catch_cnd(f(g()), "error")
+  expect_snapshot_trace(err)
+})
+
+test_that("parallel '|' branches are correctly emphasised", {
+  f <- function(n) g(n)
+  g <- function(n) h(n)
+  h <- function(n) if (n) parallel(f(n - 1)) else abort("foo")
+  parallel <- function(x) p1(identity(x))
+  p1 <- function(x) p2(x)
+  p2 <- function(x) p3(x)
+  p3 <- function(x) x
+
+  err <- expect_error(parallel(f(0)))
+  expect_snapshot_trace(err)
+
+  deep <- function(n) parallel(f(n))
+  err <- expect_error(deep(1))
+  expect_snapshot_trace(err)
+})
+
+test_that("error calls and args are highlighted", {
+  f <- function(x) g(x)
+  g <- function(x) h(x)
+  h <- function(x) check_string(x)
+  wrapper <- function() {
+    try_fetch(f(1), error = function(cnd) abort("Tilt.", parent = cnd))
+  }
+
+  parent <- catch_error(f(1))
+  child <- catch_error(wrapper())
+
+  expect_snapshot({
+    print_highlighted_trace(parent)
+    print_highlighted_trace(child)
+  })
+})
+
+test_that("error calls and args are highlighted (no highlighted arg)", {
+  f <- function() g()
+  g <- function() h()
+  h <- function() abort("foo")
+
+  argless <- catch_error(f())
+
+  expect_snapshot({
+    print_highlighted_trace(argless)
+  })
+})
+
+test_that("frame is detected from the left", {
+  f <- function() g()
+  g <- function() h()
+  h <- function() identity(evalq(identity(abort("foo"))))
+  err <- catch_error(f())
+
+  expect_snapshot({
+    "If detected from the right, `evalq()`is highlighted instead of `h()`"
+    print_highlighted_trace(err)
+  })
+})
+
+test_that("arg is defensively checked", {
+  f <- function() g()
+  g <- function() h()
+  h <- function() abort("foo", arg = env())
+  err <- catch_error(f())
+
+  expect_snapshot({
+    print_highlighted_trace(err)
+  })
+})
+
+test_that("namespaced calls are highlighted", {
+  f <- function() g()
+  g <- function() h()
+  h <- function() rlang:::as_string(1)
+  err <- catch_error(f())
+
+  expect_snapshot({
+    print_highlighted_trace(err)
+  })
 })

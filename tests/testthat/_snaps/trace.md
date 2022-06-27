@@ -4,10 +4,10 @@
       print(trace, dir = dir)
     Output
           x
-       1. \-rlang i() at test-trace.R:25:2
-       2.   \-rlang j(i) at test-trace.R:18:7
-       3.     \-rlang k(i) at test-trace.R:19:21
-       4.       \-rlang l(i) at test-trace.R:22:4
+       1. \-rlang (local) i() at test-trace.R:25:2
+       2.   \-rlang (local) j(i) at test-trace.R:18:7
+       3.     \-rlang (local) k(i) at test-trace.R:19:21
+       4.       \-rlang (local) l(i) at test-trace.R:22:4
     Code
       cat("\n")
     Output
@@ -24,44 +24,53 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
            x
-        1. \-rlang f()
-        2.   \-rlang g() at test-trace.R:49:20
+        1. \-rlang (local) f()
+        2.   \-rlang (local) g() at test-trace.R:49:20
         3.     +-base::tryCatch(h(), foo = identity, bar = identity) at test-trace.R:50:20
-        4.     | \-base tryCatchList(expr, classes, parentenv, handlers)
-        5.     |   +-base tryCatchOne(...)
-        6.     |   | \-base doTryCatch(return(expr), name, parentenv, handler)
-        7.     |   \-base tryCatchList(expr, names[-nh], parentenv, handlers[-nh])
-        8.     |     \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
-        9.     |       \-base doTryCatch(return(expr), name, parentenv, handler)
-       10.     \-rlang h()
+        4.     | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        5.     |   +-base (local) tryCatchOne(...)
+        6.     |   | \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        7.     |   \-base (local) tryCatchList(expr, names[-nh], parentenv, handlers[-nh])
+        8.     |     \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        9.     |       \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       10.     \-rlang (local) h()
        11.       +-base::tryCatch(i(), baz = identity) at test-trace.R:51:20
-       12.       | \-base tryCatchList(expr, classes, parentenv, handlers)
-       13.       |   \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
-       14.       |     \-base doTryCatch(return(expr), name, parentenv, handler)
-       15.       \-rlang i()
+       12.       | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       13.       |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       14.       |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       15.       \-rlang (local) i()
        16.         +-base::tryCatch(trace_back(e, bottom = 0)) at test-trace.R:52:20
-       17.         | \-base tryCatchList(expr, classes, parentenv, handlers)
+       17.         | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
        18.         \-rlang::trace_back(e, bottom = 0)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
            x
-        1. \-rlang f()
-        2.   \-rlang g() at test-trace.R:49:20
-        3.     +-[ base::tryCatch(...) ] with 6 more calls at test-trace.R:50:20
-       10.     \-rlang h()
-       11.       +-[ base::tryCatch(...) ] with 3 more calls at test-trace.R:51:20
-       15.       \-rlang i()
+        1. \-rlang (local) f()
+        2.   \-rlang (local) g() at test-trace.R:49:20
+        3.     +<<-base::tryCatch(h(), foo = identity, bar = identity) at test-trace.R:50:20>>
+        4.     | <<\-base (local) tryCatchList(expr, classes, parentenv, handlers)>>
+        5.     |   <<+-base (local) tryCatchOne(...)>>
+        6.     |   <<| \-base (local) doTryCatch(return(expr), name, parentenv, handler)>>
+        7.     |   <<\-base (local) tryCatchList(expr, names[-nh], parentenv, handlers[-nh])>>
+        8.     |     <<\-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])>>
+        9.     |       <<\-base (local) doTryCatch(return(expr), name, parentenv, handler)>>
+       10.     \-rlang (local) h()
+       11.       +<<-base::tryCatch(i(), baz = identity) at test-trace.R:51:20>>
+       12.       | <<\-base (local) tryCatchList(expr, classes, parentenv, handlers)>>
+       13.       |   <<\-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])>>
+       14.       |     <<\-base (local) doTryCatch(return(expr), name, parentenv, handler)>>
+       15.       \-rlang (local) i()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-        1. rlang f()
-        2. rlang g()
+        1. rlang (local) f()
+        2. rlang (local) g()
              at test-trace.R:49:20
-       10. rlang h()
-       15. rlang i()
+       10. rlang (local) h()
+       15. rlang (local) i()
 
 ---
 
@@ -70,65 +79,74 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
            x
-        1. \-rlang f()
+        1. \-rlang (local) f()
         2.   +-base::eval(quote(eval(quote(g())))) at test-trace.R:61:7
         3.   | \-base::eval(quote(eval(quote(g()))))
         4.   +-base::eval(quote(g()))
         5.   | \-base::eval(quote(g()))
-        6.   \-rlang g()
+        6.   \-rlang (local) g()
         7.     +-base::tryCatch(eval(quote(h())), foo = identity, bar = identity) at test-trace.R:62:7
-        8.     | \-base tryCatchList(expr, classes, parentenv, handlers)
-        9.     |   +-base tryCatchOne(...)
-       10.     |   | \-base doTryCatch(return(expr), name, parentenv, handler)
-       11.     |   \-base tryCatchList(expr, names[-nh], parentenv, handlers[-nh])
-       12.     |     \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
-       13.     |       \-base doTryCatch(return(expr), name, parentenv, handler)
+        8.     | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        9.     |   +-base (local) tryCatchOne(...)
+       10.     |   | \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       11.     |   \-base (local) tryCatchList(expr, names[-nh], parentenv, handlers[-nh])
+       12.     |     \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       13.     |       \-base (local) doTryCatch(return(expr), name, parentenv, handler)
        14.     +-base::eval(quote(h()))
        15.     | \-base::eval(quote(h()))
-       16.     \-rlang h()
+       16.     \-rlang (local) h()
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
            x
-        1. \-rlang f()
-        2.   +-[ base::eval(...) ] with 1 more call at test-trace.R:61:7
-        4.   +-[ base::eval(...) ] with 1 more call
-        6.   \-rlang g()
-        7.     +-[ base::tryCatch(...) ] with 6 more calls at test-trace.R:62:7
-       14.     +-[ base::eval(...) ] with 1 more call
-       16.     \-rlang h()
+        1. \-rlang (local) f()
+        2.   +<<-base::eval(quote(eval(quote(g())))) at test-trace.R:61:7>>
+        3.   | <<\-base::eval(quote(eval(quote(g()))))>>
+        4.   +<<-base::eval(quote(g()))>>
+        5.   | <<\-base::eval(quote(g()))>>
+        6.   \-rlang (local) g()
+        7.     +<<-base::tryCatch(eval(quote(h())), foo = identity, bar = identity) at test-trace.R:62:7>>
+        8.     | <<\-base (local) tryCatchList(expr, classes, parentenv, handlers)>>
+        9.     |   <<+-base (local) tryCatchOne(...)>>
+       10.     |   <<| \-base (local) doTryCatch(return(expr), name, parentenv, handler)>>
+       11.     |   <<\-base (local) tryCatchList(expr, names[-nh], parentenv, handlers[-nh])>>
+       12.     |     <<\-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])>>
+       13.     |       <<\-base (local) doTryCatch(return(expr), name, parentenv, handler)>>
+       14.     +<<-base::eval(quote(h()))>>
+       15.     | <<\-base::eval(quote(h()))>>
+       16.     \-rlang (local) h()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-        1. rlang f()
-        6. rlang g()
-       16. rlang h()
+        1. rlang (local) f()
+        6. rlang (local) g()
+       16. rlang (local) h()
 
 # cli_branch() handles edge case
 
     Code
       cli_branch(tree[-1, ])
     Output
-      [1] " 1. rlang f()"
+      [1] " 1. rlang (local) f()"
 
 # collapsed formatting doesn't collapse single frame siblings
 
     Code
-      print(trace, simplify = "none", srcrefs = FALSE)
+      print(trace, simplify = "none", drop = TRUE, srcrefs = FALSE)
     Output
           x
-       1. \-rlang f()
+       1. \-rlang (local) f()
        2.   +-rlang::eval_bare(quote(g()))
-       3.   \-rlang g()
+       3.   \-rlang (local) g()
     Code
-      print(trace, simplify = "collapse", srcrefs = FALSE)
+      print(trace, simplify = "none", drop = FALSE, srcrefs = FALSE)
     Output
           x
-       1. \-rlang f()
+       1. \-rlang (local) f()
        2.   +-rlang::eval_bare(quote(g()))
-       3.   \-rlang g()
+       3.   \-rlang (local) g()
 
 # recursive frames are rewired to the global env
 
@@ -138,23 +156,23 @@
     Output
           x
        1. +-rlang::eval_tidy(quo(f()))
-       2. \-rlang f()
-       3.   \-rlang g()
+       2. \-rlang (local) f()
+       3.   \-rlang (local) g()
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-rlang::eval_tidy(quo(f()))
-       2. \-rlang f()
-       3.   \-rlang g()
+       2. \-rlang (local) f()
+       3.   \-rlang (local) g()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. rlang::eval_tidy(quo(f()))
-       2. rlang f()
-       3. rlang g()
+       2. rlang (local) f()
+       3. rlang (local) g()
 
 # long backtrace branches are truncated
 
@@ -165,17 +183,17 @@
     Code
       print(trace, simplify = "branch", srcrefs = FALSE)
     Output
-        1. rlang f(10)
-        2. rlang f(n - 1)
-        3. rlang f(n - 1)
-        4. rlang f(n - 1)
-        5. rlang f(n - 1)
-        6. rlang f(n - 1)
-        7. rlang f(n - 1)
-        8. rlang f(n - 1)
-        9. rlang f(n - 1)
-       10. rlang f(n - 1)
-       11. rlang f(n - 1)
+        1. rlang (local) f(10)
+        2. rlang (local) f(n - 1)
+        3. rlang (local) f(n - 1)
+        4. rlang (local) f(n - 1)
+        5. rlang (local) f(n - 1)
+        6. rlang (local) f(n - 1)
+        7. rlang (local) f(n - 1)
+        8. rlang (local) f(n - 1)
+        9. rlang (local) f(n - 1)
+       10. rlang (local) f(n - 1)
+       11. rlang (local) f(n - 1)
     Code
       cat("\n5 frames:\n")
     Output
@@ -184,12 +202,12 @@
     Code
       print(trace, simplify = "branch", max_frames = 5, srcrefs = FALSE)
     Output
-        1. rlang f(10)
-        2. rlang f(n - 1)
-        3. rlang f(n - 1)
+        1. rlang (local) f(10)
+        2. rlang (local) f(n - 1)
+        3. rlang (local) f(n - 1)
            ...
-       10. rlang f(n - 1)
-       11. rlang f(n - 1)
+       10. rlang (local) f(n - 1)
+       11. rlang (local) f(n - 1)
     Code
       cat("\n2 frames:\n")
     Output
@@ -198,9 +216,9 @@
     Code
       print(trace, simplify = "branch", max_frames = 2, srcrefs = FALSE)
     Output
-        1. rlang f(10)
+        1. rlang (local) f(10)
            ...
-       11. rlang f(n - 1)
+       11. rlang (local) f(n - 1)
     Code
       cat("\n1 frame:\n")
     Output
@@ -209,7 +227,7 @@
     Code
       print(trace, simplify = "branch", max_frames = 1, srcrefs = FALSE)
     Output
-        1. rlang f(10)
+        1. rlang (local) f(10)
            ...
 
 # eval() frames are collapsed
@@ -219,27 +237,28 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang f()
+       1. \-rlang (local) f()
        2.   +-base::eval(quote(g()))
        3.   | \-base::eval(quote(g()))
-       4.   \-rlang g()
+       4.   \-rlang (local) g()
        5.     +-base::eval(quote(trace_back(e, bottom = 0)))
        6.     | \-base::eval(quote(trace_back(e, bottom = 0)))
        7.     \-rlang::trace_back(e, bottom = 0)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang f()
-       2.   +-[ base::eval(...) ] with 1 more call
-       4.   \-rlang g()
+       1. \-rlang (local) f()
+       2.   +<<-base::eval(quote(g()))>>
+       3.   | <<\-base::eval(quote(g()))>>
+       4.   \-rlang (local) g()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang f()
-       4. rlang g()
+       1. rlang (local) f()
+       4. rlang (local) g()
 
 ---
 
@@ -248,154 +267,55 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang f()
+       1. \-rlang (local) f()
        2.   +-base::evalq(g())
        3.   | \-base::evalq(g())
-       4.   \-rlang g()
+       4.   \-rlang (local) g()
        5.     +-base::evalq(trace_back(e, bottom = 0))
        6.     | \-base::evalq(trace_back(e, bottom = 0))
        7.     \-rlang::trace_back(e, bottom = 0)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang f()
-       2.   +-[ base::evalq(...) ] with 1 more call
-       4.   \-rlang g()
+       1. \-rlang (local) f()
+       2.   +<<-base::evalq(g())>>
+       3.   | <<\-base::evalq(g())>>
+       4.   \-rlang (local) g()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang f()
-       4. rlang g()
-
-# %>% frames are collapsed
-
-    Code
-      # Full
-      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-NULL %>% f() %>% g(1, 2) %>% h(3, ., 4)
-       2. \-rlang h(3, ., 4)
-    Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-NULL %>% f() %>% g(1, 2) %>% h(3, ., 4)
-       2. \-rlang h(3, ., 4)
-    Code
-      # Branch
-      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
-    Output
-       1. NULL %>% f() %>% g(1, 2) %>% h(3, ., 4)
-       2. rlang h(3, ., 4)
-
----
-
-    Code
-      # Full
-      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-f(NULL) %>% g(list(.)) %>% h(3, ., list(.))
-       2. \-rlang h(3, ., list(.))
-    Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-f(NULL) %>% g(list(.)) %>% h(3, ., list(.))
-       2. \-rlang h(3, ., list(.))
-    Code
-      # Branch
-      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
-    Output
-       1. f(NULL) %>% g(list(.)) %>% h(3, ., list(.))
-       2. rlang h(3, ., list(.))
-
----
-
-    Code
-      # Full
-      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-rlang f(g(NULL %>% f()) %>% h())
-       2. +-g(NULL %>% f()) %>% h()
-       3. \-rlang h(.)
-    Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-rlang f(g(NULL %>% f()) %>% h())
-       2. +-g(NULL %>% f()) %>% h()
-       3. \-rlang h(.)
-    Code
-      # Branch
-      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
-    Output
-       1. rlang f(g(NULL %>% f()) %>% h())
-       3. rlang h(.)
-
-# children of collapsed %>% frames have correct parent
-
-    Code
-      # Full
-      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-NA %>% F() %>% G() %>% H()
-       2. \-rlang H(.)
-       3.   \-rlang f()
-       4.     \-rlang h()
-    Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
-    Output
-          x
-       1. +-NA %>% F() %>% G() %>% H()
-       2. \-rlang H(.)
-       3.   \-rlang f()
-       4.     \-rlang h()
-    Code
-      # Branch
-      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
-    Output
-       1. NA %>% F() %>% G() %>% H()
-       2. rlang H(.)
-       3. rlang f()
-       4. rlang h()
+       1. rlang (local) f()
+       4. rlang (local) g()
 
 # children of collapsed frames are rechained to correct parent
 
     Code
-      cat("Full:\n")
+      cat("Full + drop:\n")
     Output
-      Full:
+      Full + drop:
     Code
-      print(trace, simplify = "none", srcrefs = FALSE)
+      print(trace, simplify = "none", drop = TRUE, srcrefs = FALSE)
     Output
           x
-       1. \-rlang f()
+       1. \-rlang (local) f()
        2.   \-base::eval(quote(g()), env())
        3.     \-base::eval(quote(g()), env())
-       4.       \-rlang g()
+       4.       \-rlang (local) g()
     Code
-      cat("\nCollapsed:\n")
+      cat("Full - drop:\n")
     Output
-      
-      Collapsed:
+      Full - drop:
     Code
-      print(trace, simplify = "collapse", srcrefs = FALSE)
+      print(trace, simplify = "none", drop = FALSE, srcrefs = FALSE)
     Output
           x
-       1. \-rlang f()
-       2.   \-[ base::eval(...) ] with 1 more call
-       4.     \-rlang g()
+       1. \-rlang (local) f()
+       2.   \-base::eval(quote(g()), env())
+       3.     \-base::eval(quote(g()), env())
+       4.       \-rlang (local) g()
     Code
       cat("\nBranch:\n")
     Output
@@ -404,9 +324,10 @@
     Code
       print(trace, simplify = "branch", srcrefs = FALSE)
     Output
-       1. rlang f()
-       2. [ base::eval(...) ] with 1 more call
-       4. rlang g()
+       1. rlang (local) f()
+       2. base::eval(quote(g()), env())
+       3. base::eval(quote(g()), env())
+       4. rlang (local) g()
 
 # combinations of incomplete and leading pipes collapse properly
 
@@ -416,24 +337,24 @@
     Output
           x
        1. +-NA %>% F() %>% T() %>% F() %>% F()
-       2. +-rlang F(.)
-       3. +-rlang F(.)
-       4. \-rlang T(.)
+       2. +-rlang (local) F(.)
+       3. +-rlang (local) F(.)
+       4. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-NA %>% F() %>% T() %>% F() %>% F()
-       2. +-rlang F(.)
-       3. +-rlang F(.)
-       4. \-rlang T(.)
+       2. +-rlang (local) F(.)
+       3. +-rlang (local) F(.)
+       4. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. NA %>% F() %>% T() %>% F() %>% F()
-       4. rlang T(.)
+       4. rlang (local) T(.)
 
 ---
 
@@ -443,22 +364,22 @@
     Output
           x
        1. +-T(NA) %>% F()
-       2. +-rlang F(.)
-       3. \-rlang T(NA)
+       2. +-rlang (local) F(.)
+       3. \-rlang (local) T(NA)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-T(NA) %>% F()
-       2. +-rlang F(.)
-       3. \-rlang T(NA)
+       2. +-rlang (local) F(.)
+       3. \-rlang (local) T(NA)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. T(NA) %>% F()
-       3. rlang T(NA)
+       3. rlang (local) T(NA)
 
 ---
 
@@ -468,24 +389,24 @@
     Output
           x
        1. +-F(NA) %>% F() %>% T() %>% F() %>% F()
-       2. +-rlang F(.)
-       3. +-rlang F(.)
-       4. \-rlang T(.)
+       2. +-rlang (local) F(.)
+       3. +-rlang (local) F(.)
+       4. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-F(NA) %>% F() %>% T() %>% F() %>% F()
-       2. +-rlang F(.)
-       3. +-rlang F(.)
-       4. \-rlang T(.)
+       2. +-rlang (local) F(.)
+       3. +-rlang (local) F(.)
+       4. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. F(NA) %>% F() %>% T() %>% F() %>% F()
-       4. rlang T(.)
+       4. rlang (local) T(.)
 
 ---
 
@@ -495,20 +416,20 @@
     Output
           x
        1. +-NA %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-NA %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. NA %>% T()
-       2. rlang T(.)
+       2. rlang (local) T(.)
 
 ---
 
@@ -518,20 +439,20 @@
     Output
           x
        1. +-NA %>% F() %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-NA %>% F() %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. NA %>% F() %>% T()
-       2. rlang T(.)
+       2. rlang (local) T(.)
 
 ---
 
@@ -541,20 +462,20 @@
     Output
           x
        1. +-F(NA) %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-F(NA) %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. F(NA) %>% T()
-       2. rlang T(.)
+       2. rlang (local) T(.)
 
 ---
 
@@ -564,20 +485,20 @@
     Output
           x
        1. +-F(NA) %>% F() %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-F(NA) %>% F() %>% T()
-       2. \-rlang T(.)
+       2. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. F(NA) %>% F() %>% T()
-       2. rlang T(.)
+       2. rlang (local) T(.)
 
 # calls before and after pipe are preserved
 
@@ -586,23 +507,23 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. +-rlang F(NA %>% T())
+       1. +-rlang (local) F(NA %>% T())
        2. +-NA %>% T()
-       3. \-rlang T(.)
+       3. \-rlang (local) T(.)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. +-rlang F(NA %>% T())
+       1. +-rlang (local) F(NA %>% T())
        2. +-NA %>% T()
-       3. \-rlang T(.)
+       3. \-rlang (local) T(.)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang F(NA %>% T())
-       3. rlang T(.)
+       1. rlang (local) F(NA %>% T())
+       3. rlang (local) T(.)
 
 ---
 
@@ -612,23 +533,23 @@
     Output
           x
        1. +-NA %>% C()
-       2. \-rlang C(.)
-       3.   \-rlang f()
+       2. \-rlang (local) C(.)
+       3.   \-rlang (local) f()
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-NA %>% C()
-       2. \-rlang C(.)
-       3.   \-rlang f()
+       2. \-rlang (local) C(.)
+       3.   \-rlang (local) f()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. NA %>% C()
-       2. rlang C(.)
-       3. rlang f()
+       2. rlang (local) C(.)
+       3. rlang (local) f()
 
 ---
 
@@ -637,26 +558,26 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. +-rlang F(NA %>% C())
+       1. +-rlang (local) F(NA %>% C())
        2. +-NA %>% C()
-       3. \-rlang C(.)
-       4.   \-rlang f()
+       3. \-rlang (local) C(.)
+       4.   \-rlang (local) f()
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. +-rlang F(NA %>% C())
+       1. +-rlang (local) F(NA %>% C())
        2. +-NA %>% C()
-       3. \-rlang C(.)
-       4.   \-rlang f()
+       3. \-rlang (local) C(.)
+       4.   \-rlang (local) f()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang F(NA %>% C())
-       3. rlang C(.)
-       4. rlang f()
+       1. rlang (local) F(NA %>% C())
+       3. rlang (local) C(.)
+       4. rlang (local) f()
 
 # always keep very first frame as part of backtrace branch
 
@@ -665,21 +586,21 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. +-rlang gen()
-       2. \-rlang gen.default()
+       1. +-rlang (local) gen()
+       2. \-rlang (local) gen.default()
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. +-rlang gen()
-       2. \-rlang gen.default()
+       1. +-rlang (local) gen()
+       2. \-rlang (local) gen.default()
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang gen()
-       2. rlang gen.default()
+       1. rlang (local) gen()
+       2. rlang (local) gen.default()
 
 # anonymous calls are stripped from backtraces
 
@@ -690,8 +611,8 @@
           x
        1. \-(function() {...
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. \-(function() {...
@@ -710,22 +631,22 @@
           x
        1. +-base::eval()
        2. \-base::.handleSimpleError(...)
-       3.   \-rlang h(simpleError(msg, call))
+       3.   \-rlang (local) h(simpleError(msg, call))
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-base::eval()
        2. \-base::.handleSimpleError(...)
-       3.   \-rlang h(simpleError(msg, call))
+       3.   \-rlang (local) h(simpleError(msg, call))
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. base::eval()
        2. base::.handleSimpleError(...)
-       3. rlang h(simpleError(msg, call))
+       3. rlang (local) h(simpleError(msg, call))
 
 # can print degenerate backtraces
 
@@ -736,8 +657,8 @@
           x
        1. \-foo
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. \-foo
@@ -756,8 +677,8 @@
           x
        1. \-NULL
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. \-NULL
@@ -776,8 +697,8 @@
           x
        1. \-1L
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. \-1L
@@ -795,20 +716,20 @@
     Output
           x
        1. +-base::print(foo)
-       2. \-rlang print.foo(foo)
+       2. \-rlang (local) print.foo(foo)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. +-base::print(foo)
-       2. \-rlang print.foo(foo)
+       2. \-rlang (local) print.foo(foo)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
        1. base::print(foo)
-       2. rlang print.foo(foo)
+       2. rlang (local) print.foo(foo)
 
 # dangling srcrefs are not printed
 
@@ -817,21 +738,21 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang f(current_env())
-       2.   \-rlang g(e) at fixtures/trace-srcref2.R:2:2
+       1. \-rlang (local) f(current_env())
+       2.   \-rlang (local) g(e) at fixtures/trace-srcref2.R:2:2
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang f(current_env())
-       2.   \-rlang g(e) at fixtures/trace-srcref2.R:2:2
+       1. \-rlang (local) f(current_env())
+       2.   \-rlang (local) g(e) at fixtures/trace-srcref2.R:2:2
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang f(current_env())
-       2. rlang g(e)
+       1. rlang (local) f(current_env())
+       2. rlang (local) g(e)
             at fixtures/trace-srcref2.R:2:2
 
 # summary.rlang_trace() prints the full tree
@@ -840,9 +761,9 @@
       summary(trace, srcrefs = FALSE)
     Output
           x
-       1. \-rlang f()
-       2.   \-rlang g()
-       3.     \-rlang h()
+       1. \-rlang (local) f()
+       2.   \-rlang (local) g()
+       3.     \-rlang (local) h()
 
 # global functions have `global::` prefix
 
@@ -851,20 +772,20 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang g(current_env())
+       1. \-rlang (local) g(current_env())
        2.   \-global f(e)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang g(current_env())
+       1. \-rlang (local) g(current_env())
        2.   \-global f(e)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang g(current_env())
+       1. rlang (local) g(current_env())
        2. global f(e)
 
 # local functions inheriting from global do not have `global::` prefix
@@ -874,20 +795,20 @@
       print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang g(current_env())
+       1. \-rlang (local) g(current_env())
        2.   \-f(e)
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
-       1. \-rlang g(current_env())
+       1. \-rlang (local) g(current_env())
        2.   \-f(e)
     Code
       # Branch
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
-       1. rlang g(current_env())
+       1. rlang (local) g(current_env())
        2. f(e)
 
 # can trim layers of backtraces
@@ -901,14 +822,14 @@
       summary(trace0)
     Output
            x
-        1. \-rlang f(0) at test-trace.R:456:2
-        2.   +-base::identity(identity(g(n))) at test-trace.R:452:7
+        1. \-rlang (local) f(0) at test-trace.R:412:2
+        2.   +-base::identity(identity(g(n))) at test-trace.R:408:7
         3.   +-base::identity(g(n))
-        4.   \-rlang g(n)
-        5.     +-base::identity(identity(h(n))) at test-trace.R:453:7
+        4.   \-rlang (local) g(n)
+        5.     +-base::identity(identity(h(n))) at test-trace.R:409:7
         6.     +-base::identity(h(n))
-        7.     \-rlang h(n)
-        8.       +-base::identity(identity(trace_back(e, bottom = n))) at test-trace.R:454:7
+        7.     \-rlang (local) h(n)
+        8.       +-base::identity(identity(trace_back(e, bottom = n))) at test-trace.R:410:7
         9.       +-base::identity(trace_back(e, bottom = n))
        10.       \-rlang::trace_back(e, bottom = n)
     Code
@@ -921,13 +842,13 @@
       summary(trace1)
     Output
           x
-       1. \-rlang f(1) at test-trace.R:457:2
-       2.   +-base::identity(identity(g(n))) at test-trace.R:452:7
+       1. \-rlang (local) f(1) at test-trace.R:413:2
+       2.   +-base::identity(identity(g(n))) at test-trace.R:408:7
        3.   +-base::identity(g(n))
-       4.   \-rlang g(n)
-       5.     +-base::identity(identity(h(n))) at test-trace.R:453:7
+       4.   \-rlang (local) g(n)
+       5.     +-base::identity(identity(h(n))) at test-trace.R:409:7
        6.     +-base::identity(h(n))
-       7.     \-rlang h(n)
+       7.     \-rlang (local) h(n)
     Code
       cat_line("", "", "Two layers:")
     Output
@@ -938,10 +859,10 @@
       summary(trace2)
     Output
           x
-       1. \-rlang f(2) at test-trace.R:458:2
-       2.   +-base::identity(identity(g(n))) at test-trace.R:452:7
+       1. \-rlang (local) f(2) at test-trace.R:414:2
+       2.   +-base::identity(identity(g(n))) at test-trace.R:408:7
        3.   +-base::identity(g(n))
-       4.   \-rlang g(n)
+       4.   \-rlang (local) g(n)
     Code
       cat_line("", "", "Three layers:")
     Output
@@ -952,7 +873,7 @@
       summary(trace3)
     Output
           x
-       1. \-rlang f(3) at test-trace.R:459:2
+       1. \-rlang (local) f(3) at test-trace.R:415:2
 
 # caught error does not display backtrace in knitted files
 
@@ -1025,10 +946,10 @@
     Output
           x
        1. +-rlang::inject(f(!!list()))
-       2. \-rlang f(`<list>`)
+       2. \-rlang (local) f(`<list>`)
        3.   +-base::do.call("g", list(runif(1e+06) + 0))
-       4.   \-rlang g(`<dbl>`)
-       5.     \-rlang h()
+       4.   \-rlang (local) g(`<dbl>`)
+       5.     \-rlang (local) h()
 
 # runs of namespaces are embolden (#946)
 
@@ -1036,20 +957,20 @@
       print(err)
     Output
       [1m[1m[1m[34m<error/rlang_error>[39m[22m
-      [1m[33mError[39m in [1m[1m`1 + ""`:[22m
+      [1m[33mError[39m in [1m[1m[1m[94m`1 + ""`[39m[1m:[22m
       [33m![39m non-numeric argument to binary operator
       ---
       [1mBacktrace:[22m
       [90m  1. [39m[1mrlang[22m::catch_cnd(withCallingHandlers(f(), error = entrace), "error")
-      [90m  9. [39mrlang f()
-      [90m 10. [39mrlang g()
-      [90m 11. [39mrlang h()
+      [90m  9. [39mrlang (local) f()
+      [90m 10. [39mrlang (local) g()
+      [90m 11. [39mrlang (local) h()
       [90m 12. [39m[1mbase[22m::identity(1 + "")
     Code
       summary(err)
     Output
       [1m[1m[1m[34m<error/rlang_error>[39m[22m
-      [1m[33mError[39m in [1m[1m`1 + ""`:[22m
+      [1m[33mError[39m in [1m[1m[1m[94m`1 + ""`[39m[1m:[22m
       [33m![39m non-numeric argument to binary operator
       ---
       [1mBacktrace:[22m
@@ -1057,14 +978,14 @@
       [90m  1. [39m+-[1mrlang[22m::catch_cnd(withCallingHandlers(f(), error = entrace), "error")
       [90m  2. [39m| +-rlang::eval_bare(...)
       [90m  3. [39m| +-[1mbase[22m::tryCatch(...)
-      [90m  4. [39m| | \-base tryCatchList(expr, classes, parentenv, handlers)
-      [90m  5. [39m| |   \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
-      [90m  6. [39m| |     \-base doTryCatch(return(expr), name, parentenv, handler)
+      [90m  4. [39m| | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+      [90m  5. [39m| |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+      [90m  6. [39m| |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
       [90m  7. [39m| \-base::force(expr)
       [90m  8. [39m+-base::withCallingHandlers(f(), error = entrace)
-      [90m  9. [39m\-[1mrlang[22m f()
-      [90m 10. [39m  \-rlang g()
-      [90m 11. [39m    \-rlang h()
+      [90m  9. [39m\-[1mrlang[22m (local) f()
+      [90m 10. [39m  \-rlang (local) g()
+      [90m 11. [39m    \-rlang (local) h()
       [90m 12. [39m      \-[1mbase[22m::identity(1 + "")
 
 # `bottom` must be a positive integer
@@ -1081,7 +1002,8 @@
      1. f()
      2. g()
      3. h()
-     4. [ evalq() ] with 1 more call
+     4. evalq()
+     5. evalq()
 
 # trailing `FALSE` visibility is handled
 
@@ -1096,8 +1018,8 @@
        4.       \-foo()
        5.         \-bar()
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
           x
        1. \-f()
@@ -1119,8 +1041,8 @@
     Output
       x
     Code
-      # Collapsed
-      print(trace, simplify = "collapse", dir = dir, srcrefs = srcrefs)
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
     Output
       x
     Code
@@ -1128,4 +1050,374 @@
       print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
     Output
       
+
+# sibling streaks in tree backtraces
+
+    Code
+      # Full
+      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-rlang::catch_cnd(f(g()), "error")
+        2. | +-rlang::eval_bare(...)
+        3. | +-base::tryCatch(...)
+        4. | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        5. | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        6. | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        7. | \-base::force(expr)
+        8. +-rlang (local) f(g())
+        9. | +-base::identity(identity(x))
+       10. | \-base::identity(x)
+       11. \-rlang (local) g()
+       12.   +-rlang (local) f(f(h()))
+       13.   | +-base::identity(identity(x))
+       14.   | \-base::identity(x)
+       15.   +-rlang (local) f(h())
+       16.   | +-base::identity(identity(x))
+       17.   | \-base::identity(x)
+       18.   \-rlang (local) h()
+       19.     \-rlang::abort("foo")
+    Code
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-rlang::catch_cnd(f(g()), "error")
+        2. | <<+-rlang::eval_bare(...)>>
+        3. | <<+-base::tryCatch(...)>>
+        4. | <<| \-base (local) tryCatchList(expr, classes, parentenv, handlers)>>
+        5. | <<|   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])>>
+        6. | <<|     \-base (local) doTryCatch(return(expr), name, parentenv, handler)>>
+        7. | <<\-base::force(expr)>>
+        8. +-rlang (local) f(g())
+        9. | <<+-base::identity(identity(x))>>
+       10. | <<\-base::identity(x)>>
+       11. \-rlang (local) g()
+       12.   +<<-rlang (local) f(f(h()))>>
+       13.   | <<+-base::identity(identity(x))>>
+       14.   | <<\-base::identity(x)>>
+       15.   +<<-rlang (local) f(h())>>
+       16.   | <<+-base::identity(identity(x))>>
+       17.   | <<\-base::identity(x)>>
+       18.   \-rlang (local) h()
+    Code
+      # Branch
+      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+        1. rlang::catch_cnd(f(g()), "error")
+       11. rlang (local) g()
+       18. rlang (local) h()
+
+# parallel '|' branches are correctly emphasised
+
+    Code
+      # Full
+      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-testthat::expect_error(parallel(f(0)))
+        2. | \-testthat:::expect_condition_matching(...)
+        3. |   \-testthat:::quasi_capture(...)
+        4. |     +-testthat (local) .capture(...)
+        5. |     | \-base::withCallingHandlers(...)
+        6. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+        7. +-rlang (local) parallel(f(0))
+        8. | +-rlang (local) p1(identity(x))
+        9. | | \-rlang (local) p2(x)
+       10. | |   \-rlang (local) p3(x)
+       11. | \-base::identity(x)
+       12. \-rlang (local) f(0)
+       13.   \-rlang (local) g(n)
+       14.     \-rlang (local) h(n)
+       15.       \-rlang::abort("foo")
+    Code
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-testthat::expect_error(parallel(f(0)))
+        2. | <<\-testthat:::expect_condition_matching(...)>>
+        3. |   <<\-testthat:::quasi_capture(...)>>
+        4. |     <<+-testthat (local) .capture(...)>>
+        5. |     <<| \-base::withCallingHandlers(...)>>
+        6. |     <<\-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))>>
+        7. +-rlang (local) parallel(f(0))
+        8. | <<+-rlang (local) p1(identity(x))>>
+        9. | <<| \-rlang (local) p2(x)>>
+       10. | <<|   \-rlang (local) p3(x)>>
+       11. | <<\-base::identity(x)>>
+       12. \-rlang (local) f(0)
+       13.   \-rlang (local) g(n)
+       14.     \-rlang (local) h(n)
+    Code
+      # Branch
+      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+        1. testthat::expect_error(parallel(f(0)))
+       12. rlang (local) f(0)
+       13. rlang (local) g(n)
+       14. rlang (local) h(n)
+
+---
+
+    Code
+      # Full
+      print(trace, simplify = "none", dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-testthat::expect_error(deep(1))
+        2. | \-testthat:::expect_condition_matching(...)
+        3. |   \-testthat:::quasi_capture(...)
+        4. |     +-testthat (local) .capture(...)
+        5. |     | \-base::withCallingHandlers(...)
+        6. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+        7. \-rlang (local) deep(1)
+        8.   +-rlang (local) parallel(f(n))
+        9.   | +-rlang (local) p1(identity(x))
+       10.   | | \-rlang (local) p2(x)
+       11.   | |   \-rlang (local) p3(x)
+       12.   | \-base::identity(x)
+       13.   \-rlang (local) f(n)
+       14.     \-rlang (local) g(n)
+       15.       \-rlang (local) h(n)
+       16.         +-rlang (local) parallel(f(n - 1))
+       17.         | +-rlang (local) p1(identity(x))
+       18.         | | \-rlang (local) p2(x)
+       19.         | |   \-rlang (local) p3(x)
+       20.         | \-base::identity(x)
+       21.         \-rlang (local) f(n - 1)
+       22.           \-rlang (local) g(n)
+       23.             \-rlang (local) h(n)
+       24.               \-rlang::abort("foo")
+    Code
+      # Focused
+      print_focused_trace(trace, dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-testthat::expect_error(deep(1))
+        2. | <<\-testthat:::expect_condition_matching(...)>>
+        3. |   <<\-testthat:::quasi_capture(...)>>
+        4. |     <<+-testthat (local) .capture(...)>>
+        5. |     <<| \-base::withCallingHandlers(...)>>
+        6. |     <<\-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))>>
+        7. \-rlang (local) deep(1)
+        8.   +<<-rlang (local) parallel(f(n))>>
+        9.   | <<+-rlang (local) p1(identity(x))>>
+       10.   | <<| \-rlang (local) p2(x)>>
+       11.   | <<|   \-rlang (local) p3(x)>>
+       12.   | <<\-base::identity(x)>>
+       13.   \-rlang (local) f(n)
+       14.     \-rlang (local) g(n)
+       15.       \-rlang (local) h(n)
+       16.         +<<-rlang (local) parallel(f(n - 1))>>
+       17.         | <<+-rlang (local) p1(identity(x))>>
+       18.         | <<| \-rlang (local) p2(x)>>
+       19.         | <<|   \-rlang (local) p3(x)>>
+       20.         | <<\-base::identity(x)>>
+       21.         \-rlang (local) f(n - 1)
+       22.           \-rlang (local) g(n)
+       23.             \-rlang (local) h(n)
+    Code
+      # Branch
+      print(trace, simplify = "branch", dir = dir, srcrefs = srcrefs)
+    Output
+      <error/rlang_error>
+      Error in `h()`:
+      ! foo
+      ---
+      Backtrace:
+        1. testthat::expect_error(deep(1))
+        7. rlang (local) deep(1)
+       13. rlang (local) f(n)
+       14. rlang (local) g(n)
+       15. rlang (local) h(n)
+       21. rlang (local) f(n - 1)
+       22. rlang (local) g(n)
+       23. rlang (local) h(n)
+
+# error calls and args are highlighted
+
+    Code
+      print_highlighted_trace(parent)
+    Output
+      <error/rlang_error>
+      Error in <<CALL `h()`>>:
+      ! `x` must be a single string, not a number.
+      ---
+      Backtrace:
+           x
+        1. +-rlang:::catch_error(f(1))
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f(1)
+       10.   \-rlang (local) g(x)
+       11.     \-rlang (local) <<CALL h(>><<ARG x = x>><<CALL )>>
+    Code
+      print_highlighted_trace(child)
+    Output
+      <error/rlang_error>
+      Error in <<CALL `wrapper()`>>:
+      ! Tilt.
+      Caused by error in <<CALL `h()`>>:
+      ! `x` must be a single string, not a number.
+      ---
+      Backtrace:
+           x
+        1. +-rlang:::catch_error(wrapper())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) wrapper()
+       10.   +-rlang::try_fetch(f(1), error = function(cnd) abort("Tilt.", parent = cnd))
+       11.   | +-base::tryCatch(...)
+       12.   | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       13.   | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       14.   | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       15.   | \-base::withCallingHandlers(...)
+       16.   \-rlang (local) f(1)
+       17.     \-rlang (local) g(x)
+       18.       \-rlang (local) <<CALL h(>><<ARG x = x>><<CALL )>>
+
+# error calls and args are highlighted (no highlighted arg)
+
+    Code
+      print_highlighted_trace(argless)
+    Output
+      <error/rlang_error>
+      Error in <<CALL `h()`>>:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) <<CALL h(>><<CALL )>>
+
+# frame is detected from the left
+
+    Code
+      # If detected from the right, `evalq()`is highlighted instead of `h()`
+      print_highlighted_trace(err)
+    Output
+      <error/rlang_error>
+      Error in <<CALL `h()`>>:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) <<CALL h(>><<CALL )>>
+
+# arg is defensively checked
+
+    Code
+      print_highlighted_trace(err)
+    Output
+      <error/rlang_error>
+      Error in <<CALL `h()`>>:
+      ! foo
+      ---
+      Backtrace:
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) <<CALL h(>><<CALL )>>
+
+# namespaced calls are highlighted
+
+    Code
+      print_highlighted_trace(err)
+    Output
+      <error/rlang_error>
+      Error in <<CALL `rlang:::as_string()`>>:
+      ! Can't convert a number to a string.
+      ---
+      Backtrace:
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) h()
+       12.       \-<<CALL rlang:::as_string(>>1<<CALL )>>
 

@@ -5,6 +5,8 @@
 \alias{warn}
 \alias{inform}
 \alias{signal}
+\alias{reset_warning_verbosity}
+\alias{reset_message_verbosity}
 \title{Signal an error, warning, or message}
 \usage{
 abort(
@@ -19,7 +21,8 @@ abort(
   use_cli_format = NULL,
   .internal = FALSE,
   .file = NULL,
-  .frame = NULL,
+  .frame = caller_env(),
+  .trace_bottom = NULL,
   .subclass = deprecated()
 )
 
@@ -49,20 +52,28 @@ inform(
 )
 
 signal(message, class, ..., .subclass = deprecated())
+
+reset_warning_verbosity(id)
+
+reset_message_verbosity(id)
 }
 \arguments{
 \item{message}{The message to display, formatted as a \strong{bulleted
 list}. The first element is displayed as an \emph{alert} bullet
-prefixed with \code{!} by default. Elements named \code{"*"}, \code{"i"}, and
-\code{"x"} are formatted as regular, info, and cross bullets
-respectively. Se\ifelse{html}{\link[=topic-condition-formatting]{Formatting messages with cli}}{\link[=topic-condition-formatting]{Formatting messages with cli}})` for more
-about bulleted messaging.
+prefixed with \code{!} by default. Elements named \code{"*"}, \code{"i"}, \code{"v"},
+\code{"x"}, and \code{"!"} are formatted as regular, info, success,
+failure, and error bullets respectively. Se\ifelse{html}{\link[=topic-condition-formatting]{Formatting messages with cli}}{\link[=topic-condition-formatting]{Formatting messages with cli}})`
+for more about bulleted messaging.
 
 If a message is not supplied, it is expected that the message is
 generated \strong{lazily} through \code{\link[=cnd_header]{cnd_header()}} and \code{\link[=cnd_body]{cnd_body()}}
 methods. In that case, \code{class} must be supplied. Only \code{inform()}
 allows empty messages as it is occasionally useful to build user
-output incrementally.}
+output incrementally.
+
+If a function, it is stored in the \code{header} field of the error
+condition. This acts as a \code{\link[=cnd_header]{cnd_header()}} method that is invoked
+lazily when the error message is displayed.}
 
 \item{class}{Subclass of the condition.}
 
@@ -129,12 +140,16 @@ incompatible with \code{footer}.}
 message. The default depends on the context, see the \code{stdout} vs
 \code{stderr} section.}
 
-\item{.frame}{The throwing context. Defaults to \code{call} if it is an
-environment, \code{\link[=caller_env]{caller_env()}} otherwise. This is used in the
-display of simplified backtraces as the last relevant call frame
-to show. This way, the irrelevant parts of backtraces
-corresponding to condition handling (\code{\link[=tryCatch]{tryCatch()}}, \code{\link[=try_fetch]{try_fetch()}},
-\code{abort()}, etc.) are hidden by default.}
+\item{.frame}{The throwing context. Used as default for
+\code{.trace_bottom}, and to determine the internal package to mention
+in internal errors when \code{.internal} is \code{TRUE}.}
+
+\item{.trace_bottom}{Used in the display of simplified backtraces
+as the last relevant call frame to show. This way, the irrelevant
+parts of backtraces corresponding to condition handling
+(\code{\link[=tryCatch]{tryCatch()}}, \code{\link[=try_fetch]{try_fetch()}}, \code{abort()}, etc.) are hidden by
+default. Defaults to \code{call} if it is an environment, or \code{.frame}
+otherwise. Without effect if \code{trace} is supplied.}
 
 \item{.subclass}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} This argument
 was renamed to \code{class} in rlang 0.4.2 for consistency with our
@@ -150,6 +165,9 @@ time. If \code{"regularly"}, it is displayed once every 8 hours. If
 message. This is used when \code{.frequency} is supplied to recognise
 recurring conditions. This argument must be supplied if
 \code{.frequency} is not set to \code{"always"}.}
+
+\item{id}{The identifying string of the condition that was supplied
+as \code{.frequency_id} to \code{warn()} or \code{inform()}.}
 }
 \description{
 These functions are equivalent to base functions \code{\link[base:stop]{base::stop()}},

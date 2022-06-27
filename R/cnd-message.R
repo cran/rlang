@@ -67,14 +67,24 @@ cnd_message <- function(cnd, ..., inherit = TRUE, prefix = FALSE) {
   }
 
   if (prefix) {
-    msg <- cnd_message_format_prefixed(cnd, ..., parent = FALSE)
+    # Skip child errors that have empty messages and calls
+    while (!length(msg <- cnd_message_format_prefixed(cnd, ..., parent = FALSE))) {
+      parent <- cnd[["parent"]]
+      if (is_condition(parent)) {
+        cnd <- parent
+      } else {
+        break
+      }
+    }
   } else {
     msg <- cnd_message_format(cnd, ...)
   }
 
+  warning <- inherits(cnd, "warning")
+
   # Parent messages are always prefixed
   while (is_condition(cnd <- cnd$parent)) {
-    parent_msg <- cnd_message_format_prefixed(cnd, parent = TRUE)
+    parent_msg <- cnd_message_format_prefixed(cnd, parent = TRUE, warning = warning)
     msg <- paste_line(msg, parent_msg)
   }
 
@@ -149,7 +159,7 @@ cnd_header <- function(cnd, ...) {
   if (is_null(cnd[["header"]])) {
     UseMethod("cnd_header")
   } else {
-    exec_cnd_method("header", cnd)
+    exec_cnd_method("header", cnd, ...)
   }
 }
 #' @export
@@ -163,7 +173,7 @@ cnd_body <- function(cnd, ...) {
   if (is_null(cnd[["body"]])) {
     UseMethod("cnd_body")
   } else {
-    exec_cnd_method("body", cnd)
+    exec_cnd_method("body", cnd, ...)
   }
 }
 #' @export
@@ -177,7 +187,7 @@ cnd_footer <- function(cnd, ...) {
   if (is_null(cnd[["footer"]])) {
     UseMethod("cnd_footer")
   } else {
-    exec_cnd_method("footer", cnd)
+    exec_cnd_method("footer", cnd, ...)
   }
 }
 #' @export
@@ -185,14 +195,14 @@ cnd_footer.default <- function(cnd, ...) {
   chr()
 }
 
-exec_cnd_method <- function(name, cnd) {
+exec_cnd_method <- function(name, cnd, ...) {
   method <- cnd[[name]]
 
   if (is_function(method)) {
-    method(cnd)
+    method(cnd, ...)
   } else if (is_bare_formula(method)) {
     method <- as_function(method)
-    method(cnd)
+    method(cnd, ...)
   } else if (is_character(method)) {
     method
   } else {
@@ -208,7 +218,8 @@ exec_cnd_method <- function(name, cnd) {
 cnd_message_format_prefixed <- function(cnd,
                                         ...,
                                         parent = FALSE,
-                                        alert = NULL) {
+                                        alert = NULL,
+                                        warning = FALSE) {
   type <- cnd_type(cnd)
 
   if (is_null(alert)) {
@@ -221,13 +232,18 @@ cnd_message_format_prefixed <- function(cnd,
     prefix <- col_yellow(capitalise(type))
   }
 
-  call <- format_error_call(cnd$call)
+  evalq({
+    if (is_true(peek_option("rlang:::error_highlight"))) {
+      local_error_highlight()
+    }
+    call <- format_error_call(cnd[["call"]])
+  })
 
   message <- cnd_message_format(cnd, ..., alert = alert)
   message <- strip_trailing_newline(message)
 
-  if (!nzchar(message)) {
-    return(NULL)
+  if (!nzchar(message) && is_null(call)) {
+    return(character())
   }
 
   has_loc <- FALSE
@@ -235,7 +251,7 @@ cnd_message_format_prefixed <- function(cnd,
   if (is_null(call)) {
     prefix <- sprintf("%s:", prefix)
   } else {
-    src_loc <- src_loc(attr(cnd$call, "srcref"))
+    src_loc <- src_loc(attr(cnd[["call"]], "srcref"))
     if (nzchar(src_loc) && peek_call_format_srcref()) {
       prefix <- sprintf("%s in %s at %s:", prefix, call, src_loc)
       has_loc <- TRUE
@@ -243,9 +259,15 @@ cnd_message_format_prefixed <- function(cnd,
       prefix <- sprintf("%s in %s:", prefix, call)
     }
   }
-  prefix <- style_bold(prefix)
+  if (!warning) {
+    prefix <- style_bold(prefix)
+  }
 
-  paste0(prefix, "\n", message)
+  if (nzchar(message)) {
+    paste0(prefix, "\n", message)
+  } else {
+    prefix
+  }
 }
 
 peek_call_format_srcref <- function() {

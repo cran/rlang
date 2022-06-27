@@ -53,10 +53,8 @@ arg_match <- function(arg,
   }
 
   if (length(arg) > 1 && !setequal(arg, values)) {
-    abort(
-      arg_match_invalid_msg(arg, values, error_arg),
-      call = error_call
-    )
+    msg <- arg_match_invalid_msg(arg, values, error_arg)
+    abort(msg, call = error_call, arg = error_arg)
   }
 
   arg <- arg[[1]]
@@ -98,7 +96,7 @@ arg_match0 <- function(arg,
                        values,
                        arg_nm = caller_arg(arg),
                        error_call = caller_env()) {
-  .External(ffi_arg_match0, arg, values, arg_nm, error_call)
+  .External(ffi_arg_match0, arg, values, environment())
 }
 
 stop_arg_match <- function(arg, values, error_arg, error_call) {
@@ -111,7 +109,7 @@ stop_arg_match <- function(arg, values, error_arg, error_call) {
         format_arg("arg"),
         format_arg("values")
       )
-      abort(msg, call = quote(arg_match()))
+      abort(msg, call = quote(arg_match()), arg = "arg")
     }
   }
 
@@ -144,7 +142,7 @@ stop_arg_match <- function(arg, values, error_arg, error_call) {
     msg <- c(msg, i = paste0("Did you mean ", candidate, "?"))
   }
 
-  abort(msg, call = error_call)
+  abort(msg, call = error_call, arg = error_arg)
 }
 
 arg_match_invalid_msg <- function(val, values, error_arg) {
@@ -265,7 +263,7 @@ chr_enumerate <- function(chr, sep = ", ", final = "or") {
 check_exclusive <- function(...,
                             .require = TRUE,
                             .frame = caller_env(),
-                            .error_call = .frame) {
+                            .call = .frame) {
   args <- enexprs(..., .named = TRUE)
   if (length(args) < 2) {
     abort("Must supply at least two arguments.")
@@ -282,7 +280,7 @@ check_exclusive <- function(...,
       args <- map(names(args), format_arg)
       enum <- chr_enumerate(args)
       msg <- sprintf("One of %s must be supplied.", enum)
-      abort(msg, call = .error_call)
+      abort(msg, call = .call)
     } else {
       return("")
     }
@@ -301,7 +299,7 @@ check_exclusive <- function(...,
     msg <- c(msg, x = sprintf("%s were supplied together.", enum))
   }
 
-  abort(msg, call = .error_call)
+  abort(msg, call = .call)
 }
 
 #' Generate or handle a missing argument

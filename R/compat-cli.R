@@ -1,11 +1,16 @@
 # nocov start - compat-cli.R
-# Latest version: https://github.com/r-lib/rlang/blob/master/R/compat-cli.R
+# Latest version: https://github.com/r-lib/rlang/blob/main/R/compat-cli.R
 
 # Provides a minimal shim API to format message elements consistently
 # with cli in packages that can't depend on it. If available, cli is
 # used to format the elements. Otherwise a fallback format is used.
 #
 # Changelog:
+#
+# 2022-05-23:
+#
+# * Added compat for `style_hyperlink()`.
+#
 #
 # 2022-02-23:
 #
@@ -129,6 +134,25 @@ style_reset            <- function(x) if (.rlang_cli_has_ansi()) cli::style_rese
 style_no_colour        <- function(x) if (.rlang_cli_has_ansi()) cli::style_no_color(x) else x
 style_no_bg_colour     <- function(x) if (.rlang_cli_has_ansi()) cli::style_no_bg_color(x) else x
 
+CLI_SUPPORT_HYPERLINK <- "2.2.0"
+CLI_SUPPORT_HYPERLINK_PARAMS <- "3.1.1"
+
+style_hyperlink <- function(text, url, params = NULL) {
+  if (is.null(params)) {
+    if (.rlang_cli_has_cli(CLI_SUPPORT_HYPERLINK)) {
+      cli::style_hyperlink(text, url)
+    } else {
+      text
+    }
+  } else {
+    if (.rlang_cli_has_cli(CLI_SUPPORT_HYPERLINK_PARAMS)) {
+      cli::style_hyperlink(text, url, params = params)
+    } else {
+      text
+    }
+  }
+}
+
 #' Apply inline styling
 #'
 #' @description
@@ -189,6 +213,21 @@ format_url    <- function(x) .rlang_cli_format_inline(x, "url", "<%s>")
 format_var    <- function(x) .rlang_cli_format_inline(x, "var", "`%s`")
 format_envvar <- function(x) .rlang_cli_format_inline(x, "envvar", "`%s`")
 format_field  <- function(x) .rlang_cli_format_inline(x, "field", NULL)
+
+format_error_arg_highlight <- function(x, quote = TRUE) {
+  if (is_true(peek_option("rlang:::trace_test_highlight"))) {
+    return(paste0("<<ARG ", x, ">>"))
+  }
+  out <- if (quote) format_arg(x) else x
+  style_bold(cli::col_br_magenta(out))
+}
+format_error_call_highlight <- function(x, quote = TRUE) {
+  if (is_true(peek_option("rlang:::trace_test_highlight"))) {
+    return(paste0("<<CALL ", x, ">>"))
+  }
+  out <- if (quote) format_code(x) else x
+  style_bold(cli::col_br_blue(out))
+}
 
 format_cls <- function(x) {
   fallback <- function(x) sprintf("<%s>", paste0(x, collapse = "/"))
@@ -329,16 +368,18 @@ format_message <- function(x) {
 }
 
 .rlang_cli_has_cli <- local({
-  has_cli <- NULL
+  cache <- new.env()
 
-  function(pkg) {
-    if (is.null(has_cli)) {
-      has_cli <<- TRUE &&
+  function(version = "3.0.0") {
+    out <- cache[[version]]
+
+    if (is.null(out)) {
+      out <- cache[[version]] <<-
         requireNamespace("cli", quietly = TRUE) &&
-        utils::packageVersion("cli") >= "3.0.0"
+        utils::packageVersion("cli") >= version
     }
 
-    has_cli
+    out
   }
 })
 

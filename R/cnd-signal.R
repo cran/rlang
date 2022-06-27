@@ -206,13 +206,17 @@ default_message_file <- function() {
     return(opt)
   }
 
-  if (is_interactive() &&
+  if ((is_interactive() || is_rstudio()) &&
       sink.number("output") == 0 &&
       sink.number("message") == 2) {
     stdout()
   } else {
     stderr()
   }
+}
+
+is_rstudio <- function() {
+  Sys.getenv("RSTUDIO_SESSION_PID") %in% c(Sys.getpid(), getppid())
 }
 
 deprecate_subclass <- function(subclass, fn, env = caller_env()) {
@@ -271,14 +275,19 @@ validate_signal_args <- function(message,
     }
   }
 
-  if (is_null(message)) {
-    if (is_null(class)) {
-      abort("Either `message` or `class` must be supplied.", call = env)
-    }
-    message <- ""
+  if (is_null(message) && is_null(class)) {
+    abort("Either `message` or `class` must be supplied.", call = env)
   }
 
-  check_character(message, call = env)
+  message <- message %||% ""
+  if (is_function(message)) {
+    if (!"..." %in% names(formals(message))) {
+      abort("`cnd_header()` methods must take `...`.", call = env)
+    }
+  } else {
+    check_character(message, call = env)
+  }
+
   if (!is_null(class)) {
     check_character(class, call = env)
   }
@@ -349,6 +358,32 @@ peek_verbosity <- function(opt, call = caller_env()) {
     opt,
     error_call = call
   )
+}
+
+#' @rdname abort
+#' @param id The identifying string of the condition that was supplied
+#'   as `.frequency_id` to `warn()` or `inform()`.
+#' @export
+reset_warning_verbosity <- function(id) {
+  reset_verbosity(id, "warning")
+}
+#' @rdname abort
+#' @export
+reset_message_verbosity <- function(id) {
+  reset_verbosity(id, "message")
+}
+reset_verbosity <- function(id, type = c("message", "warning")) {
+  check_string(id)
+  type <- arg_match(type)
+
+  env <- switch(
+    type,
+    message = message_freq_env,
+    warning = warning_freq_env
+  )
+  env[[id]] <- NULL
+
+  invisible(NULL)
 }
 
 message_freq <- function(message, frequency, type) {

@@ -26,6 +26,17 @@ run_script <- function(file, envvars = chr()) {
   ))
 }
 
+run_code <- function(code) {
+  file <- withr::local_tempfile()
+  writeLines(code, file)
+
+  out <- run_script(file)
+  list(
+    success = identical(attr(out, "status"), 0L),
+    output = unstructure(out)
+  )
+}
+
 local_methods <- function(..., .frame = caller_env()) {
   local_bindings(..., .env = global_env(), .frame = .frame)
 }
@@ -112,4 +123,9 @@ err <- function(...) {
 
 checker <- function(foo, check) {
   check(foo)
+}
+
+import_or_skip <- function(ns, names, env = caller_env()) {
+  skip_if_not_installed(ns)
+  ns_import_from(ns, names, env = env)
 }

@@ -534,7 +534,10 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
 
 static
 enum dots_ignore_empty arg_match_ignore_empty(r_obj* ignore_empty) {
-  return r_arg_match(ignore_empty, dots_ignore_empty_values, dots_ignore_empty_arg, r_missing_arg);
+  return r_arg_match(ignore_empty,
+                     dots_ignore_empty_values,
+                     dots_ignore_empty_arg,
+                     r_lazy_missing_arg);
 }
 
 static
@@ -547,7 +550,10 @@ const char* dots_homonyms_c_values[DOTS_HOMONYMS_SIZE] = {
 
 static
 enum dots_homonyms arg_match_homonyms(r_obj* homonyms) {
-  return r_arg_match(homonyms, dots_homonyms_values, dots_homonyms_arg, r_missing_arg);
+  return r_arg_match(homonyms,
+                     dots_homonyms_values,
+                     dots_homonyms_arg,
+                     r_lazy_missing_arg);
 }
 
 static
@@ -603,6 +609,12 @@ void check_named_splice(r_obj* node) {
 
 r_obj* dots_as_list(r_obj* dots, struct dots_capture_info* capture_info) {
   int n_kept = 0;
+
+  if (r_names(dots) == r_null && r_node_cdr(dots) == r_null && is_splice_box(r_node_car(dots))) {
+    r_obj* out = rlang_unbox(r_node_car(dots));
+    r_mark_shared(out);
+    return out;
+  }
 
   r_obj* out = KEEP_N(r_alloc_list(capture_info->count), &n_kept);
 
@@ -723,9 +735,6 @@ r_obj* dots_keep(r_obj* dots, r_obj* nms, bool first) {
 }
 
 static
-r_obj* abort_dots_homonyms_call = NULL;
-
-static
 void dots_check_homonyms(r_obj* dots, r_obj* nms) {
   r_obj* dups = KEEP(nms_are_duplicated(nms, false));
 
@@ -740,7 +749,7 @@ void dots_check_homonyms(r_obj* dots, r_obj* nms) {
       { r_sym("dups"), dups }
     };
     r_exec_n(r_null,
-             r_sym("abort_dots_homonyms"),
+             abort_dots_homonyms_ns_sym,
              args,
              R_ARR_SIZEOF(args),
              env);
@@ -766,6 +775,7 @@ r_obj* ffi_unescape_character(r_obj*);
 
 static
 r_obj* dots_finalise(struct dots_capture_info* capture_info, r_obj* dots) {
+  int n_prot = 0;
   r_obj* nms = r_names(dots);
 
   // Here handle minimal vs none
@@ -773,13 +783,13 @@ r_obj* dots_finalise(struct dots_capture_info* capture_info, r_obj* dots) {
   case ARG_NAMED_auto:
   case ARG_NAMED_minimal:
     if (nms == r_null) {
-      nms = r_alloc_character(r_length(dots));
+      nms = KEEP_N(r_alloc_character(r_length(dots)), &n_prot);
+      dots = KEEP_N(r_vec_clone(dots), &n_prot);
     }
     break;
   case ARG_NAMED_none:
     break;
   }
-  KEEP(nms);
 
   if (nms != r_null) {
     // Serialised unicode points might arise when unquoting lists
@@ -800,7 +810,7 @@ r_obj* dots_finalise(struct dots_capture_info* capture_info, r_obj* dots) {
     FREE(2);
   }
 
-  FREE(1);
+  FREE(n_prot);
   return dots;
 }
 
@@ -943,16 +953,21 @@ r_obj* rlang_env_dots_values(r_obj* env) {
                           r_false,
                           false);
 }
+
 // [[ export() ]]
 r_obj* rlang_env_dots_list(r_obj* env) {
-  return dots_values_impl(env,
-                          r_null,
-                          rlang_objs_trailing,
-                          r_false,
-                          r_true,
-                          rlang_objs_keep,
-                          r_false,
-                          true);
+  r_obj* out = KEEP(dots_values_impl(env,
+                                     r_null,
+                                     rlang_objs_trailing,
+                                     r_false,
+                                     r_true,
+                                     rlang_objs_keep,
+                                     r_false,
+                                     true));
+  out = r_vec_clone_shared(out);
+
+  FREE(1);
+  return out;
 }
 
 r_obj* ffi_dots_list(r_obj* frame_env,
@@ -1053,8 +1068,8 @@ void rlang_init_dots(r_obj* ns) {
   auto_name_call = r_parse("rlang:::quos_auto_name(x)");
   r_preserve(auto_name_call);
 
-  abort_dots_homonyms_call = r_parse("rlang:::abort_dots_homonyms(x, y)");
-  r_preserve(abort_dots_homonyms_call);
+  abort_dots_homonyms_ns_sym = r_parse("rlang:::abort_dots_homonyms");
+  r_preserve(abort_dots_homonyms_ns_sym);
 
   {
     r_obj* splice_box_class = KEEP(r_alloc_character(2));
@@ -1096,16 +1111,18 @@ void rlang_init_dots(r_obj* ns) {
   dots_homonyms_values = r_chr_n(dots_homonyms_c_values, DOTS_HOMONYMS_SIZE);
   r_preserve_global(dots_homonyms_values);
 
-  dots_ignore_empty_arg = r_sym(".ignore_empty");
-  dots_homonyms_arg = r_sym(".homonyms");
+  dots_ignore_empty_arg = (struct r_lazy) { .x = r_sym(".ignore_empty"), .env = r_null };
+  dots_homonyms_arg = (struct r_lazy) { .x = r_sym(".homonyms"), .env = r_null };
 }
 
 static r_obj* auto_name_call = NULL;
 static r_obj* empty_spliced_arg = NULL;
 static r_obj* glue_unquote_fn = NULL;
-static r_obj* dots_homonyms_arg = NULL;
 static r_obj* dots_homonyms_values = NULL;
-static r_obj* dots_ignore_empty_arg = NULL;
 static r_obj* dots_ignore_empty_values = NULL;
 static r_obj* quosures_attrib = NULL;
 static r_obj* splice_box_attrib = NULL;
+static r_obj* abort_dots_homonyms_ns_sym = NULL;
+
+static struct r_lazy dots_homonyms_arg = { 0 };
+static struct r_lazy dots_ignore_empty_arg = { 0 };

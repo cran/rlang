@@ -26,7 +26,7 @@
           x
        1. \-global f()
        2.   +-base::tryCatch(g())
-       3.   | \-base tryCatchList(expr, classes, parentenv, handlers)
+       3.   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
        4.   \-global g()
        5.     \-global h()
        6.       \-rlang::abort("Error message")
@@ -52,12 +52,10 @@
     Output
       Error in `h()`:
       ! Error message
-      Backtrace:
-          x
-       1. \-global f()
-       2.   +-[ base::tryCatch(...) ] with 1 more call
-       4.   \-global g()
-       5.     \-global h()
+      Warning message:
+      `"collapse"` is deprecated as of rlang 1.1.0.
+      Please use `"none"` instead.
+      This warning is displayed once per session. 
       Execution halted
     Code
       cat_line(full)
@@ -68,7 +66,7 @@
           x
        1. \-global f()
        2.   +-base::tryCatch(g())
-       3.   | \-base tryCatchList(expr, classes, parentenv, handlers)
+       3.   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
        4.   \-global g()
        5.     \-global h()
        6.       \-rlang::abort("Error message")
@@ -88,12 +86,12 @@
       Backtrace:
            x
         1. +-base::tryCatch(f(), error = function(cnd) rlang::cnd_signal(cnd))
-        2. | \-base tryCatchList(expr, classes, parentenv, handlers)
-        3. |   \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
-        4. |     \-base doTryCatch(return(expr), name, parentenv, handler)
+        2. | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        3. |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        4. |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
         5. \-global f()
         6.   +-base::tryCatch(g())
-        7.   | \-base tryCatchList(expr, classes, parentenv, handlers)
+        7.   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
         8.   \-global g()
         9.     \-global h()
        10.       \-rlang::abort("Error message")
@@ -161,9 +159,9 @@
         2.   \-global b()
         3.     \-global c()
         4.       +-base::tryCatch(...)
-        5.       | \-base tryCatchList(expr, classes, parentenv, handlers)
-        6.       |   \-base tryCatchOne(expr, names, parentenv, handlers[[1L]])
-        7.       |     \-base doTryCatch(return(expr), name, parentenv, handler)
+        5.       | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6.       |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7.       |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
         8.       \-global f()
         9.         \-global g()
        10.           \-global h()
@@ -182,9 +180,9 @@
       ---
       Backtrace:
         1. rlang:::catch_error(f())
-        9. rlang f()
-       10. rlang g()
-       11. rlang h()
+        9. rlang (local) f()
+       10. rlang (local) g()
+       11. rlang (local) h()
     Code
       # From `last_error()`
       print(last_error())
@@ -195,9 +193,9 @@
       ---
       Backtrace:
         1. rlang:::catch_error(f())
-        9. rlang f()
-       10. rlang g()
-       11. rlang h()
+        9. rlang (local) f()
+       10. rlang (local) g()
+       11. rlang (local) h()
       Run `rlang::last_trace()` to see the full context.
     Code
       # Saved from `last_error()`
@@ -212,9 +210,9 @@
       ---
       Backtrace:
         1. rlang:::catch_error(f())
-        9. rlang f()
-       10. rlang g()
-       11. rlang h()
+        9. rlang (local) f()
+       10. rlang (local) g()
+       11. rlang (local) h()
       Run `rlang::last_trace()` to see the full context.
     Code
       # Saved from `last_error()`, but no longer last
@@ -229,9 +227,9 @@
       ---
       Backtrace:
         1. rlang:::catch_error(f())
-        9. rlang f()
-       10. rlang g()
-       11. rlang h()
+        9. rlang (local) f()
+       10. rlang (local) g()
+       11. rlang (local) h()
       Run `rlang::last_trace()` to see the full context.
 
 # Backtrace on rethrow: stop() - tryCatch()
@@ -247,9 +245,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -261,9 +259,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -275,9 +273,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -289,9 +287,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
 
 # Backtrace on rethrow: stop() - withCallingHandlers()
 
@@ -306,12 +304,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::stop("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
@@ -324,12 +322,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
@@ -342,12 +340,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
@@ -360,12 +358,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::stop("low-level")
 
 # Backtrace on rethrow: stop() - try_fetch()
@@ -381,12 +379,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::stop("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
@@ -399,12 +397,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
@@ -417,12 +415,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
@@ -435,12 +433,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::stop("low-level")
 
 # Backtrace on rethrow: abort() - tryCatch()
@@ -456,12 +454,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       17. rlang low1()
-       18. rlang low2()
-       19. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       17. rlang (local) low1()
+       18. rlang (local) low2()
+       19. rlang (local) low3()
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -473,12 +471,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       17. rlang low1()
-       18. rlang low2()
-       19. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       17. rlang (local) low1()
+       18. rlang (local) low2()
+       19. rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -490,12 +488,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       17. rlang low1()
-       18. rlang low2()
-       19. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       17. rlang (local) low1()
+       18. rlang (local) low2()
+       19. rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -507,12 +505,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       17. rlang low1()
-       18. rlang low2()
-       19. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       17. rlang (local) low1()
+       18. rlang (local) low2()
+       19. rlang (local) low3()
 
 # Backtrace on rethrow: abort() - withCallingHandlers()
 
@@ -527,12 +525,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -544,12 +542,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -561,12 +559,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -578,12 +576,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
 
 # Backtrace on rethrow: abort() - try_fetch()
 
@@ -598,12 +596,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -615,12 +613,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -632,12 +630,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -649,12 +647,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
 
 # Backtrace on rethrow: warn = 2 - tryCatch()
 
@@ -669,9 +667,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -683,9 +681,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -697,9 +695,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -711,9 +709,9 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
 
 # Backtrace on rethrow: warn = 2 - withCallingHandlers()
 
@@ -728,12 +726,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::warning("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
@@ -746,12 +744,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
@@ -764,12 +762,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
@@ -782,12 +780,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       14. rlang low1()
-       15. rlang low2()
-       16. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       14. rlang (local) low1()
+       15. rlang (local) low2()
+       16. rlang (local) low3()
        17. base::warning("low-level")
 
 # Backtrace on rethrow: warn = 2 - try_fetch()
@@ -803,12 +801,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::warning("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
@@ -821,12 +819,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
@@ -839,12 +837,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
@@ -857,12 +855,12 @@
       ---
       Backtrace:
         1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang high2(...)
-       12. rlang high3(...)
-       19. rlang low1()
-       20. rlang low2()
-       21. rlang low3()
+       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11. rlang (local) high2(...)
+       12. rlang (local) high3(...)
+       19. rlang (local) low1()
+       20. rlang (local) low2()
+       21. rlang (local) low3()
        22. base::warning("low-level")
 
 # abort() displays call in error prefix
@@ -1164,7 +1162,7 @@
 # must pass character `body` when `message` is > 1
 
     Code
-      err(abort("foo", body = function(cnd) c(i = "bar")))
+      err(abort("foo", body = function(cnd, ...) c(i = "bar")))
     Output
       <error/rlang_error>
       Error:
@@ -1182,7 +1180,7 @@
 # must pass character `body` when `message` is > 1 (non-cli case)
 
     Code
-      err(abort("foo", body = function(cnd) c(i = "bar")))
+      err(abort("foo", body = function(cnd, ...) c(i = "bar")))
     Output
       <error/rlang_error>
       Error:
@@ -1208,7 +1206,8 @@
       i bar
       i baz
     Code
-      err(abort("foo", body = function(cnd) c(i = "bar"), footer = function(cnd) c(i = "baz")))
+      err(abort("foo", body = function(cnd, ...) c(i = "bar"), footer = function(cnd,
+        ...) c(i = "baz")))
     Output
       <error/rlang_error>
       Error in `f()`:
@@ -1227,7 +1226,8 @@
       i bar
       i baz
     Code
-      err(abort("foo", body = function(cnd) c(i = "bar"), footer = function(cnd) c(i = "baz")))
+      err(abort("foo", body = function(cnd, ...) c(i = "bar"), footer = function(cnd,
+        ...) c(i = "baz")))
     Output
       <error/rlang_error>
       Error in `f()`:
@@ -1269,9 +1269,9 @@
       ---
       Backtrace:
         1. base::print(err(foo()))
-        9. rlang foo()
-       10. rlang bar()
-       11. rlang baz()
+        9. rlang (local) foo()
+       10. rlang (local) bar()
+       11. rlang (local) baz()
 
 # if `call` is older than handler caller, use that as bottom
 
@@ -1289,7 +1289,7 @@
       ---
       Backtrace:
        1. base::print(expect_error(f()))
-       8. rlang f()
+       8. rlang (local) f()
     Code
       low_level <- (function(call) {
         abort("Tilt.", call = list(NULL, frame = call))
@@ -1304,7 +1304,7 @@
       ---
       Backtrace:
        1. base::print(expect_error(f()))
-       8. rlang f()
+       8. rlang (local) f()
 
 # base causal errors include full user backtrace
 
@@ -1319,5 +1319,16 @@
       ---
       Backtrace:
         1. base::print(expect_error(my_verb(add(1, ""))))
-       16. rlang add(1, "")
+       16. rlang (local) add(1, "")
+
+# can supply header method via `message`
+
+    Code
+      abort(~"foo")
+    Error <rlang_error>
+      foo
+    Code
+      abort(function(cnd, ...) "foo")
+    Error <rlang_error>
+      foo
 

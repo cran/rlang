@@ -512,3 +512,63 @@ test_that("fallback method supports unknown bullets (#1364)", {
     (expect_error(abort(c(i1 = "foo", i2 = "bar"))))
   })
 })
+
+test_that("`cnd_message(prefix = TRUE)` propagates warning style across parent errors (#1387)", {
+  local_options(cli.num_colors = 8)
+
+  hnd_message <- function(cnd) cnd_message(cnd, prefix = TRUE)
+
+  msg_warning <- try_fetch(
+    error = function(cnd) warn("foo", parent = cnd),
+    condition = hnd_message,
+    abort("bar")
+  )
+  msg_error <- try_fetch(
+    error = function(cnd) abort("foo", parent = cnd),
+    condition = hnd_message,
+    abort("bar")
+  )
+
+  expect_false(grepl("\033\\[1mCaused by error", msg_warning))
+  expect_true(grepl("\033\\[1mCaused by error", msg_error))
+})
+
+test_that("arguments are highlighted but code spans are not", {
+  local_options("rlang:::trace_test_highlight" = TRUE)
+
+  err <- error_cnd(header = function(cnd) sprintf(
+    "%s - %s - %s",
+    format_arg("arg1"),
+    format_code("code"),
+    format_arg("arg2")
+  ))
+
+  expect_snapshot({
+    with_error_arg_highlight(
+      print(err)
+    )
+  })
+})
+
+test_that("chained errors may have empty messages", {
+  parent <- error_cnd(message = "Tilt.")
+  child <- error_cnd(parent = parent)
+  expect_snapshot({
+    print(child)
+    cat_line(cnd_message(child, prefix = TRUE))
+  })
+
+  # This is the intended usage
+  child <- error_cnd(call = call("foo"), parent = parent)
+  expect_snapshot({
+    print(child)
+    cat_line(cnd_message(child, prefix = TRUE))
+  })
+
+  # Irrelevant calls are considered as NULL
+  child <- error_cnd(call = call("eval"), parent = parent)
+  expect_snapshot({
+    print(child)
+    cat_line(cnd_message(child, prefix = TRUE))
+  })
+})

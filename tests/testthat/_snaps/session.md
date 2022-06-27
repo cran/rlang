@@ -124,6 +124,9 @@
       <error/rlang_error>
       Error in `caller()`:
       ! Can't parse version in `pkg`.
+      x Problematic versions:
+      * foo (1.0)
+      i Example of expected version format: `rlang (>= 1.0.0)`.
     Code
       (expect_error(pkg_version_info("foo (>= 1.0)", "1.0"), "both"))
     Output
@@ -182,4 +185,12 @@
       <error/rlang_error>
       Error in `check_installed()`:
       ! `action` must take a `...` argument.
+
+# `check_installed()` works within `tryCatch(error = )` (#1402, tidyverse/ggplot2#4845)
+
+    Code
+      cat(tryCatch(error = function(cnd) NULL, check_installed("rlangFoo")))
+    Output
+      i The package `rlangFoo` is required.
+      x Would you like to install it?
 

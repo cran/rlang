@@ -109,7 +109,6 @@ trace_back <- function(top = NULL, bottom = NULL) {
   calls <- map(calls, call_zap_inline)
 
   context <- empty_trace_context()
-
   if (length(calls)) {
     context_data <- map2(calls, seq_along(calls), call_trace_context)
     context$namespace <- do.call(base::c, map(context_data, `[[`, "namespace"))
@@ -118,7 +117,6 @@ trace_back <- function(top = NULL, bottom = NULL) {
   context <- new_data_frame(context)
 
   parents <- normalise_parents(parents)
-
   trace <- new_trace(
     calls,
     parents,
@@ -126,6 +124,29 @@ trace_back <- function(top = NULL, bottom = NULL) {
     scope = context$scope,
     visible = is_visible
   )
+
+  error_frame <- peek_option("rlang:::error_frame")
+  if (!is_null(error_frame)) {
+    trace[["error_frame"]] <- FALSE
+    i <- detect_index(frames, identical, error_frame)
+    if (i) {
+      trace[["error_frame"]][[i]] <- TRUE
+      error_arg <- peek_option("rlang:::error_arg")
+      if (!is_null(error_arg)) {
+        if (is_null(trace[["error_arg"]])) {
+          trace[["error_arg"]] <- list(NULL)
+        }
+        trace[["error_arg"]][[i]] <- error_arg
+
+        # Match arguments so we can fully highlight the faulty input in
+        # the backtrace. Preserve srcrefs from original frame call.
+        matched <- call_match(trace$call[[i]], frame_fn(error_frame), defaults = TRUE)
+        attributes(matched) <- attributes(trace$call[[i]])
+        trace$call[[i]] <- matched
+      }
+    }
+  }
+
   trace <- add_winch_trace(trace)
   trace <- trace_trim_env(trace, frames, top)
 
@@ -397,19 +418,55 @@ c.rlang_trace <- function(...) {
 #' @export
 format.rlang_trace <- function(x,
                                ...,
-                               simplify = c("none", "collapse", "branch"),
+                               simplify = c("none", "branch"),
                                max_frames = NULL,
                                dir = getwd(),
-                               srcrefs = NULL) {
+                               srcrefs = NULL,
+                               drop = FALSE) {
   switch(
-    arg_match(simplify),
-    none = trace_format_full(x, max_frames, dir, srcrefs),
-    collapse = trace_format_collapse(x, max_frames, dir, srcrefs),
+    arg_match_simplify(simplify),
+    none = trace_format(x, max_frames, dir, srcrefs, drop = drop, ...),
     branch = trace_format_branch(x, max_frames, dir, srcrefs)
   )
 }
 
-trace_format <- function(trace, max_frames, dir, srcrefs) {
+arg_match_simplify <- function(simplify, call = caller_env()) {
+  if (is_null(simplify)) {
+    if (use_tree_display()) {
+      return("none")
+    } else {
+      return("branch")
+    }
+  }
+
+  if (is_string(simplify, "collapse")) {
+    deprecate_collapse()
+    simplify <- "none"
+  }
+  arg_match0(simplify, c("none", "branch"), error_call = call)
+}
+arg_match_drop <- function(drop) {
+  if (is_null(drop)) {
+    use_tree_display()
+  } else {
+    drop
+  }
+}
+
+deprecate_collapse <- function() {
+  warn_deprecated("`\"collapse\"` is deprecated as of rlang 1.1.0.\nPlease use `\"none\"` instead.")
+}
+
+trace_format <- function(trace,
+                         max_frames,
+                         dir,
+                         srcrefs,
+                         drop = FALSE,
+                         ...) {
+  if (is_false(drop) && length(trace$visible)) {
+    trace$visible <- TRUE
+  }
+
   if (!is_null(max_frames)) {
     msg <- "`max_frames` is currently only supported with `simplify = \"branch\"`"
     stop(msg, call. = FALSE)
@@ -418,19 +475,15 @@ trace_format <- function(trace, max_frames, dir, srcrefs) {
     return(trace_root())
   }
 
-  cli_tree(trace_as_tree(trace, dir = dir, srcrefs = srcrefs))
+  tree <- trace_as_tree(
+    trace,
+    dir = dir,
+    srcrefs = srcrefs,
+    drop = drop
+  )
+  cli_tree(tree)
 }
 
-trace_format_full <- function(trace, max_frames, dir, srcrefs) {
-  if (length(trace$visible)) {
-    trace$visible <- TRUE
-  }
-  trace_format(trace, max_frames, dir, srcrefs)
-}
-trace_format_collapse <- function(trace, max_frames, dir, srcrefs) {
-  trace <- trace_simplify_collapse(trace)
-  trace_format(trace, max_frames, dir, srcrefs)
-}
 trace_format_branch <- function(trace, max_frames, dir, srcrefs) {
   trace <- trace_simplify_branch(trace)
   tree <- trace_as_tree(trace, dir = dir, srcrefs = srcrefs)
@@ -439,18 +492,6 @@ trace_format_branch <- function(trace, max_frames, dir, srcrefs) {
   tree <- vec_slice(tree, -1)
 
   cli_branch(tree, max = max_frames)
-}
-
-format_collapsed <- function(what, n) {
-  if (n > 0L) {
-    call_text <- pluralise_n(n, "call", "calls")
-    n_text <- sprintf(" with %d more %s", n, call_text)
-    n_text <- silver(n_text)
-  } else {
-    n_text <- ""
-  }
-
-  paste0(what, n_text)
 }
 
 cli_branch <- function(tree,
@@ -530,11 +571,11 @@ zip_chr <- function(xs, ys) {
 #' @export
 print.rlang_trace <- function(x,
                               ...,
-                              simplify = c("none", "branch", "collapse"),
+                              simplify = c("none", "branch"),
                               max_frames = NULL,
                               dir = getwd(),
                               srcrefs = NULL) {
-  simplify <- arg_match(simplify)
+  simplify <- arg_match_simplify(simplify)
   cat_line(format(x, ...,
     simplify = simplify,
     max_frames = max_frames,
@@ -586,43 +627,6 @@ trace_trim_env_idx <- function(n, frames, to) {
   seq2(start, n)
 }
 
-set_trace_skipped <- function(trace, id, n) {
-  trace$collapsed[[id]] <- n
-  trace
-}
-set_trace_collapsed <- function(trace, id, n) {
-  trace$collapsed[[id - n]] <- n
-  trace
-}
-n_collapsed <- function(trace, id) {
-  call <- trace$call[[id]]
-
-  if (is_eval_call(call)) {
-    # When error occurs inside eval()'s frame at top level, there
-    # might be only one frame and nothing to collapse
-    if (id > 1L && is_eval_call(trace$call[[id - 1L]])) {
-      n <- 1L
-    } else {
-      n <- 0L
-    }
-    return(n)
-  }
-
-  if (identical(call, quote(function_list[[i]](value)))) {
-    return(6L)
-  }
-
-  if (identical(call, quote(function_list[[k]](value)))) {
-    return(7L)
-  }
-
-  0L
-}
-
-is_eval_call <- function(call) {
-  is_call2(call, c("eval", "evalq"), ns = c("", "base"))
-}
-
 trace_simplify_branch <- function(trace) {
   if (!trace_length(trace)) {
     return(trace)
@@ -640,17 +644,7 @@ trace_simplify_branch <- function(trace) {
     id <- 0L
   }
 
-  trace$collapsed <- 0L
-
   while (id != 0L) {
-    n_collapsed <- n_collapsed(trace, id)
-
-    if (n_collapsed) {
-      trace <- set_trace_collapsed(trace, id, n_collapsed)
-      next_id <- id - n_collapsed
-      id <- next_id
-    }
-
     # Set `old_visible` to avoid uninformative calls in position 1 to
     # be included (see below)
     if (is_uninformative_call(trace$call[[id]])) {
@@ -718,69 +712,29 @@ is_winch_frame <- function(call) {
   grepl("^[/\\\\].+[.]", name)
 }
 
-trace_simplify_collapse <- function(trace) {
-  if (!trace_length(trace)) {
-    return(trace)
-  }
-
-  parents <- trace$parent
-
-  old_visible <- trace$visible
-  visible <- rep_along(old_visible, FALSE)
-
-  id <- trace_length(trace)
-
-  trace$collapsed <- 0L
-
-  while (id > 0L) {
-    n_collapsed <- n_collapsed(trace, id)
-
-    if (n_collapsed) {
-      trace <- set_trace_collapsed(trace, id, n_collapsed)
-      next_id <- id - n_collapsed
-
-      # Rechain child of collapsed parent to correct parent
-      parents[[id + 1L]] <- next_id
-
-      id <- next_id
-    }
-
-    visible[[id]] <- TRUE
-    parent_id <- parents[[id]]
-    id <- dec(id)
-
-    # Collapse intervening call branches
-    n_skipped <- 0L
-    while (id != parent_id) {
-      sibling_parent_id <- parents[[id]]
-
-      if (sibling_parent_id == parent_id) {
-        trace <- set_trace_skipped(trace, id, n_skipped)
-        visible[[id]] <- TRUE
-        n_skipped <- 0L
-      } else {
-        n_skipped <- inc(n_skipped)
-      }
-
-      id <- dec(id)
-    }
-  }
-
-  trace$visible <- visible & old_visible
-  trace$parent <- parents
-
-  trace
-}
-
 
 # Printing ----------------------------------------------------------------
 
-trace_as_tree <- function(trace, dir = getwd(), srcrefs = NULL) {
-  if (is_null(trace$collapsed)) {
-    trace$collapsed <- vec_recycle(0L, trace_length(trace))
-  }
-  call_text_data <- trace[c("call", "collapsed", "namespace", "scope")]
-  call_text <- chr(!!!pmap(call_text_data, trace_call_text))
+trace_as_tree <- function(trace,
+                          dir = getwd(),
+                          srcrefs = NULL,
+                          drop = FALSE) {
+  root_id <- 0
+  root_children <- list(find_children(root_id, trace$parent))
+
+  trace$id <- seq_len(nrow(trace))
+  trace$children <- map(trace$id, find_children, trace$parent)
+
+  # Subset out hidden frames
+  trace <- trace_slice(trace, trace$visible)
+  trace$children <- map(trace$children, intersect, trace$id)
+  root_children[[1]] <- intersect(root_children[[1]], trace$id)
+
+  params <- intersect(
+    c("call", "namespace", "scope", "error_frame", "error_arg"),
+    names(trace)
+  )
+  trace$call_text <- chr(!!!pmap(trace[params], trace_call_text))
 
   srcrefs <- srcrefs %||% peek_option("rlang_trace_format_srcrefs") %||% TRUE
   stopifnot(is_scalar_logical(srcrefs))
@@ -793,39 +747,34 @@ trace_as_tree <- function(trace, dir = getwd(), srcrefs = NULL) {
     trace$src_loc <- vec_recycle("", trace_length(trace))
   }
 
-  id <- c(0, seq_along(trace$call))
-  children <- map(id, function(id) seq_along(trace$parent)[trace$parent == id])
-
   root <- data_frame(
     call = list(NULL),
     parent = 0L,
     visible = TRUE,
     namespace = NA,
     scope = NA,
-    src_loc = ""
+    src_loc = "",
+    id = root_id,
+    children = root_children,
+    call_text = trace_root()
   )
   trace <- vec_rbind(root, trace)
 
-  tree_data <- data_frame(
-    id = as.character(id),
-    children = children,
-    call_text = c(trace_root(), call_text)
-  )
-  tree <- vec_cbind(tree_data, trace)
-
-  # Subset out hidden frames
-  tree <- vec_slice(tree, tree$visible)
-  tree$children <- map(tree$children, intersect, tree$id)
+  if (drop) {
+    trace$node_type <- node_type(lengths(trace$children), trace$children)
+  } else {
+    trace$node_type <- rep_len("main", nrow(trace))
+  }
 
   if (has_crayon()) {
     # Detect runs of namespaces/global
-    ns <- tree$namespace
-    ns <- ifelse(is.na(ns) & tree$scope == "global", "global", ns)
+    ns <- trace$namespace
+    ns <- ifelse(is.na(ns) & trace$scope == "global", "global", ns)
     ns[[1]] <- "_root"
     starts <- detect_run_starts(ns)
 
     # Embolden first occurrences in runs of namespaces/global
-    tree$call_text <- map2_chr(tree$call_text, starts, function(text, start) {
+    trace$call_text <- map2_chr(trace$call_text, starts, function(text, start) {
       if (is_true(start)) {
         text <- sub(
           "^([a-zA-Z]+)(::|:::| )",
@@ -837,32 +786,57 @@ trace_as_tree <- function(trace, dir = getwd(), srcrefs = NULL) {
     })
   }
 
-  tree
+  trace
+}
+
+find_children <- function(id, parent) {
+  seq_along(parent)[parent == id]
+}
+
+node_type <- function(ns, children) {
+  type <- rep_along(ns, "main")
+
+  for (i in seq_along(ns)) {
+    n <- ns[[i]]
+    if (is_string(type[[i]], "main")) {
+      if (n >= 2) {
+        val <- if (i == 1) "main_sibling" else "sibling"
+        idx <- as.numeric(children[[i]][-n]) + 1
+        type[idx] <- val
+      }
+    } else {
+      if (n >= 1) {
+        idx <- as.numeric(children[[i]][-1]) + 1
+        type[idx] <- "sibling"
+      }
+    }
+  }
+
+  type
 }
 
 # FIXME: Add something like call_deparse_line()
-trace_call_text <- function(call, collapsed, namespace, scope) {
-  if (collapsed && length(call) > 1L) {
-    call <- call2(call[[1]], quote(...))
-  }
-
+trace_call_text <- function(call,
+                            namespace,
+                            scope,
+                            error_frame = FALSE,
+                            error_arg = NULL) {
   if (is_call(call) && is_symbol(call[[1]])) {
     if (scope %in% c("::", ":::") && !is_na(namespace)) {
       call[[1]] <- call(scope, sym(namespace), call[[1]])
     }
   }
 
-  text <- as_label(call)
+  if (error_frame) {
+    text <- call_deparse_highlight(call, error_arg)
+  } else {
+    text <- as_label(call)
+  }
 
   if (is_string(scope, "global")) {
     text <- paste0("global ", text)
   } else if (is_string(scope, "local") && !is_na(namespace)) {
-    text <- paste0(namespace, " ", text)
-  }
-
-  if (collapsed) {
-    n_collapsed_text <- sprintf(" ... +%d", collapsed)
-    text <- format_collapsed(paste0("[ ", text, " ]"), collapsed)
+    text <- paste0(namespace, " (local) ", text)
   }
 
   text
@@ -884,13 +858,19 @@ src_loc <- function(srcref) {
   }
 
   if (is_null(peek_option("rlang:::disable_trim_srcref"))) {
-    file <- path_trim_prefix(file, 3)
+    file_trim <- path_trim_prefix(file, 3)
+  } else {
+    file_trim <- file
   }
 
   line <- srcref[[1]]
   column <- srcref[[5]] - 1L
 
-  paste0(file, ":", line, ":", column)
+  style_hyperlink(
+    paste0(file_trim, ":", line, ":", column),
+    paste0("file://", file),
+    params = c(line = line, col = column)
+  )
 }
 
 trace_root <- function() {
@@ -915,9 +895,60 @@ trace_root <- function() {
 trace_pkgs <- function(pkgs, max_level = Inf, ..., regexp = NULL) {
   check_dots_empty()
 
-  # Avoids namespace loading issues
-  lapply(pkgs, requireNamespace, quietly = TRUE)
+  if (length(regexp) == 1) {
+    regexp <- rep_along(pkgs, regexp)
+  }
 
+  fns <- lapply(seq_along(pkgs), function(i) {
+    fns <- as.list(ns_env(pkgs[[i]]))
+    fns <- keep(fns, is_closure)
+    fns <- names(fns)
+
+    if (!is_null(regexp)) {
+      fns <- fns[grepl(regexp[[i]], fns)]
+    }
+
+    fns
+  })
+  names(fns) <- pkgs
+
+  trace_fns(fns)
+}
+
+trace_fns <- function(fns, max_level = Inf) {
+  stopifnot(
+    is_list(fns),
+    every(fns, is_character)
+  )
+
+  c(tracer, exit) %<-% new_tracers(max_level)
+
+  pkgs <- names(fns)
+
+  for (i in seq_along(pkgs)) {
+    nms <- fns[[i]]
+    pkg <- pkgs[[i]]
+    ns <- ns_env(pkg)
+
+    suppressMessages(trace(
+      nms,
+      tracer = tracer,
+      exit = exit,
+      print = FALSE,
+      where = ns
+    ))
+
+    message(sprintf(
+      "Tracing %d functions in %s.",
+      length(nms),
+      pkg
+    ))
+  }
+}
+
+utils::globalVariables(c("tracer", "exit"))
+
+new_tracers <- function(max_level) {
   trace_level <- 0
 
   # Create a thunk because `trace()` sloppily transforms functions into calls
@@ -946,33 +977,7 @@ trace_pkgs <- function(pkgs, max_level = Inf, ..., regexp = NULL) {
     trace_level <<- trace_level - 1
   })
 
-  if (length(regexp) == 1) {
-    regexp <- rep_along(pkgs, regexp)
-  }
-
-  for (i in seq_along(pkgs)) {
-    pkg <- pkgs[[i]]
-    ns <- ns_env(pkg)
-    ns_fns <- names(keep(as.list(ns), is.function))
-
-    if (!is_null(regexp)) {
-      ns_fns <- ns_fns[grepl(regexp[[i]], ns_fns)]
-    }
-
-    suppressMessages(trace(
-      ns_fns,
-      tracer = tracer,
-      exit = exit,
-      print = FALSE,
-      where = ns
-    ))
-
-    message(sprintf(
-      "Tracing %d functions in %s.",
-      length(ns_fns),
-      pkg
-    ))
-  }
+  list(tracer = tracer, exit = exit)
 }
 
 call_add_namespace <- function(call, fn) {
@@ -1063,3 +1068,90 @@ is_trace <- function(x) {
 #' @name rlib_trace_spec
 #' @keywords internal
 NULL
+
+local_error_highlight <- function(frame = caller_env(), code = TRUE) {
+  if (!has_cli_start_app) {
+    return()
+  }
+
+  if (is_true(peek_option("rlang:::trace_test_highlight"))) {
+    if (code) {
+      theme <- theme_error_highlight_test
+    } else {
+      theme <- theme_error_arg_highlight_test
+    }
+  } else {
+    if (code) {
+      theme <- theme_error_highlight
+    } else {
+      theme <- theme_error_arg_highlight
+    }
+  }
+
+  cli::start_app(theme, .envir = frame)
+}
+
+with_error_highlight <- function(expr) {
+  local_error_highlight()
+  expr
+}
+
+# Used for highlighting `.arg` spans in error messages without
+# affecting `.code` spans
+with_error_arg_highlight <- function(expr) {
+  local_options("rlang:::error_highlight" = TRUE)
+  local_error_highlight(code = FALSE)
+  expr
+}
+
+on_load({
+  theme_error_highlight <- local({
+    if (ns_exports_has("cli", "builtin_theme")) {
+      cli_theme <- cli::builtin_theme()
+    } else {
+      cli_theme <- list()
+    }
+
+    arg_theme <- list(
+      "color" = "br_magenta",
+      "font-weight" = "bold"
+    )
+    code_theme <- list(
+      "color" = "br_blue",
+      "font-weight" = "bold"
+    )
+
+    list(
+      "span.arg" = utils::modifyList(
+        cli_theme[["span.arg"]] %||% list(),
+        arg_theme
+      ),
+      "span.code" = utils::modifyList(
+        cli_theme[["span.code"]] %||% list(),
+        code_theme
+      ),
+      "span.arg-unquoted" = arg_theme,
+      "span.code-unquoted" = code_theme
+    )
+  })
+
+  theme_error_arg_highlight <- theme_error_highlight
+  theme_error_arg_highlight[c("span.code", "span.code-unquoted")] <- NULL
+})
+
+theme_error_highlight_test <- list(
+  "span.arg" = list(before = "<<ARG ", after = ">>"),
+  "span.code" = list(before = "<<CALL ", after = ">>"),
+  "span.arg-unquoted" = list(before = "<<ARG ", after = ">>", transform = NULL),
+  "span.code-unquoted" = list(before = "<<CALL ", after = ">>", transform = NULL)
+)
+
+theme_error_arg_highlight_test <- theme_error_highlight_test
+theme_error_arg_highlight_test[c("span.code", "span.code-unquoted")] <- NULL
+
+format_arg_unquoted <- function(x) {
+  .rlang_cli_format_inline(x, "arg-unquoted", "%s")
+}
+format_code_unquoted <- function(x) {
+  .rlang_cli_format_inline(x, "code-unquoted", "%s")
+}

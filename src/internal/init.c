@@ -69,6 +69,7 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_env_binding_types",            (DL_FUNC) &r_env_binding_types, 2},
   {"ffi_env_browse",                   (DL_FUNC) &ffi_env_browse, 2},
   {"ffi_env_clone",                    (DL_FUNC) &r_env_clone, 2},
+  {"ffi_env_coalesce",                 (DL_FUNC) &ffi_env_coalesce, 2},
   {"ffi_env_frame",                    (DL_FUNC) &ffi_env_frame, 1},
   {"ffi_env_get",                      (DL_FUNC) &ffi_env_get, 5},
   {"ffi_env_get_list",                 (DL_FUNC) &ffi_env_get_list, 5},
@@ -89,6 +90,7 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_fini_rlang",                   (DL_FUNC) &ffi_fini_rlang, 0},
   {"ffi_format_error_arg",             (DL_FUNC) &ffi_format_error_arg, 1},
   {"ffi_get_expression",               (DL_FUNC) &ffi_get_expression, 2},
+  {"ffi_getppid",                      (DL_FUNC) &ffi_getppid, 0},
   {"ffi_glue_is_here",                 (DL_FUNC) &ffi_glue_is_here, 0},
   {"ffi_has_local_precious_list",      (DL_FUNC) &ffi_has_local_precious_list, 0},
   {"ffi_hash",                         (DL_FUNC) &ffi_hash, 1},
@@ -212,6 +214,7 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_test_parse_eval",              (DL_FUNC) &ffi_test_parse_eval, 2},
   {"ffi_test_r_on_exit",               (DL_FUNC) &r_on_exit, 2},
   {"ffi_test_r_warn",                  (DL_FUNC) &ffi_test_r_warn, 1},
+  {"ffi_test_stop_internal",           (DL_FUNC) &ffi_test_stop_internal, 1},
   {"ffi_test_sys_call",                (DL_FUNC) &ffi_test_sys_call, 1},
   {"ffi_test_sys_frame",               (DL_FUNC) &ffi_test_sys_frame, 1},
   {"ffi_true_length",                  (DL_FUNC) &ffi_true_length, 1},
@@ -233,7 +236,7 @@ static const R_CallMethodDef r_callables[] = {
 
 
 static const R_ExternalMethodDef externals[] = {
-  {"ffi_arg_match0",                    (DL_FUNC) &ffi_arg_match0, 4},
+  {"ffi_arg_match0",                    (DL_FUNC) &ffi_arg_match0, 3},
   {"ffi_call2",                         (DL_FUNC) &ffi_call2, 2},
   {"ffi_capturearginfo",                (DL_FUNC) &ffi_capturearginfo, 2},
   {"ffi_capturedots",                   (DL_FUNC) &ffi_capturedots, 1},
@@ -259,7 +262,8 @@ extern uint64_t XXH3_64bits(const void*, size_t);
 
 r_visible
 void R_init_rlang(DllInfo* dll) {
-  R_RegisterCCallable("rlang", "rlang_arg_match",           (DL_FUNC) &arg_match);
+  R_RegisterCCallable("rlang", "rlang_arg_match",           (DL_FUNC) &arg_match_legacy);
+  R_RegisterCCallable("rlang", "rlang_arg_match_2",         (DL_FUNC) &cci_arg_match);
   R_RegisterCCallable("rlang", "rlang_as_data_mask_3.0.0",  (DL_FUNC) &ffi_as_data_mask);
   R_RegisterCCallable("rlang", "rlang_as_data_pronoun",     (DL_FUNC) &ffi_as_data_pronoun);
   R_RegisterCCallable("rlang", "rlang_env_unbind",          (DL_FUNC) &r_env_unbind);
@@ -300,6 +304,7 @@ void R_init_rlang(DllInfo* dll) {
 
   // Only for debugging - no stability guaranteed
   R_RegisterCCallable("rlang", "rlang_print_backtrace",     (DL_FUNC) &rlang_print_backtrace);
+  R_RegisterCCallable("rlang", "rlang_env_print",           (DL_FUNC) &rlang_env_print);
 
   R_registerRoutines(dll, NULL, r_callables, NULL, externals);
   R_useDynamicSymbols(dll, FALSE);

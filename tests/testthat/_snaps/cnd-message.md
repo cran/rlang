@@ -101,7 +101,7 @@
     Code
       writeLines(cnd_message_format_prefixed(err2))
     Output
-      Error:
+      Error in `foo$bar()`:
       ! msg
     Code
       writeLines(cnd_message_format_prefixed(err3))
@@ -485,4 +485,57 @@
       Error:
       foo
       bar
+
+# arguments are highlighted but code spans are not
+
+    Code
+      with_error_arg_highlight(print(err))
+    Output
+      <error/rlang_error>
+      Error:
+      ! <<ARG `arg1`>> - `code` - <<ARG `arg2`>>
+
+# chained errors may have empty messages
+
+    Code
+      print(child)
+    Output
+      <error/rlang_error>
+      Error:
+      ! Tilt.
+    Code
+      cat_line(cnd_message(child, prefix = TRUE))
+    Output
+      Error:
+      ! Tilt.
+
+---
+
+    Code
+      print(child)
+    Output
+      <error/rlang_error>
+      Error in `foo()`:
+      Caused by error:
+      ! Tilt.
+    Code
+      cat_line(cnd_message(child, prefix = TRUE))
+    Output
+      Error in `foo()`:
+      Caused by error:
+      ! Tilt.
+
+---
+
+    Code
+      print(child)
+    Output
+      <error/rlang_error>
+      Error:
+      ! Tilt.
+    Code
+      cat_line(cnd_message(child, prefix = TRUE))
+    Output
+      Error:
+      ! Tilt.
 

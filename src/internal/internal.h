@@ -3,6 +3,7 @@
 
 #include "arg.h"
 #include "call.h"
+#include "globals.h"
 #include "quo.h"
 #include "vec.h"
 
@@ -55,7 +56,7 @@ extern struct rlang_globals_syms rlang_syms;
 
 // From cnd.c
 // Protects with the vmax stack
-const char* friendly_type_of(r_obj* x);
+const char* obj_type_friendly(r_obj* x);
 
 
 #endif

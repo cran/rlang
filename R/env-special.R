@@ -203,12 +203,23 @@ ns_exports <- function(ns) getNamespaceExports(ns)
 ns_imports <- function(ns) getNamespaceImports(ns)
 
 ns_exports_has <- function(ns, name) {
-  if (is_reference(ns, base_ns_env)) {
+  if (is_string(ns)) {
+    if (!is_installed(ns)) {
+      return(FALSE)
+    }
+    ns <- ns_env(ns)
+  }
+  if (is_reference(ns, ns_env("base"))) {
     exports <- base_pkg_env
   } else {
     exports <- ns$.__NAMESPACE__.$exports
   }
   !is_null(exports) && exists(name, envir = exports, inherits = FALSE)
+}
+
+ns_import_from <- function(ns, names, env = caller_env()) {
+  objs <- env_get_list(ns_env(ns), names)
+  env_bind(env, !!!objs)
 }
 
 #' Is an object a namespace environment?
@@ -323,8 +334,15 @@ env_label <- function(env) {
   }
 }
 
-# This does not behave like a normal environment because the parent is
-# NULL instead of the empty env
+#' Return the namespace registry env
+#'
+#' Note that the namespace registry does not behave like a normal
+#' environment because the parent is `NULL` instead of the empty
+#' environment. This is exported for expert usage in development tools
+#' only.
+#'
+#' @keywords internal
+#' @export
 ns_registry_env <- function() {
   .Call(ffi_ns_registry_env)
 }

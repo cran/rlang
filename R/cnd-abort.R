@@ -26,16 +26,20 @@
 #' @inheritParams cnd
 #' @param message The message to display, formatted as a __bulleted
 #'   list__. The first element is displayed as an _alert_ bullet
-#'   prefixed with `!` by default. Elements named `"*"`, `"i"`, and
-#'   `"x"` are formatted as regular, info, and cross bullets
-#'   respectively. See `r link("topic_condition_formatting")` for more
-#'   about bulleted messaging.
+#'   prefixed with `!` by default. Elements named `"*"`, `"i"`, `"v"`,
+#'   `"x"`, and `"!"` are formatted as regular, info, success,
+#'   failure, and error bullets respectively. See `r link("topic_condition_formatting")`
+#'   for more about bulleted messaging.
 #'
 #'   If a message is not supplied, it is expected that the message is
 #'   generated __lazily__ through [cnd_header()] and [cnd_body()]
 #'   methods. In that case, `class` must be supplied. Only `inform()`
 #'   allows empty messages as it is occasionally useful to build user
 #'   output incrementally.
+#'
+#'   If a function, it is stored in the `header` field of the error
+#'   condition. This acts as a [cnd_header()] method that is invoked
+#'   lazily when the error message is displayed.
 #' @param class Subclass of the condition.
 #' @param ... Additional data to be stored in the condition object.
 #'   If you supply condition fields, you should usually provide a
@@ -91,12 +95,15 @@
 #' @param .file A connection or a string specifying where to print the
 #'   message. The default depends on the context, see the `stdout` vs
 #'   `stderr` section.
-#' @param .frame The throwing context. Defaults to `call` if it is an
-#'   environment, [caller_env()] otherwise. This is used in the
-#'   display of simplified backtraces as the last relevant call frame
-#'   to show. This way, the irrelevant parts of backtraces
-#'   corresponding to condition handling ([tryCatch()], [try_fetch()],
-#'   `abort()`, etc.) are hidden by default.
+#' @param .frame The throwing context. Used as default for
+#'   `.trace_bottom`, and to determine the internal package to mention
+#'   in internal errors when `.internal` is `TRUE`.
+#' @param .trace_bottom Used in the display of simplified backtraces
+#'   as the last relevant call frame to show. This way, the irrelevant
+#'   parts of backtraces corresponding to condition handling
+#'   ([tryCatch()], [try_fetch()], `abort()`, etc.) are hidden by
+#'   default. Defaults to `call` if it is an environment, or `.frame`
+#'   otherwise. Without effect if `trace` is supplied.
 #' @param .subclass `r lifecycle::badge("deprecated")` This argument
 #'   was renamed to `class` in rlang 0.4.2 for consistency with our
 #'   conventions for class constructors documented in
@@ -247,10 +254,12 @@ abort <- function(message = NULL,
                   use_cli_format = NULL,
                   .internal = FALSE,
                   .file = NULL,
-                  .frame = NULL,
+                  .frame = caller_env(),
+                  .trace_bottom = NULL,
                   .subclass = deprecated()) {
+  check_environment(.frame)
+
   .__signal_frame__. <- TRUE
-  caller <- caller_env()
 
   rethrowing <- !is_null(parent)
   if (is_na(parent)) {
@@ -267,22 +276,22 @@ abort <- function(message = NULL,
   }
 
   # `.frame` is used to soft-truncate the backtrace
-  if (is_null(.frame)) {
+  if (is_null(.trace_bottom)) {
     if (rethrowing) {
-      .frame <- caller
+      .trace_bottom <- .frame
     } else {
       # Truncate backtrace up to `call` if it is a frame
       if (is_environment(maybe_missing(call))) {
-        .frame <- call
+        .trace_bottom <- call
       } else {
-        .frame <- caller
+        .trace_bottom <- .frame
       }
     }
   } else {
-    check_environment(.frame)
+    check_environment(.trace_bottom)
   }
 
-  info <- abort_context(.frame, rethrowing, maybe_missing(call))
+  info <- abort_context(.trace_bottom, rethrowing, maybe_missing(call))
 
   if (is_missing(call)) {
     if (is_null(info$from_handler)) {
@@ -294,14 +303,18 @@ abort <- function(message = NULL,
     call <- info$setup_caller
   }
 
+  if (is_formula(message, scoped = TRUE, lhs = FALSE)) {
+    message <- as_function(message)
+  }
+
   message <- validate_signal_args(message, class, call, .subclass, "abort")
-  call <- error_call(call)
+  error_call <- error_call(call)
 
   message_info <- cnd_message_info(
     message,
     body,
     footer,
-    caller,
+    .frame,
     use_cli_format = use_cli_format,
     internal = .internal
   )
@@ -309,16 +322,25 @@ abort <- function(message = NULL,
   extra_fields <- message_info$extra_fields
   use_cli_format <- message_info$use_cli_format
 
-  if (rethrowing) {
-    trace <- trace %||% parent[["trace"]]
-  }
-  if (is_null(trace) && is_null(peek_option("rlang:::disable_trace_capture"))) {
-    with_options(
-      # Prevents infloops when rlang throws during trace capture
-      "rlang:::disable_trace_capture" = TRUE,
-      "rlang:::visible_bottom" = info$bottom_frame,
-      { trace <- trace_back() }
-    )
+  parent_trace <- if (rethrowing) parent[["trace"]]
+
+  if (!is_null(parent_trace) && is_environment(call)) {
+    calls <- sys.calls()
+    frames <- sys.frames()
+
+    loc_frame <- detect_index(frames, identical, call, .right = TRUE)
+    if (loc_frame && loc_frame <= nrow(parent_trace)) {
+      parent_call <- parent_trace[["call"]][[loc_frame]]
+      this_call <- frame_call(call)
+
+      if (identical(parent_call, this_call)) {
+        if (is_null(parent_trace[["error_frame"]])) {
+          parent_trace[["error_frame"]] <- FALSE
+        }
+        parent_trace[["error_frame"]][[loc_frame]] <- TRUE
+        parent$trace <- parent_trace
+      }
+    }
   }
 
   cnd <- error_cnd(
@@ -327,10 +349,22 @@ abort <- function(message = NULL,
     message = message,
     !!!extra_fields,
     use_cli_format = use_cli_format,
-    call = call,
-    parent = parent,
-    trace = trace
+    call = error_call,
+    parent = parent
   )
+
+  if (is_null(trace) && is_null(parent_trace) && is_null(peek_option("rlang:::disable_trace_capture"))) {
+    with_options(
+      # Prevents infloops when rlang throws during trace capture
+      "rlang:::disable_trace_capture" = TRUE,
+      "rlang:::visible_bottom" = info$bottom_frame,
+      "rlang:::error_frame" = if (is_environment(call)) call else NULL,
+      "rlang:::error_arg" = cnd[["arg"]],
+      { trace <- trace_back() }
+    )
+  }
+  cnd$trace <- trace
+
   signal_abort(cnd, .file)
 }
 
@@ -417,7 +451,7 @@ abort_context <- function(frame,
     bottom_frame <- NULL
   }
 
-  if (is_null(setup_caller) && setup_loc) {
+  if (is_null(setup_caller) && setup_loc && parents[[setup_loc]]) {
     setup_caller <- frames[[parents[[setup_loc]]]]
   }
 
@@ -553,6 +587,13 @@ cnd_message_info <- function(message,
     check_exclusive(footer, .internal, .require = FALSE, .frame = error_call)
   }
 
+  if (is_function(message)) {
+    header <- message
+    message <- ""
+  } else {
+    header <- NULL
+  }
+
   if (length(message) > 1 && !is_character(body) && !is_null(body)) {
     stop_multiple_body(body, call = error_call)
   }
@@ -580,6 +621,9 @@ cnd_message_info <- function(message,
     } else {
       fields$body <- body
     }
+    if (!is_null(header)) {
+      fields$header <- header
+    }
     if (!is_null(footer)) {
       fields$footer <- footer
     }
@@ -605,6 +649,10 @@ cnd_message_info <- function(message,
       message <- c(message, footer_internal(env))
     }
     message <- .rlang_cli_format_fallback(message)
+
+    if (is_function(header)) {
+      fields$header <- header
+    }
   }
 
   list(
@@ -645,7 +693,7 @@ stop_multiple_body <- function(body, call) {
     "i" = sprintf(
       "%s is currently %s.",
       format_arg("body"),
-      friendly_type_of(body)
+      obj_type_friendly(body)
     )
   )
   abort(msg, call = call)
@@ -976,10 +1024,17 @@ local_error_call <- function(call, frame = caller_env()) {
 #'   field named `call`. An easy way to do this is by passing a `call`
 #'   argument to [abort()]. See also [local_error_call()].
 #'
-#' @param arg,error_arg An argument name as a string. This argument
+#' @param arg An argument name as a string. This argument
 #'   will be mentioned in error messages as the input that is at the
 #'   origin of a problem.
-#' @param call,error_call The execution environment of a currently
+#' @param error_arg An argument name as a string. This argument
+#'   will be mentioned in error messages as the input that is at the
+#'   origin of a problem.
+#' @param call The execution environment of a currently
+#'   running function, e.g. `caller_env()`. The function will be
+#'   mentioned in error messages as the source of the error. See the
+#'   `call` argument of [rlang::abort()] for more information.
+#' @param error_call The execution environment of a currently
 #'   running function, e.g. `caller_env()`. The function will be
 #'   mentioned in error messages as the source of the error. See the
 #'   `call` argument of [rlang::abort()] for more information.
@@ -1008,7 +1063,7 @@ NULL
 #'
 #' @examples
 #' arg_checker <- function(x, arg = caller_arg(x), call = caller_env()) {
-#'   cli::cli_abort("{.arg arg} must be a thingy.", call = call)
+#'   cli::cli_abort("{.arg {arg}} must be a thingy.", arg = arg, call = call)
 #' }
 #'
 #' my_function <- function(my_arg) {
@@ -1080,10 +1135,10 @@ format_error_call <- function(call) {
   }
 
   if (grepl("\n", label)) {
-    cli_with_whiteline_escapes(label, format_code)
-  } else {
-    format_code(label)
+    return(cli_with_whiteline_escapes(label, format_code))
   }
+
+  format_code(label)
 }
 
 error_call_as_string <- function(call) {
@@ -1118,7 +1173,11 @@ error_call_as_string <- function(call) {
   }
 
   if (!is_call_simple(call)) {
-    return(NULL)
+    if (is_expression(call) && is_call_index(call)) {
+      return(as_label(call[1]))
+    } else {
+      return(NULL)
+    }
   }
 
   # Remove namespace for now to simplify conversion
@@ -1228,7 +1287,6 @@ call_restore <- function(x, to) {
 #' * `"reminder"`, the default in interactive sessions, displays a reminder that
 #'   you can see the backtrace with [rlang::last_error()].
 #' * `"branch"` displays a simplified backtrace.
-#' * `"collapse"` displays a collapsed backtrace tree.
 #' * `"full"`, the default in non-interactive sessions, displays the full tree.
 #'
 #' rlang errors are normally thrown with [abort()]. If you promote
@@ -1288,7 +1346,7 @@ call_restore <- function(x, to) {
 #' # stop("foo")
 NULL
 
-backtrace_on_error_opts <- c("none", "reminder", "branch", "collapse", "full")
+backtrace_on_error_opts <- c("none", "reminder", "branch", "full")
 
 # Whenever the backtrace-on-error format is changed, the version in
 # `inst/backtrace-ver` and in `tests/testthat/helper-rlang.R` must be
@@ -1319,7 +1377,12 @@ format_onerror_backtrace <- function(cnd, opt = peek_backtrace_on_error()) {
   # reminder when there is no trace to display
   if (opt == "reminder") {
     if (is_interactive()) {
-      reminder <- silver("Run `rlang::last_error()` to see where the error occurred.")
+      if (use_tree_display()) {
+        last_error <- style_rlang_run("last_trace()")
+      } else {
+        last_error <- style_rlang_run("last_error()")
+      }
+      reminder <- silver(paste0("Run `", last_error, "` to see where the error occurred."))
     } else {
       reminder <- NULL
     }
@@ -1369,13 +1432,21 @@ peek_backtrace_on_error_report <- function() {
 peek_backtrace_on_error_opt <- function(name) {
   opt <- peek_option(name)
 
-  if (!is_null(opt) && !is_string(opt, backtrace_on_error_opts)) {
-    options(list2("{name}" := NULL))
-    warn(c(
-      sprintf("Invalid %s option.", format_arg(name)),
-      i = "The option was just reset to `NULL`."
-    ))
-    return(NULL)
+  if (!is_null(opt)) {
+    if (is_string(opt, "collapse")) {
+      options(list2("{name}" := "none"))
+      deprecate_collapse()
+      return("none")
+    }
+
+    if (!is_string(opt, backtrace_on_error_opts)) {
+      options(list2("{name}" := NULL))
+      warn(c(
+        sprintf("Invalid %s option.", format_arg(name)),
+        i = "The option was just reset to `NULL`."
+      ))
+      return(NULL)
+    }
   }
 
   opt
