@@ -74,11 +74,17 @@ detect_installed <- function(info) {
   }
 
   flatten_lgl(pmap(info, function(pkg, cmp, ver) {
-    # Check for sealed namespaces to protect against `is_installed()`
-    # being called from user hooks of `pkg` (#1378)
-    is_fully_loaded <-
-      requireNamespace(pkg, quietly = TRUE) &&
-      env_is_locked(ns_env(pkg))
+    if (is_string(pkg, "base")) {
+      # Special-case the base package because it is not locked on
+      # older R versions
+      is_fully_loaded <- TRUE
+    } else {
+      # Check for sealed namespaces to protect against `is_installed()`
+      # being called from user hooks of `pkg` (#1378)
+      is_fully_loaded <-
+        requireNamespace(pkg, quietly = TRUE) &&
+        env_is_locked(ns_env(pkg))
+    }
 
     if (is_fully_loaded) {
       is_na(ver) || exec(cmp, utils::packageVersion(pkg), ver)
@@ -99,17 +105,6 @@ pkg_version_info <- function(pkg,
 
   info <- data_frame(pkg = pkg, cmp = na_chr, ver = na_chr)
   info <- vec_assign(info, matches, pkg_info)
-
-  is_invalid <- grepl("[^A-Za-z0-9.]", info$pkg)
-  if (any(is_invalid)) {
-    elts <- encodeString(info$pkg[is_invalid], quote = '"')
-    msg <- c(
-      "Must supply valid package names.",
-      "x" = "Problematic names:",
-      set_names(elts, "*")
-    )
-    abort(msg, call = call)
-  }
 
   if (!is_null(version)) {
     has_version <- !detect_na(version)

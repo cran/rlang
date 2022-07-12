@@ -1,8 +1,8 @@
-c5f9ef0b77342a4f338e1ad75f9ce73d *DESCRIPTION
+980d2af1a1500b7f78604cd7cb418de3 *DESCRIPTION
 e6f43178fbfc71c5d0c6586954b66df1 *LICENSE
 571f9fded5d43695ad11e04790c0af64 *LICENSE.note
 bec89c7f4cb9e844d112c7a422d67f0e *NAMESPACE
-c929918a5335b02343739a025e38e9b4 *NEWS.md
+47121cae3ce69ab28338051f2e594544 *NEWS.md
 735441b7f469df891cd9debe004dd218 *R/aaa-topics.R
 9c49f97fb467665306aedfde4d326e28 *R/aaa.R
 b660c961753b2d118fceaa007e3e4c9d *R/arg.R
@@ -57,7 +57,7 @@ dbec277c519d99eb74026771d03ffaa7 *R/obj.R
 8a5fc056502149af6e6d3a2fdc36080d *R/raw.R
 5110647d7eb7c53b4613bda3a5106a37 *R/rlang.R
 c41f2e460a75695f99370d8aead2dd8b *R/s3.R
-7f71e26787b35e2b764566e845f80dae *R/session.R
+6bc35bbbfb4117c21d375c00eac00256 *R/session.R
 00a32154998f6686e4f5268a8d661e85 *R/stack.R
 eaeec3c3f9abd9cdcb96188f3a8810a0 *R/state.R
 cefd68df4edd60820de55e2804486a26 *R/sym.R
@@ -461,7 +461,7 @@ ab8b09a3d36dc1775148e9a512895711 *src/rlang/vendor.c
 139544f5576475c395dc8601655c7948 *src/rlang/vendor.h
 4b8fd26a08a137a90c8d1323faa286ec *src/rlang/walk.c
 05a1bc12017a29dd10726ce3a2320dcb *src/rlang/walk.h
-e402003e246ff3f3b6b83101776bed0f *src/version.c
+838097c05aaeecc87057ff96e189fd95 *src/version.c
 b535466226f2ed8212a97ea8790639c4 *tests/sink.R
 689f0fa1b25df0719206586844edb2d0 *tests/testthat.R
 683b34662bdd231b0869d25497b93376 *tests/testthat/_snaps/arg.md
@@ -491,7 +491,7 @@ a03a46d329a39091b09146875117ba48 *tests/testthat/_snaps/fn.md
 30e39e163d67da011eab19ae8e8a62e6 *tests/testthat/_snaps/operators.md
 d9977898c017591a75b1e000134935fd *tests/testthat/_snaps/parse.md
 64e91ff371bc1bc29445a73248272642 *tests/testthat/_snaps/pre-3.6.0/cnd-abort.md
-59137d7cff3d2c8dd221a76da58b8176 *tests/testthat/_snaps/session.md
+d845a2428b0d280bc1992ceb5cf4e897 *tests/testthat/_snaps/session.md
 37a08870995b87f2e7bdc31f71380ecb *tests/testthat/_snaps/state.md
 0f2bcb63150664cd2ee10f897de52cdc *tests/testthat/_snaps/sym.md
 85ebb1891df3648d8be2484eb38794ea *tests/testthat/_snaps/trace.md
@@ -572,7 +572,7 @@ b6b164362e05305015b0062f0049fa84 *tests/testthat/test-obj.R
 e99f5f5ea6504e9047b3bfe94c3e37da *tests/testthat/test-quo.R
 9b5fcad3895f42f389b18c755e9d4dd1 *tests/testthat/test-raw.R
 cd79a31ecfc1258251c3949b62a4578f *tests/testthat/test-s3.R
-fa159859bd7d23906a50b2316bb72c7e *tests/testthat/test-session.R
+e25609f1f1993089704de27077ecc847 *tests/testthat/test-session.R
 507cdddc0c4b741a528c2b5930971ca2 *tests/testthat/test-stack.R
 338286a6cca19f833d8c7b7d2b8dbcb2 *tests/testthat/test-state.R
 a1f2e44398700558882d15c4503588a8 *tests/testthat/test-sym.R

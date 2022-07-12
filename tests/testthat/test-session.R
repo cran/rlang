@@ -171,7 +171,6 @@ test_that("pkg_version_info() parses info", {
   ))
 
   expect_snapshot({
-    (expect_error(pkg_version_info("foo 1.0"), "valid"))
     (expect_error(pkg_version_info("foo (1.0)"), "parse"))
     (expect_error(pkg_version_info("foo (>= 1.0)", "1.0"), "both"))
     (expect_error(pkg_version_info(c("foo (!= 1.0)"))))
@@ -215,4 +214,28 @@ test_that("`check_installed()` works within `tryCatch(error = )` (#1402, tidyver
       check_installed("rlangFoo")
     ))
   })
+})
+
+test_that("is_installed('base') works (#1434)", {
+  r_ver <- as.character(getRversion())
+
+  expect_true(is_installed("base"))
+  expect_true(is_installed("base", version = "0.0.1"))
+  expect_true(is_installed("base", version = r_ver))
+  expect_false(is_installed("base", version = "999.9.9"))
+
+  skip_if_not(is_string(Sys.getenv("R_DEFAULT_PACKAGES"), ""))
+
+  for (pkg in peek_option("defaultPackages")) {
+    expect_true(is_installed(pkg))
+    expect_true(is_installed(pkg, version = "0.0.1"))
+    expect_true(is_installed(pkg, version = r_ver))
+    expect_false(is_installed(pkg, version = "999.9.9"))
+  }
+})
+
+test_that("is_installed() allows irregular package names", {
+  # Consistently with `loadNamespace()`
+  expect_false(is_installed("foo 1.0"))
+  expect_false(is_installed("::", version = "1.0"))
 })
