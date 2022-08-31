@@ -30,9 +30,9 @@ test_that("line_push() handles the nchar(line) == boundary case", {
 })
 
 test_that("line_push() strips ANSI codes before computing overflow", {
-  local_options(crayon.enabled = TRUE)
-  if (!has_crayon()) {
-    skip("test needs crayon")
+  local_options(cli.num_colors = 8L)
+  if (!has_ansi()) {
+    skip("test needs cli")
   }
   expect_identical(length(line_push("foo", open_blue(), width = 3L)), 2L)
   expect_identical(length(line_push("foo", open_blue(), width = 3L, has_colour = TRUE)), 1L)
@@ -690,5 +690,36 @@ test_that("binary op without arguments", {
   expect_equal(
     expr_deparse(quote(`~`())),
     "`~`()"
+  )
+})
+
+test_that("call_deparse_highlight() handles long lists of arguments (#1456)", {
+  out <- call_deparse_highlight(quote(
+    foo(
+      aaaaaa = aaaaaa,
+      bbbbbb = bbbbbb,
+      cccccc = cccccc,
+      dddddd = dddddd,
+      eeeeee = eeeeee
+    )
+  ), NULL)
+
+  expect_equal(
+    cli::ansi_strip(out),
+    "foo(aaaaaa = aaaaaa, bbbbbb = bbbbbb, cccccc = cccccc, dddddd = dddddd, eeeeee = eeeeee)"
+  )
+})
+
+test_that("call_deparse_highlight() handles multi-line arguments (#1456)", {
+  out <- call_deparse_highlight(quote(
+    fn(arg = {
+      a
+      b
+    })
+  ), NULL)
+
+  expect_equal(
+    cli::ansi_strip(out),
+    "fn(arg = {\n  a\n  b\n})"
   )
 })

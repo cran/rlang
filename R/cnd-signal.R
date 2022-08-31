@@ -327,12 +327,7 @@ needs_signal <- function(frequency,
       format_arg(".frequency")
     ))
   }
-  if (!is_string(id)) {
-    abort(sprintf(
-      "%s must be a string.",
-      format_arg(".frequency")
-    ))
-  }
+  check_string(id, arg = ".frequency")
 
   sentinel <- env[[id]]
   if (is_null(sentinel)) {
@@ -392,9 +387,9 @@ message_freq <- function(message, frequency, type) {
   }
 
   if (is_string(frequency, "regularly")) {
-    info <- silver("This %s is displayed once every 8 hours.")
+    info <- col_silver("This %s is displayed once every 8 hours.")
   } else {
-    info <- silver("This %s is displayed once per session.")
+    info <- col_silver("This %s is displayed once per session.")
   }
   sprintf(info, type)
 }

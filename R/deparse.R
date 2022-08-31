@@ -973,10 +973,6 @@ nchar_infix <- function(x) {
 #' - Use [as_label()] when you need to transform any kind of object to
 #'   a string to _represent_ that object with a short description.
 #'
-#' Expect `as_name()` to gain
-#' [name-repairing](https://principles.tidyverse.org/names-attribute.html#minimal-unique-universal)
-#' features in the future.
-#'
 #' @param x A string or symbol, possibly wrapped in a [quosure][quosure].
 #'   If a string, the attributes are removed, if any.
 #' @return A character vector of length 1.
@@ -1034,7 +1030,7 @@ call_deparse_highlight <- function(call, arg) {
     args_list <- sprintf("%s = %s", arg, as_label(call[[arg]]))
     args_list <- format_arg_unquoted(args_list)
   } else {
-    args_list <- args_deparse(node_cdr(call))
+    args_list <- paste_line(args_deparse(node_cdr(call)))
     args_list <- substring(args_list, 2, nchar(args_list) - 1)
   }
 

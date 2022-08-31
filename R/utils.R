@@ -37,36 +37,20 @@ paste_line <- function(..., .trailing = FALSE) {
   }
 }
 
-has_crayon <- function() {
-  is_installed("crayon") && crayon::has_color()
-}
+open_red     <- function() if (has_ansi()) open_style("red")
+open_blue    <- function() if (has_ansi()) open_style("blue")
+open_green   <- function() if (has_ansi()) open_style("green")
+open_yellow  <- function() if (has_ansi()) open_style("yellow")
+open_magenta <- function() if (has_ansi()) open_style("magenta")
+open_cyan    <- function() if (has_ansi()) open_style("cyan")
+open_bold    <- function() if (has_ansi()) open_style("bold")
+close_colour <- function() if (has_ansi()) "\u001b[39m"
+close_italic <- function() if (has_ansi()) "\u001b[23m"
+close_bold   <- function() if (has_ansi()) close_style("bold")
 
-red       <- function(x) if (has_crayon()) crayon::red(x)       else x
-blue      <- function(x) if (has_crayon()) crayon::blue(x)      else x
-green     <- function(x) if (has_crayon()) crayon::green(x)     else x
-yellow    <- function(x) if (has_crayon()) crayon::yellow(x)    else x
-magenta   <- function(x) if (has_crayon()) crayon::magenta(x)   else x
-cyan      <- function(x) if (has_crayon()) crayon::cyan(x)      else x
-blurred   <- function(x) if (has_crayon()) crayon::blurred(x)   else x
-silver    <- function(x) if (has_crayon()) crayon::silver(x)    else x
-bold      <- function(x) if (has_crayon()) crayon::bold(x)      else x
-italic    <- function(x) if (has_crayon()) crayon::italic(x)    else x
-underline <- function(x) if (has_crayon()) crayon::underline(x) else x
-
-open_red     <- function() if (has_crayon()) open_style("red")
-open_blue    <- function() if (has_crayon()) open_style("blue")
-open_green   <- function() if (has_crayon()) open_style("green")
-open_yellow  <- function() if (has_crayon()) open_style("yellow")
-open_magenta <- function() if (has_crayon()) open_style("magenta")
-open_cyan    <- function() if (has_crayon()) open_style("cyan")
-open_bold    <- function() if (has_crayon()) open_style("bold")
-close_colour <- function() if (has_crayon()) "\u001b[39m"
-close_italic <- function() if (has_crayon()) "\u001b[23m"
-close_bold   <- function() if (has_crayon()) close_style("bold")
-
-open_yellow_italic   <- function() if (has_crayon()) "\u001b[33m\u001b[3m"
-open_blurred_italic  <- function() if (has_crayon()) "\u001b[2m\u001b[3m"
-close_blurred_italic <- function() if (has_crayon()) "\u001b[23m\u001b[22m"
+open_yellow_italic   <- function() if (has_ansi()) "\u001b[33m\u001b[3m"
+open_blurred_italic  <- function() if (has_ansi()) "\u001b[2m\u001b[3m"
+close_blurred_italic <- function() if (has_ansi()) "\u001b[23m\u001b[22m"
 
 
 open_style <- function(style) {
@@ -150,9 +134,6 @@ pluralise <- function(n, singular, plural) {
     plural
   }
 }
-pluralise_n <- function(n, singular, plural) {
-  pluralise(n, singular, plural)
-}
 
 pad_spaces <- function(x, left = TRUE) {
   widths <- nchar(x)
@@ -172,38 +153,11 @@ on_load({
   has_cli_start_app <- is_installed("cli", version = "2.0.0")
 })
 
-info <- function() {
-  i <- if (has_cli) cli::symbol$info else "i"
-  blue(i)
-}
-cross <- function() {
-  x <- if (has_cli) cli::symbol$cross else "x"
-  red(x)
-}
-tick <- function() {
-  x <- if (has_cli) cli::symbol$tick else "v"
-  green(x)
-}
-bullet <- function() {
-  x <- if (has_cli) cli::symbol$bullet else "*"
-
-  # Use small bullet if cli is too old.
-  # See https://github.com/r-lib/cli/issues/241
-  if (!has_cli_format && !is_string(x, "*")) {
-    x <- "\u2022"
-  }
-
-  cyan(x)
-}
-arrow_right <- function() {
-  if (has_cli) cli::symbol$arrow_right else ">"
-}
-
 style_dim_soft <- function(x) {
   if (cli::num_ansi_colors() >= 256) {
     crayon::make_style(grDevices::grey(0.6), colors =  256)(x)
   } else {
-    silver(x)
+    col_silver(x)
   }
 }
 
@@ -217,6 +171,11 @@ strip_trailing_newline <- function(x) {
 }
 
 unstructure <- function(x) {
+  attributes(x) <- NULL
+  x
+}
+
+vec_unstructure <- function(x) {
   out <- x
   attributes(out) <- NULL
 

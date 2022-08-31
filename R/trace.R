@@ -287,6 +287,9 @@ normalise_parents <- function(parents) {
 winch_available_env <- new.env(parent = emptyenv())
 
 add_winch_trace <- function(trace) {
+  # FIXME: Until r-prof/winch#56 is fixed
+  return(trace)
+
   avail <- winch_available_env$installed
   if (is_null(avail)) {
     avail <- rlang::is_installed("winch")
@@ -508,7 +511,7 @@ cli_branch <- function(tree,
   indices <- paste0(" ", indices, ". ")
   padding <- spaces(nchar(indices[[1]]))
 
-  lines <- paste0(silver(indices), lines)
+  lines <- paste0(col_silver(indices), lines)
 
   src_locs <- tree$src_loc
   src_locs <- map_if(src_locs, nzchar, ~ paste0(padding, "  at ", .x))
@@ -766,7 +769,7 @@ trace_as_tree <- function(trace,
     trace$node_type <- rep_len("main", nrow(trace))
   }
 
-  if (has_crayon()) {
+  if (has_ansi()) {
     # Detect runs of namespaces/global
     ns <- trace$namespace
     ns <- ifelse(is.na(ns) & trace$scope == "global", "global", ns)
@@ -868,7 +871,7 @@ src_loc <- function(srcref) {
 
   style_hyperlink(
     paste0(file_trim, ":", line, ":", column),
-    paste0("file://", file),
+    paste0("file://", normalizePath(file, mustWork = FALSE)),
     params = c(line = line, col = column)
   )
 }
