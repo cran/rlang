@@ -7,6 +7,14 @@
 #
 # Changelog:
 #
+# 2022-09-23:
+#
+# * `format_` functions now use `cli::format_inline()` instead of
+#   `cli::format_message()`, resulting in simpler ANSI codes.
+#
+# * Added `format_run()` and `format_href()`.
+#
+#
 # 2022-08-16:
 #
 # * Added `has_ansi()`. This checks that cli is installed and that
@@ -221,6 +229,8 @@ format_url    <- function(x) .rlang_cli_format_inline(x, "url", "<%s>")
 format_var    <- function(x) .rlang_cli_format_inline(x, "var", "`%s`")
 format_envvar <- function(x) .rlang_cli_format_inline(x, "envvar", "`%s`")
 format_field  <- function(x) .rlang_cli_format_inline(x, "field", NULL)
+format_href   <- function(x, target = NULL) .rlang_cli_format_inline_link(x, target, "href", "<%s>")
+format_run    <- function(x, target = NULL) .rlang_cli_format_inline_link(x, target, "run", "`%s`")
 
 format_error_arg_highlight <- function(x, quote = TRUE) {
   if (is_true(peek_option("rlang:::trace_test_highlight"))) {
@@ -255,7 +265,19 @@ format_cls <- function(x) {
 }
 .rlang_cli_format_inline <- function(x, span, fallback = "`%s`") {
   if (.rlang_cli_has_cli()) {
-    cli::format_message(paste0("{.", span, " {x}}"))
+    cli::format_inline(paste0("{.", span, " {x}}"))
+  } else {
+    .rlang_cli_style_inline(x, span, fallback = fallback)
+  }
+}
+
+.rlang_cli_format_inline_link <- function(x, target, span, fallback = "`%s`") {
+  if (.rlang_cli_has_cli()) {
+    if (is_null(target)) {
+      cli::format_inline(paste0("{.", span, " {x}}"))
+    } else {
+      cli::format_inline(paste0("{.", span, " [{x}]({target})}"))
+    }
   } else {
     .rlang_cli_style_inline(x, span, fallback = fallback)
   }
@@ -415,23 +437,22 @@ cli_escape <- function(x) {
     is_installed = return(function(pkg) requireNamespace(pkg, quietly = TRUE))
   )
 
-  if (try_rlang && requireNamespace("rlang", quietly = TRUE)) {
-    # Don't use `::` because this is also called from rlang's onLoad
-    # hook and exports are not initialised at this point
-    ns <- asNamespace("rlang")
-
+  # Only use rlang if it is fully loaded (#1482)
+  if (try_rlang &&
+        requireNamespace("rlang", quietly = TRUE) &&
+        environmentIsLocked(asNamespace("rlang"))) {
     switch(
       fn,
-      is_interactive = return(get("is_interactive", envir = ns))
+      is_interactive = return(rlang::is_interactive)
     )
 
     # Make sure rlang knows about "x" and "i" bullets
     if (utils::packageVersion("rlang") >= "0.4.2") {
       switch(
         fn,
-        abort = return(get("abort", envir = ns)),
-        warn = return(get("warn", envir = ns)),
-        inform = return(get("inform", envir = ns))
+        abort = return(rlang::abort),
+        warn = return((rlang::warn)),
+        inform = return(rlang::inform)
       )
     }
   }

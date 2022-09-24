@@ -665,17 +665,28 @@ utils::globalVariables(".internal")
 
 footer_internal <- function(env) {
   top <- topenv(env)
-  if (is_namespace(top)) {
-    pkg <- sprintf(" in the %s package", ns_env_name(top))
-  } else {
-    pkg <- ""
-  }
-  footer <- sprintf(
-    "This is an internal error%s, please report it to the package authors.",
-    pkg
-  )
+  url_line <- NULL
 
-  c(i = footer)
+  if (is_namespace(top)) {
+    pkg <- ns_env_name(top)
+    pkg_line <- sprintf(
+      "This is an internal error that was detected in the %s package.",
+      format_pkg(pkg)
+    )
+
+    url <- pkg_url_bug(pkg)
+    if (!is_null(url)) {
+      url_line <- sprintf(
+        "Please report it at %s with a %s and the full backtrace.",
+        format_url(url),
+        format_href("reprex", "https://https://tidyverse.org/help/")
+      )
+    }
+  } else {
+    pkg_line <- "This is an internal error, please report it to the package authors."
+  }
+
+  c("i" = pkg_line, " " = url_line)
 }
 
 stop_multiple_body <- function(body, call) {
@@ -1084,13 +1095,18 @@ caller_arg <- function(arg) {
 #'
 #' @description
 #'
-#' `format_error_call()` simplifies its input to a simple call (see
-#' section below) and formats the result as code (using cli if
-#' available). Use this function to generate the "in" part
-#' of an error message from a stack frame call.
+#' - `error_call()` takes either a frame environment or a call. If the
+#'   input is an environment, `error_call()` acts like [frame_call()]
+#'   with some additional logic, e.g. for S3 methods and for frames
+#'   with a [local_error_call()].
 #'
-#' If passed an environment, the corresponding `sys.call()` is taken
-#' as call, unless there is a local flag (see [local_error_call()]).
+#' - `format_error_call()` simplifies its input to a simple call (see
+#'   section below) and formats the result as code (using cli if
+#'   available). Use this function to generate the "in" part of an
+#'   error message from a stack frame call.
+#'
+#'   `format_error_call()` first passes its input to `error_call()` to
+#'   fetch calls from frame environments.
 #'
 #' @section Details of formatting:
 #'
@@ -1216,6 +1232,8 @@ error_call_deparse <- function(call) {
   out
 }
 
+#' @rdname format_error_call
+#' @export
 error_call <- function(call) {
   while (is_environment(call)) {
     flag <- env_get(call, ".__error_call__.", default = TRUE)

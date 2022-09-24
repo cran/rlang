@@ -416,6 +416,15 @@ test_that("r_lgl_which() handles empty vectors", {
   expect_identical(r_lgl_which(lgl(), FALSE), int())
 })
 
+test_that("r_lgl_which() propagates names", {
+  x <- c(a = TRUE, b = FALSE, c = NA)
+  expect_named(r_lgl_which(x, na_propagate = TRUE), c("a", "c"))
+  expect_named(r_lgl_which(x, na_propagate = FALSE), "a")
+
+  # Unnamed if input is unnamed
+  expect_named(r_lgl_which(TRUE, na_propagate = TRUE), NULL)
+})
+
 test_that("r_lgl_which() handles `NA` when propagation is disabled (#750)", {
   expect_identical(r_lgl_which(lgl(TRUE, FALSE, NA), FALSE), int(1))
   expect_identical(r_lgl_which(lgl(TRUE, FALSE, NA, TRUE), FALSE), int(1, 4))
@@ -559,7 +568,7 @@ test_that("can put again after del", {
 
   # Used to fail because we deleted whole bucket instead of just a
   # node when this node appeared first in the bucket
-  
+
   dict <- new_dict(3L)
   dict_put(dict, chr_get("1"), NULL)
   dict_put(dict, chr_get("foo"), NULL)
@@ -1301,8 +1310,8 @@ test_that("r_stop_internal() mentions expected namespace", {
   }
 
   environment(fn) <- ns_env("base")
-  expect_error(fn(), "in the base package")
+  expect_error(fn(), "detected in the base package")
 
   environment(fn) <- ns_env("utils")
-  expect_error(fn(), "in the utils package")
+  expect_error(fn(), "detected in the utils package")
 })

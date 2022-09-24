@@ -956,8 +956,8 @@
     Code
       print(err)
     Output
-      [1m[1m[1m[34m<error/rlang_error>[39m[22m
-      [1m[33mError[39m in [1m[1m[1m[94m`1 + ""`[39m[1m:[22m
+      [1m[34m<error/rlang_error>[39m[22m
+      [1m[33mError[39m in [1m[94m`1 + ""`[39m[1m:[22m
       [33m![39m non-numeric argument to binary operator
       ---
       [1mBacktrace:[22m
@@ -969,8 +969,8 @@
     Code
       summary(err)
     Output
-      [1m[1m[1m[34m<error/rlang_error>[39m[22m
-      [1m[33mError[39m in [1m[1m[1m[94m`1 + ""`[39m[1m:[22m
+      [1m[34m<error/rlang_error>[39m[22m
+      [1m[33mError[39m in [1m[94m`1 + ""`[39m[1m:[22m
       [33m![39m non-numeric argument to binary operator
       ---
       [1mBacktrace:[22m
@@ -1441,8 +1441,7 @@
         7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
         8. |   \-base::force(expr)
         9. \-rlang (local) f()
-       10.   \-rlang (local) <<CALL g(>>aaaaaaaaaaaa = aaaaaaaaaaaa, bbbbbbbbbbbb = bbbbbbbbbbbb, cccccccccccc = cccccccccccc,
-        dddddddddddd = dddddddddddd, eeeeeeeeeeee = eeeeeeeeeeee, ...<<CALL )>>
+       10.   \-rlang (local) <<CALL g(>>...<<CALL )>>
 
 ---
 
@@ -1486,10 +1485,7 @@
         7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
         8. |   \-base::force(expr)
         9. \-rlang (local) f()
-       10.   \-rlang (local) <<CALL g(>>x = {
-        a
-        b
-      }, ...<<CALL )>>
+       10.   \-rlang (local) <<CALL g(>>...<<CALL )>>
 
 ---
 

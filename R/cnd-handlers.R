@@ -122,7 +122,7 @@ environment(hnd_prompt_install) <- baseenv()
 #' code along the way) and then calls the handler, `try_fetch()` first
 #' calls the handler with the condition on top of the currently
 #' running code (fetches it where it stands) and then catches the
-#' return value . This is a subtle difference that has implications
+#' return value. This is a subtle difference that has implications
 #' for the debuggability of your functions. See the comparison with
 #' `tryCatch()` section below.
 #'
@@ -156,11 +156,11 @@ environment(hnd_prompt_install) <- baseenv()
 #' [trace_back()] capture might miss frames.
 #'
 #' Note that error handlers are only run for stack overflows on R >=
-#' 4.2 (unreleased at the time of writing). On older versions of R the
-#' handlers are simply not run. This is because these errors do not
-#' inherit from the class `stackOverflowError` before R 4.2. Consider
-#' using [tryCatch()] instead with critical error handlers that need
-#' to capture all errors on old versions of R.
+#' 4.2. On older versions of R the handlers are simply not run. This
+#' is because these errors do not inherit from the class
+#' `stackOverflowError` before R 4.2. Consider using [tryCatch()]
+#' instead with critical error handlers that need to capture all
+#' errors on old versions of R.
 #'
 #' @section Comparison with `tryCatch()`:
 #'
@@ -185,10 +185,10 @@ try_fetch <- function(expr, ...) {
   frame <- environment()
 
   catch <- value <- NULL
-  delayedAssign("catch", return(value), frame, frame)
 
   throw <- function(x) {
     value <<- x
+    delayedAssign("catch", return(value), frame, frame)
     catch
   }
 
