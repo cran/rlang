@@ -4,7 +4,12 @@
 
 # gives an error with more than one arg
 
-    `arg` must be length 1 or a permutation of `values`.
+    Code
+      (expect_error(arg_match0_wrapper(c("bar", "fun"), c("bar", "baz"))))
+    Output
+      <error/rlang_error>
+      Error in `arg_match0_wrapper()`:
+      ! `arg` must be length 1 or a permutation of `c("bar", "baz")`.
 
 # gives error with different than rearranged arg vs value
 
@@ -12,7 +17,7 @@
 
 ---
 
-    `arg` must be length 1 or a permutation of `values`.
+    `arg` must be length 1 or a permutation of `c("foo", "bar")`.
 
 # `arg_match()` has informative error messages
 
@@ -124,7 +129,7 @@
     Output
       <error/rlang_error>
       Error in `arg_match()`:
-      ! `arg` must be a symbol, not a string.
+      ! `arg` must be a symbol, not the string "foo".
 
 # can match multiple arguments
 
@@ -219,7 +224,7 @@
     Output
       <error/rlang_error>
       Error in `g()`:
-      ! `my_arg` must be a character vector, not a number.
+      ! `my_arg` must be a character vector, not the number 1.
 
 # arg_match() backtrace highlights call and arg
 
@@ -244,4 +249,25 @@
         9. \-rlang (local) f("f")
        10.   \-rlang (local) g(x)
        11.     \-rlang (local) <<CALL h(>><<ARG my_arg = x>><<CALL )>>
+
+# arg_match() supports `NA` (#1519)
+
+    Code
+      (expect_error(f(NA)))
+    Output
+      <error/rlang_error>
+      Error in `f()`:
+      ! `x` must be a character vector, not `NA`.
+    Code
+      (expect_error(f(na_chr)))
+    Output
+      <error/rlang_error>
+      Error in `f()`:
+      ! `x` must be a single string, not a character `NA`.
+    Code
+      (expect_error(f(chr())))
+    Output
+      <error/rlang_error>
+      Error in `f()`:
+      ! `x` must be length 1, not length 0
 

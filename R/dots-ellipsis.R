@@ -39,6 +39,18 @@
 #'
 #' try(f(x = 1, y = 2, 3, 4, 5))
 #'
+#' # Use an `error` handler to handle the error differently.
+#' # For instance to demote the error to a warning:
+#' fn <- function(...) {
+#'   check_dots_empty(
+#'     error = function(cnd) {
+#'       warning(cnd)
+#'     }
+#'   )
+#'   "out"
+#' }
+#' fn()
+#'
 #' @export
 check_dots_used <- function(env = caller_env(),
                             call = caller_env(),
@@ -64,6 +76,7 @@ check_dots <- function(env = caller_env(), error, action, call) {
     error = error,
     action = action,
     message = "Arguments in `...` must be used.",
+    note = c("i" = "Did you misspell an argument name?"),
     dots_i = unused,
     class = "rlib_error_dots_unused",
     call = call,
@@ -93,12 +106,13 @@ check_dots_unnamed <- function(env = caller_env(),
                                error = NULL,
                                call = caller_env(),
                                action = abort) {
-  proms <- ellipsis_dots(env)
-  if (length(proms) == 0) {
+  if (.Call(ffi_has_dots_unnamed, env)) {
     return()
   }
 
+  proms <- ellipsis_dots(env)
   unnamed <- names2(proms) == ""
+
   if (all(unnamed)) {
     return(invisible())
   }

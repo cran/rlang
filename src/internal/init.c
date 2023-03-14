@@ -4,10 +4,10 @@
 
 // Library initialisation defined below
 static r_obj* ffi_init_rlang(r_obj*);
-static r_obj* ffi_fini_rlang();
+static r_obj* ffi_fini_rlang(void);
 
 // From version.c
-extern r_obj* rlang_linked_version();
+extern r_obj* rlang_linked_version(void);
 
 static const R_CallMethodDef r_callables[] = {
   {"ffi_alloc_data_frame",             (DL_FUNC) &ffi_alloc_data_frame, 3},
@@ -92,7 +92,9 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_get_expression",               (DL_FUNC) &ffi_get_expression, 2},
   {"ffi_getppid",                      (DL_FUNC) &ffi_getppid, 0},
   {"ffi_glue_is_here",                 (DL_FUNC) &ffi_glue_is_here, 0},
+  {"ffi_has_dots_unnamed",             (DL_FUNC) &ffi_has_dots_unnamed, 1},
   {"ffi_has_local_precious_list",      (DL_FUNC) &ffi_has_local_precious_list, 0},
+  {"ffi_has_size_one_bool",            (DL_FUNC) &ffi_has_size_one_bool, 0},
   {"ffi_hash",                         (DL_FUNC) &ffi_hash, 1},
   {"ffi_hash_file",                    (DL_FUNC) &ffi_hash_file, 1},
   {"ffi_hasher_init",                  (DL_FUNC) &ffi_hasher_init, 0},
@@ -195,6 +197,8 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_set_names",                    (DL_FUNC) &ffi_set_names, 4},
   {"ffi_sexp_iterate",                 (DL_FUNC) &ffi_sexp_iterate, 2},
   {"ffi_squash",                       (DL_FUNC) &ffi_squash, 4},
+  {"ffi_standalone_check_number_1.0.7", (DL_FUNC) &ffi_standalone_check_number, 7},
+  {"ffi_standalone_is_bool_1.0.7",     (DL_FUNC) &ffi_standalone_is_bool, 3},
   {"ffi_sym_as_character",             (DL_FUNC) &ffi_sym_as_character, 1},
   {"ffi_symbol",                       (DL_FUNC) &ffi_symbol, 1},
   {"ffi_test_Rf_error",                (DL_FUNC) &ffi_test_Rf_error, 1},
@@ -230,6 +234,7 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_which_operator",               (DL_FUNC) &ffi_which_operator, 1},
   {"ffi_wref_key",                     (DL_FUNC) &ffi_wref_key, 1},
   {"ffi_wref_value",                   (DL_FUNC) &ffi_wref_value, 1},
+  {"ffi_zap_srcref",                   (DL_FUNC) &zap_srcref, 1},
   {"rlang_linked_version",             (DL_FUNC) &rlang_linked_version, 0},
   {NULL, NULL, 0}
 };
@@ -322,6 +327,6 @@ r_obj* ffi_init_rlang(r_obj* ns) {
 }
 
 static
-r_obj* ffi_fini_rlang() {
+r_obj* ffi_fini_rlang(void) {
   return r_null;
 }

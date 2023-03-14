@@ -133,3 +133,88 @@ test_that("stackOverflowError are caught", {
   )
   expect_equal(handled, c(1, 2))
 })
+
+test_that("tryFetch() looks across chained errors (#1534)", {
+  cnd <- error_cnd("foo", message = "ok")
+  parent <- error_cnd(message = "bad", parent = cnd)
+
+  out <- try_fetch(
+    cnd_signal(parent),
+    foo = function(x) x$message
+  )
+
+  expect_equal(out, "ok")
+})
+
+test_that("try_fetch() doesn't match downgraded conditions", {
+  out <- NULL
+  try_fetch(
+    error = function(cnd) abort("Wrongly caught error"),
+    warning = function(cnd) out <<- cnd,
+    try_fetch(
+      error = function(cnd) warn("Downgraded error", parent = cnd),
+      abort("Parent error")
+    )
+  )
+
+  expect_s3_class(out, "warning")
+  expect_equal(cnd_header(out), "Downgraded error")
+
+  out <- NULL
+  try_fetch(
+    error = function(cnd) abort("Wrongly caught error"),
+    warning = function(cnd) abort("Wrongly caught warning"),
+    message = function(cnd) out <<- cnd,
+    try_fetch(
+      error = function(cnd) inform("Downgraded error", parent = cnd),
+      abort("Parent error")
+    )
+  )
+
+  expect_s3_class(out, "message")
+  expect_equal(cnd_header(out), "Downgraded error")
+})
+
+test_that("try_fetch() matches upgraded conditions", {
+  out <- NULL
+  try_fetch(
+    message = function(cnd) out <<- cnd,
+    try_fetch(
+      message = function(cnd) warn("Upgraded message", parent = cnd),
+      inform("Parent message")
+    )
+  )
+
+  expect_s3_class(out, "message")
+  expect_equal(cnd_header(out), "Parent message")
+
+  out <- NULL
+  try_fetch(
+    warning = function(cnd) out <<- cnd,
+    try_fetch(
+      warning = function(cnd) abort("Upgraded warning", parent = cnd),
+      warn("Parent warning")
+    )
+  )
+
+  expect_s3_class(out, "warning")
+  expect_equal(cnd_header(out), "Parent warning")
+})
+
+test_that("`inherit` is recursively checked", {
+  parent <- try_fetch(
+    abort("foo", parent = error_cnd("qux"), .inherit = FALSE),
+    error = identity
+  )
+
+  out <- try_fetch(
+    abort("bar", parent = parent, .inherit = TRUE),
+    qux = function(cnd) cnd,
+    error = function(cnd) cnd
+  )
+
+  expect_s3_class(out, "error")
+
+  expect_true(inherits(out$parent$parent, "qux"))
+  expect_false(cnd_inherits(out, "qux"))
+})

@@ -567,6 +567,8 @@ test_that("`:=` unquotes its LHS as name unless `.unquote_names` is FALSE", {
   expect_identical(quos(a := b), quos_list(a = quo(b)))
   expect_identical(quos(a := b, .unquote_names = FALSE), quos_list(new_quosure(quote(a := b))))
   expect_identical(dots_list(a := NULL), list(a = NULL))
+
+  local_lifecycle_silence()
   expect_identical(dots_splice(a := NULL), list(a = NULL))
 })
 
@@ -574,6 +576,8 @@ test_that("`:=` chaining is detected at dots capture", {
   expect_error(exprs(a := b := c), "chained")
   expect_error(quos(a := b := c), "chained")
   expect_error(dots_list(a := b := c), "chained")
+
+  local_lifecycle_silence()
   expect_error(dots_splice(a := b := c), "chained")
 })
 
@@ -625,7 +629,7 @@ test_that("can defuse-and-label and interpolate with glue", {
   suffix <- "foo"
 
   expect_identical(glue_first_pass("{{var}}_{suffix}"), glue::glue("letters_{{suffix}}"))
-  expect_identical(glue_unquote("{{var}}_{suffix}"), glue::glue("letters_foo"))
+  expect_identical(glue_embrace("{{var}}_{suffix}"), glue::glue("letters_foo"))
 
   expect_identical(exprs("{{var}}_{suffix}" := 1), exprs(letters_foo = 1))
 })
@@ -637,6 +641,55 @@ test_that("unquoted strings are not interpolated with glue", {
   )
 })
 
+test_that("englue() returns a bare string", {
+  fn <- function(x) englue("{{ x }}")
+  expect_null(attributes(fn(foo)), "foo")
+})
+
+test_that("englue() has good error messages (#1531)", {
+  expect_snapshot({
+    fn <- function(x) englue(c("a", "b"))
+    (expect_error(fn()))
+
+    fn <- function(x) englue(env())
+    (expect_error(fn()))
+
+    fn <- function(x) glue_embrace("{{ x }}_foo")
+    (expect_error(fn()))
+
+    fn <- function(x) englue("{{ x }}_foo")
+    (expect_error(fn()))
+
+    fn <- function(x) list2("{{ x }}_foo" := NULL)
+    (expect_error(fn()))
+  })
+})
+
+test_that("can wrap englue() (#1565)", {
+  my_englue <- function(text) {
+    englue(
+      text,
+      env = env(caller_env(), .qux = "QUX"),
+      error_arg = "text",
+      error_call = current_env()
+    )
+  }
+
+  fn <- function(x) {
+    foo <- "FOO"
+    my_englue("{{ x }}_{.qux}_{foo}")
+  }
+
+  expect_equal(fn(bar), "bar_QUX_FOO")
+
+  expect_snapshot({
+    (expect_error(my_englue(c("a", "b"))))
+    (expect_error(my_englue(env())))
+    (expect_error(my_englue("{'foo'}")))
+    (expect_error(fn()))
+  })
+})
+
 
 # Lifecycle ----------------------------------------------------------
 
@@ -645,6 +698,8 @@ test_that("unquoting with rlang namespace is deprecated", {
   expect_warning_(quo(list(rlang::UQ(1:2))), regexp = "deprecated as of rlang 0.3.0")
 
   # Old tests
+
+  local_lifecycle_silence()
 
   expect_identical(quo(rlang::UQ(toupper("a"))), new_quosure("A", empty_env()))
   expect_identical(quo(list(rlang::UQS(list(a = 1, b = 2)))), quo(list(a = 1, b = 2)))
@@ -767,4 +822,14 @@ test_that("englue() works", {
   expect_equal(g(cyl), "prefix_cyl_suffix")
 
   expect_snapshot(err(englue("{'foo'}"), "Must use"))
+})
+
+test_that("englue() checks for the size of its result (#1492)", {
+  expect_snapshot({
+    fn <- function(x) englue("{{ x }} {NULL}")
+    (expect_error(fn(foo)))
+
+    fn <- function(x) list2("{{ x }} {NULL}" := NULL)
+    (expect_error(fn(foo)))
+  })
 })

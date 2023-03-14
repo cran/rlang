@@ -388,20 +388,17 @@ test_that("picks up caller frame", {
   )
 })
 
-test_that("tree display option is picked up when printing errors", {
-  local_options(rlang_trace_format_srcrefs = FALSE)
+test_that("cnd_inherits() checks `inherit` field (#1573)", {
+  cnd <- catch_cnd(warn("", parent = error_cnd()))
+  expect_false(cnd_inherits(cnd, "error"))
+  expect_true(cnd_inherits(cnd, "warning"))
 
-  f <- function() g()
-  g <- function() h()
-  h <- function() abort("foo")
-  cnd <- catch_cnd(f())
+  cnd <- catch_cnd(warn("", parent = error_cnd(), .inherit = TRUE))
+  expect_true(cnd_inherits(cnd, "error"))
 
-  expect_snapshot({
-    print(cnd)
-
-    local({
-      local_options("rlang:::trace_display_tree_override" = TRUE)
-      print(cnd)
-    })
-  })
+  parent <- error_cnd(class = "parent")
+  cnd_default <- catch_cnd(abort("", parent = parent))
+  cnd_false <- catch_cnd(abort("", parent = parent, .inherit = FALSE))
+  expect_true(cnd_inherits(cnd_default, "parent"))
+  expect_false(cnd_inherits(cnd_false, "parent"))
 })

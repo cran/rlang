@@ -207,9 +207,10 @@ The \code{.data} pronoun can only be subsetted with single column names. It does
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{mtcars \%>\% dplyr::summarise(.data[c("cyl", "am")])
 #> Error in `dplyr::summarise()`:
-#> ! Can't compute `..1 = .data[c("cyl", "am")]`.
+#> i In argument: `.data[c("cyl", "am")]`.
 #> Caused by error in `.data[c("cyl", "am")]`:
-#> ! `[` is not supported by the `.data` pronoun, use `[[` or $ instead.
+#> ! `[` is not supported by the `.data` pronoun, use `[[` or $
+#>   instead.
 }\if{html}{\out{</div>}}
 
 There is no plural variant of \code{.data} built in tidy eval. Instead, we'll used the \code{all_of()} operator available in tidy selections to supply character vectors. This is straightforward in functions that take tidy selections, like \code{tidyr::pivot_longer()}:
@@ -297,7 +298,7 @@ mtcars \%>\% my_pivot_longer(cyl, am = am * 100)
 \section{Transformation patterns}{
 \subsection{Named inputs versus \code{...}}{
 
-In the case of a named argument, transformation is easy. We simply surround the embraced input it in R code. For instance, the \code{my_summarise()} function is not exactly useful compared to just calling \code{summarise()}:
+In the case of a named argument, transformation is easy. We simply surround the embraced input in R code. For instance, the \code{my_summarise()} function is not exactly useful compared to just calling \code{summarise()}:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{my_summarise <- function(data, var) \{
   data \%>\% dplyr::summarise(\{\{ var \}\})

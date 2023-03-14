@@ -1,11 +1,19 @@
-# nocov start - compat-purrr.R
-# Latest version: https://github.com/r-lib/rlang/blob/main/R/compat-purrr.R
-
+# ---
+# repo: r-lib/rlang
+# file: standalone-purrr.R
+# last-updated: 2023-02-23
+# license: https://unlicense.org
+# imports: rlang
+# ---
+#
 # This file provides a minimal shim to provide a purrr-like API on top of
 # base R functions. They are not drop-in replacements but allow a similar style
 # of programming.
 #
-# Changelog:
+# ## Changelog
+#
+# 2023-02-23:
+# * Added `list_c()`
 #
 # 2022-06-07:
 # * `transpose()` is now more consistent with purrr when inner names
@@ -22,6 +30,8 @@
 # * Removed `*_cpl()` functions
 # * Used `as_function()` to allow use of `~`
 # * Used `.` prefix for helpers
+#
+# nocov start
 
 map <- function(.x, .f, ...) {
   .f <- as_function(.f, env = global_env())
@@ -217,6 +227,10 @@ detect_index <- function(.x, .f, ..., .right = FALSE, .p = is_true) {
     idx <- rev(idx)
   }
   idx
+}
+
+list_c <- function(x) {
+  inject(c(!!!x))
 }
 
 # nocov end

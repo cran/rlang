@@ -13,24 +13,44 @@ global_entrace(enable = TRUE, class = c("error", "warning", "message"))
 conditions to be entraced.}
 }
 \description{
-\code{global_entrace()} enriches base errors with rlang features:
+\code{global_entrace()} enriches base errors, warnings, and messages
+with rlang features.
 \itemize{
 \item They are assigned a backtrace. You can configure whether to
 display a backtrace on error with the \link{rlang_backtrace_on_error}
 global option.
-\item They are recorded in \code{\link[=last_error]{last_error()}}. Calling this function is
-another way of inspecting the backtrace.
+\item They are recorded in \code{\link[=last_error]{last_error()}}, \code{\link[=last_warnings]{last_warnings()}}, or
+\code{\link[=last_messages]{last_messages()}}. You can inspect backtraces at any time by
+calling these functions.
 }
-
-When global entracing is enabled, all errors behave as if they had
-been thrown with \code{\link[=abort]{abort()}}, even the ones thrown with
-\code{\link[=stop]{stop()}} or from native code.
 
 Set global entracing in your RProfile with:
 
 \if{html}{\out{<div class="sourceCode">}}\preformatted{rlang::global_entrace()
 }\if{html}{\out{</div>}}
 }
+\section{Inside RMarkdown documents}{
+
+
+Call \code{global_entrace()} inside an RMarkdown document to cause
+errors and warnings to be promoted to rlang conditions that include
+a backtrace. This needs to be done in a separate setup chunk before
+the first error or warning.
+
+This is useful in conjunction with
+\code{\link{rlang_backtrace_on_error_report}} and
+\code{\link{rlang_backtrace_on_warning_report}}. To get full entracing in an
+Rmd document, include this in a setup chunk before the first error
+or warning is signalled.
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{```\{r setup\}
+rlang::global_entrace()
+options(rlang_backtrace_on_warning_report = "full")
+options(rlang_backtrace_on_error_report = "full")
+```
+}\if{html}{\out{</div>}}
+}
+
 \section{Under the hood}{
 
 On R 4.0 and newer, \code{global_entrace()} installs a global handler

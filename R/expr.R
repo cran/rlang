@@ -94,10 +94,14 @@
 #' is_pairlist(fmls)
 is_expression <- function(x) {
   stack <- new_stack()
-  stack$push(x)
+  stack$push(zap_srcref(x))
 
   while (!is_exhausted(elt <- stack$pop())) {
     if (is_missing(elt)) {
+      return(FALSE)
+    }
+
+    if (!is_null(attributes(elt))) {
       return(FALSE)
     }
 

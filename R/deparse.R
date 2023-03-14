@@ -419,6 +419,7 @@ parens_deparse <- function(x, lines = new_lines()) {
 
   lines$get_lines()
 }
+
 braces_deparse <- function(x, lines = new_lines()) {
   lines$push("{")
   lines$increase_indent()
@@ -443,6 +444,20 @@ braces_deparse <- function(x, lines = new_lines()) {
 
   lines$get_lines()
 }
+
+embrace_deparse <- function(x, lines = new_lines()) {
+  lines$push("{{ ")
+  lines$increase_indent()
+
+  sym <- node_cadr(node_cadr(x))
+  lines$deparse(sym)
+
+  lines$push(" }}")
+  lines$decrease_indent()
+
+  lines$get_lines()
+}
+
 
 sym_deparse <- function(x, lines = new_lines()) {
   str <- encodeString(as_string(x))
@@ -555,7 +570,8 @@ call_delimited_type <- function(call) {
     `[` = ,
     `[[` = ,
     `(` = ,
-    `{` =
+    `{` = ,
+    `{{` =
       "none",
     abort("Internal error: Unexpected operator while deparsing")
   )
@@ -609,6 +625,7 @@ op_deparse <- function(op, x, lines) {
     `[[` = brackets2_deparse,
     `(` = parens_deparse,
     `{` = braces_deparse,
+    `{{` = embrace_deparse,
     abort("Internal error: Unexpected operator while deparsing")
   )
 
@@ -899,7 +916,7 @@ as_label <- function(x) {
       if (is_data_pronoun(x)) {
         return(data_pronoun_name(x) %||% "<unknown>")
       }
-      if (infix_overflows(x)) {
+      if (use_as_label_infix() && infix_overflows(x)) {
         return(as_label_infix(x))
       }
 
@@ -915,6 +932,13 @@ as_label <- function(x) {
       paste0("<", rlang_type_sum(x), ">")
     }
   )
+}
+
+# Work around a slowdown caused by `infix_overflows()`
+# https://github.com/tidyverse/dplyr/issues/6674
+# https://github.com/tidyverse/dplyr/issues/6681
+use_as_label_infix <- function() {
+  !is_false(peek_option("rlang:::use_as_label_infix"))
 }
 
 infix_overflows <- function(x) {

@@ -6,10 +6,17 @@
       <error/rlang_error_foobar>
       ---
       Backtrace:
-        1. rlang::catch_cnd(f())
-        8. rlang (local) f()
-        9. rlang (local) g()
-       10. rlang (local) h()
+           x
+        1. +-rlang::catch_cnd(f())
+        2. | +-rlang::eval_bare(...)
+        3. | +-base::tryCatch(...)
+        4. | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        5. | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        6. | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        7. | \-base::force(expr)
+        8. \-rlang (local) f()
+        9.   \-rlang (local) g()
+       10.     \-rlang (local) h()
 
 # `inform()` and `warn()` with recurrent footer handle newlines correctly
 
@@ -47,7 +54,7 @@
     Output
       <error/rlang_error>
       Error in `warn()`:
-      ! `.frequency` must be a single string, not an integer.
+      ! `.frequency` must be a valid name, not the number 1.
 
 # signal functions check inputs
 
@@ -80,12 +87,10 @@
 
     Code
       expect_equal(error_cnd(.subclass = "foo"), error_cnd("foo"))
-    Warning <deprecatedWarning>
+    Warning <lifecycle_warning_deprecated>
       The `.subclass` argument of `error_cnd()` has been renamed to `class`.
-      This warning is displayed once per session.
     Code
       expect_error(abort("foo", .subclass = "bar"), class = "bar")
-    Warning <deprecatedWarning>
+    Warning <lifecycle_warning_deprecated>
       The `.subclass` argument of `abort()` has been renamed to `class`.
-      This warning is displayed once per session.
 

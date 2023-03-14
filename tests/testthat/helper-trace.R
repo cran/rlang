@@ -12,7 +12,6 @@ expect_snapshot_trace <- function(trace,
 }
 print_focused_trace <- function(trace, ...) {
   with_options(
-    "rlang:::trace_display_tree_override" = TRUE,
     "rlang:::trace_deemph" = function(x) sprintf("<<%s>>", x),
     print(trace, ..., simplify = "none", drop = TRUE)
   )
@@ -35,7 +34,7 @@ expect_equal_trace <- function(x, y) {
   expect_equal(x$calls, y$calls)
 }
 
-render_md <- function(file) {
+render_md <- function(file, env = global_env()) {
   skip_if_not_installed("rmarkdown")
   skip_if_not_installed("knitr")
 
@@ -47,7 +46,7 @@ render_md <- function(file) {
     output_format = "md_document",
     output_file = out_file,
     quiet = TRUE,
-    envir = globalenv()
+    envir = env
   )
 
   readLines(out_file)

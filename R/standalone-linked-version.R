@@ -1,9 +1,17 @@
-# nocov start --- compat-linked-version --- 2020-02-24 Mon 13:05 CET
+# ---
+# repo: r-lib/rlang
+# file: standalone-linked-version.R
+# last-updated: 2022-05-26
+# license: https://unlicense.org
+# imports: rlang (>= 1.0.0)
+# ---
+#
+# nocov start
 
 
 check_linked_version <- local({
 
-  # Keep in sync with compat-downstream-deps.R
+  # Keep in sync with standalone-downstream-deps.R
   howto_reinstall_msg <- function(pkg) {
     os <- tolower(Sys.info()[["sysname"]])
 

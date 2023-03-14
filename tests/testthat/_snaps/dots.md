@@ -1,3 +1,18 @@
+# empty arguments trigger meaningful error
+
+    Code
+      (expect_error(list2(1, , 3), "empty"))
+    Output
+      <error/rlang_error>
+      Error in `list2()`:
+      ! Argument 2 can't be empty.
+    Code
+      (expect_error(dots_list(1, , 3), "empty"))
+    Output
+      <error/rlang_error>
+      Error in `dots_list()`:
+      ! Argument 2 can't be empty.
+
 # `.homonyms` = 'error' fails with homonyms
 
     Code
@@ -67,4 +82,11 @@
       [1] 848 B
     Code
       expect_equal(out, as.list(x))
+
+# list2(...) doesn't copy forced promises (#1491)
+
+    Code
+      fn(x, x, x, x, x, x)
+    Output
+      [1] 0 B
 

@@ -196,7 +196,7 @@ test_that("as_quosures() auto-names if requested", {
 })
 
 test_that("quosures class has subset assign methods", {
-  local_options(lifecycle_verbose_soft_deprecation = TRUE)
+  local_options(lifecycle_verbosity = "warning")
 
   x <- quos(1, 2)
 
@@ -227,9 +227,12 @@ test_that("can remove quosures by assigning NULL", {
 })
 
 test_that("can't cast a quosure to base types (#523)", {
-  local_options(lifecycle_verbose_soft_deprecation = TRUE)
-  expect_warning(as.character(quo(foo)), "`as.character\\(\\)` on a quosure")
-  expect_identical(as.character(quo(foo)), c("~", "foo"))
+  expect_deprecated(
+    out <- as.character(quo(foo)),
+    "on a quosure",
+    fixed = TRUE
+  )
+  expect_identical(out, c("~", "foo"))
 })
 
 test_that("quosures fail with common operations (#478, tidyverse/dplyr#3476)", {
@@ -298,6 +301,29 @@ test_that("quo_squash() supports nested missing args", {
 
   expect_equal(quo_squash(missing_arg()), missing_arg())
   expect_equal(quo_squash(quo()), missing_arg())
+})
+
+test_that("quo_squash() handles quosures in function positions", {
+  expr <- call2(quo(`==`), 1, 2)
+  expect_equal(quo_squash(expr), quote(1 == 2))
+})
+
+test_that("quosures can be concatenated with lists of quosures (#1446)", {
+  expect_equal(
+    c(quo(1), quos(2)),
+    quos(1, 2)
+  )
+
+  expect_equal(
+    c(quos(1), quo(2)),
+    quos(1, 2)
+  )
+})
+
+test_that("quo_squash() handles nested quosured quosures", {
+  q <- new_quosure(quo(1))
+  expect_equal(quo_squash(q), 1)
+  expect_equal(quo_squash(quo(foo(!!q))), quote(foo(1)))
 })
 
 

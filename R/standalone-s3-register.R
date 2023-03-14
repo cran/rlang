@@ -1,6 +1,10 @@
-# This source code file is licensed under the unlicense license
-# https://unlicense.org
-
+# ---
+# repo: r-lib/rlang
+# file: standalone-s3-register.R
+# last-updated: 2022-08-29
+# license: https://unlicense.org
+# ---
+#
 # nocov start
 
 #' Register a method for a suggested dependency
@@ -27,7 +31,7 @@
 #'
 #' @section Usage in other packages:
 #' To avoid taking a dependency on vctrs, you copy the source of
-#' [`s3_register()`](https://github.com/r-lib/rlang/blob/main/R/compat-register.R)
+#' [`s3_register()`](https://github.com/r-lib/rlang/blob/main/R/standalone-s3-register.R)
 #' into your own package. It is licensed under the permissive
 #' [unlicense](https://choosealicense.com/licenses/unlicense/) to make it
 #' crystal clear that we're happy for you to do this. There's no need to include
@@ -109,12 +113,17 @@ s3_register <- function(generic, class, method = NULL) {
     register()
   })
 
+  # For compatibility with R < 4.1.0 where base isn't locked
+  is_sealed <- function(pkg) {
+    identical(pkg, "base") || environmentIsLocked(asNamespace(pkg))
+  }
+
   # Avoid registration failures during loading (pkgload or regular).
   # Check that environment is locked because the registering package
   # might be a dependency of the package that exports the generic. In
   # that case, the exports (and the generic) might not be populated
   # yet (#1225).
-  if (isNamespaceLoaded(package) && environmentIsLocked(asNamespace(package))) {
+  if (isNamespaceLoaded(package) && is_sealed(package)) {
     register()
   }
 

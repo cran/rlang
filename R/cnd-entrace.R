@@ -1,18 +1,16 @@
 #' Entrace unexpected errors
 #'
 #' @description
-#' `global_entrace()` enriches base errors with rlang features:
+#' `global_entrace()` enriches base errors, warnings, and messages
+#' with rlang features.
 #'
 #' - They are assigned a backtrace. You can configure whether to
 #'   display a backtrace on error with the [rlang_backtrace_on_error]
 #'   global option.
 #'
-#' - They are recorded in [last_error()]. Calling this function is
-#'   another way of inspecting the backtrace.
-#'
-#' When global entracing is enabled, all errors behave as if they had
-#' been thrown with [rlang::abort()], even the ones thrown with
-#' [stop()] or from native code.
+#' - They are recorded in [last_error()], [last_warnings()], or
+#'   [last_messages()]. You can inspect backtraces at any time by
+#'   calling these functions.
 #'
 #' Set global entracing in your RProfile with:
 #'
@@ -23,6 +21,27 @@
 #' @param enable Whether to enable or disable global handling.
 #' @param class A character vector of one or several classes of
 #'   conditions to be entraced.
+#'
+#' @section Inside RMarkdown documents:
+#'
+#' Call `global_entrace()` inside an RMarkdown document to cause
+#' errors and warnings to be promoted to rlang conditions that include
+#' a backtrace. This needs to be done in a separate setup chunk before
+#' the first error or warning.
+#'
+#' This is useful in conjunction with
+#' [`rlang_backtrace_on_error_report`] and
+#' [`rlang_backtrace_on_warning_report`]. To get full entracing in an
+#' Rmd document, include this in a setup chunk before the first error
+#' or warning is signalled.
+#'
+#' ````
+#' ```{r setup}
+#' rlang::global_entrace()
+#' options(rlang_backtrace_on_warning_report = "full")
+#' options(rlang_backtrace_on_error_report = "full")
+#' ```
+#' ````
 #'
 #' @section Under the hood:
 #' On R 4.0 and newer, `global_entrace()` installs a global handler
@@ -38,7 +57,7 @@ global_entrace <- function(enable = TRUE,
   check_bool(enable)
   class <- arg_match(class, multiple = TRUE)
 
-  if (getRversion() < "4.0") {
+  if (getRversion() < "4.0" && !knitr_in_progress()) {
     return(global_entrace_fallback(enable, class))
   }
 
@@ -141,18 +160,36 @@ entrace <- function(cnd, ..., top = NULL, bottom = NULL) {
     bottom <- sys.frame(info[[2]])
   }
 
-  trace <- trace_back(top = top, bottom = bottom)
+  if (!has_new_cmd_frame() && the$n_conditions >= max_entracing()) {
+    trace <- NULL
+  } else {
+    trace <- trace_back(top = top, bottom = bottom)
+  }
 
   # `options(error = )` case
   if (missing(cnd)) {
     return(entrace_handle_top(trace))
   }
 
-  # Log warnings and messages
+  # Log warnings
   if (is_warning(cnd)) {
-    push_warning(as_rlang_warning(cnd, trace))
-    return()
+    wrn <- as_rlang_warning(cnd, trace)
+    push_warning(wrn)
+
+    # Resignal enriched warning
+    if (!is_null(findRestart("muffleWarning"))) {
+      if (identical(peek_option("warn"), 2L)) {
+        return()
+      } else {
+        warning(wrn)
+        invokeRestart("muffleWarning")
+      }
+    } else {
+      return()
+    }
   }
+
+  # Log messages
   if (is_message(cnd)) {
     push_message(as_rlang_message(cnd, trace))
     return()
@@ -176,6 +213,10 @@ entrace <- function(cnd, ..., top = NULL, bottom = NULL) {
 
   # Ignore other condition types
   NULL
+}
+
+max_entracing <- function() {
+  peek_option("rlang:::max_entracing") %||% 20
 }
 
 has_recover <- function() {

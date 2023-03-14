@@ -1,6 +1,8 @@
 #ifndef RLANG_INTERNAL_PARSE_H
 #define RLANG_INTERNAL_PARSE_H
 
+#include <rlang.h>
+
 
 // This only includes operators that actually appear in the AST.
 // Examples of silent operators are `else` and `in`.
@@ -52,6 +54,7 @@ enum r_operator {
   R_OP_BRACKETS1,
   R_OP_BRACKETS2,
   R_OP_BRACES,
+  R_OP_EMBRACE,
   R_OP_MAX
 };
 

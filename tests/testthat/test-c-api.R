@@ -1,3 +1,6 @@
+# https://github.com/r-lib/rlang/issues/1556
+skip_if_not(has_size_one_bool())
+
 r_string <- function(str) {
   stopifnot(is_string(str))
   .Call(ffi_r_string, str)
@@ -14,10 +17,8 @@ test_that("chr_append() appends", {
 })
 
 test_that("r_warn() signals", {
-  handler <- function(c) expect_null(c$call)
-
   expect_warning(regexp = "foo",
-    with_handlers(warning = calling(handler),
+    withCallingHandlers(warning = function(c) expect_null(c$call),
       .Call(ffi_test_r_warn, "foo")
     ))
 })
@@ -379,10 +380,10 @@ test_that("failed parses are printed if `rlang__verbose_errors` is non-NULL", {
   )
 })
 
-test_that("r_warn_deprecated() warns once", {
-  expect_warning(warn_deprecated("retired", "foo"), "retired")
-  expect_no_warning(warn_deprecated("retired", "foo"))
-  expect_warning(warn_deprecated("retired", "bar"), "retired")
+test_that("r_deprecate_warn() warns once", {
+  expect_warning(deprecate_warn("retired", "foo"), "retired")
+  expect_no_warning(deprecate_warn("retired", "foo"))
+  expect_warning(deprecate_warn("retired", "bar"), "retired")
 })
 
 test_that("nms_are_duplicated() detects duplicates", {
@@ -400,6 +401,7 @@ test_that("nms_are_duplicated() handles empty and missing names", {
 
 test_that("r_lgl_sum() handles NA", {
   expect_identical(r_lgl_sum(lgl(TRUE, FALSE), TRUE), 1L)
+  expect_identical(r_lgl_sum(lgl(TRUE, FALSE), FALSE), 1L)
   expect_identical(r_lgl_sum(lgl(TRUE, NA), TRUE), 2L)
   expect_identical(r_lgl_sum(lgl(TRUE, NA), FALSE), 1L)
 })
@@ -407,22 +409,26 @@ test_that("r_lgl_sum() handles NA", {
 test_that("r_lgl_which() handles NA", {
   expect_identical(r_lgl_which(lgl(TRUE, FALSE), TRUE), 1L)
   expect_identical(r_lgl_which(lgl(TRUE, FALSE), FALSE), 1L)
-  expect_identical(r_lgl_which(lgl(TRUE, NA), TRUE), int(1L, NA))
-  expect_identical(r_lgl_which(lgl(TRUE, NA), FALSE), 1L)
+  expect_identical(r_lgl_which(lgl(TRUE, NA, FALSE, NA, TRUE, NA), TRUE), int(1L, NA, NA, 5L, NA))
+  expect_identical(r_lgl_which(lgl(TRUE, NA, FALSE, NA, TRUE, NA), FALSE), int(1L, 5L))
 })
 
 test_that("r_lgl_which() handles empty vectors", {
   expect_identical(r_lgl_which(lgl(), TRUE), int())
   expect_identical(r_lgl_which(lgl(), FALSE), int())
+
+  expect_identical(r_lgl_which(named(lgl()), TRUE), named(int()))
+  expect_identical(r_lgl_which(named(lgl()), FALSE), named(int()))
 })
 
 test_that("r_lgl_which() propagates names", {
-  x <- c(a = TRUE, b = FALSE, c = NA)
-  expect_named(r_lgl_which(x, na_propagate = TRUE), c("a", "c"))
-  expect_named(r_lgl_which(x, na_propagate = FALSE), "a")
+  x <- lgl(a = TRUE, b = FALSE, c = NA, d = FALSE, e = NA, f = TRUE)
+  expect_named(r_lgl_which(x, na_propagate = TRUE), c("a", "c", "e", "f"))
+  expect_named(r_lgl_which(x, na_propagate = FALSE), c("a", "f"))
 
   # Unnamed if input is unnamed
   expect_named(r_lgl_which(TRUE, na_propagate = TRUE), NULL)
+  expect_named(r_lgl_which(lgl(TRUE, NA), na_propagate = TRUE), NULL)
 })
 
 test_that("r_lgl_which() handles `NA` when propagation is disabled (#750)", {

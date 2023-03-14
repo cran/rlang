@@ -51,7 +51,7 @@ static r_obj* rlang_new_data_pronoun(r_obj* mask) {
   return pronoun;
 }
 static r_obj* rlang_new_ctxt_pronoun(r_obj* top) {
-  r_obj* pronoun = KEEP(r_alloc_environment(0, r_env_parent(top)));
+  r_obj* pronoun = KEEP(r_alloc_empty_environment(r_env_parent(top)));
 
   r_attrib_poke(pronoun, r_syms.class_, ctxt_pronoun_class);
 
@@ -160,14 +160,14 @@ r_obj* ffi_new_data_mask(r_obj* bottom, r_obj* top) {
   r_obj* data_mask;
 
   if (bottom == r_null) {
-    bottom = KEEP(r_alloc_environment(100, r_envs.empty));
+    bottom = KEEP(r_alloc_environment(10, r_envs.empty));
     data_mask = bottom;
   } else {
     check_data_mask_input(bottom, "bottom");
     // Create a child because we don't know what might be in `bottom`
     // and we need to clear its contents without deleting any object
     // created in the data mask environment
-    data_mask = KEEP(r_alloc_environment(100, bottom));
+    data_mask = KEEP(r_alloc_environment(10, bottom));
   }
 
   if (top == r_null) {
@@ -253,7 +253,7 @@ r_obj* ffi_data_pronoun_get(r_obj* pronoun, r_obj* sym, r_obj* error_call) {
   return obj;
 }
 
-static void warn_env_as_mask_once() {
+static void warn_env_as_mask_once(void) {
   const char* msg =
     "Passing an environment as data mask is deprecated.\n"
     "Please use `new_data_mask()` to transform your environment to a mask.\n"
@@ -267,7 +267,7 @@ static void warn_env_as_mask_once() {
     "  # Good:\n"
     "  mask <- new_data_mask(env)\n"
     "  eval_tidy(expr, mask)";
-  warn_deprecated(msg, msg);
+  deprecate_warn(msg, msg);
 }
 
 static r_obj* data_pronoun_sym = NULL;
@@ -549,7 +549,7 @@ r_obj* ffi_eval_tidy(r_obj* call, r_obj* op, r_obj* args, r_obj* rho) {
 }
 
 
-void rlang_init_eval_tidy() {
+void rlang_init_eval_tidy(void) {
   r_obj* rlang_ns_env = KEEP(r_ns_env("rlang"));
 
   tilde_fn = r_eval(r_sym("tilde_eval"), rlang_ns_env);

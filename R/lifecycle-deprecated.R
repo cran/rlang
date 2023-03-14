@@ -3,6 +3,242 @@
 # rlang 0.4.0: 2019-06
 # rlang 0.4.2: 2019-11
 # rlang 1.0.0: 2022-01
+# rlang 1.1.0: 2023-02
+
+
+#  Deprecated in rlang 1.1.0
+
+# rlang 1.1.0: silent deprecation.
+
+#' Create a child environment
+#'
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' [env()] now supports creating child environments, please use it
+#' instead.
+#'
+#' @keywords internal
+#' @export
+child_env <- function(.parent, ...) {
+  env <- new.env(parent = as_environment(.parent))
+  env_bind0(env, list2(...))
+  env
+}
+
+# rlang 1.1.0: soft-deprecation
+
+#' Flatten or squash a list of lists into a simpler vector
+#'
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' These functions are deprecated in favour of `purrr::list_c()` and
+#' `purrr::list_flatten()`.
+#'
+#' `flatten()` removes one level hierarchy from a list, while
+#' `squash()` removes all levels. These functions are similar to
+#' [unlist()] but they are type-stable so you always know what the
+#' type of the output is.
+#'
+#' @param x A list to flatten or squash. The contents of the list can
+#'   be anything for unsuffixed functions `flatten()` and `squash()`
+#'   (as a list is returned), but the contents must match the type for
+#'   the other functions.
+#' @return `flatten()` returns a list, `flatten_lgl()` a logical
+#'   vector, `flatten_int()` an integer vector, `flatten_dbl()` a
+#'   double vector, and `flatten_chr()` a character vector. Similarly
+#'   for `squash()` and the typed variants (`squash_lgl()` etc).
+#' @export
+#' @keywords internal
+#' @examples
+#' x <- replicate(2, sample(4), simplify = FALSE)
+#' x
+#'
+#' flatten(x)
+#' flatten_int(x)
+#'
+#' # With flatten(), only one level gets removed at a time:
+#' deep <- list(1, list(2, list(3)))
+#' flatten(deep)
+#' flatten(flatten(deep))
+#'
+#' # But squash() removes all levels:
+#' squash(deep)
+#' squash_dbl(deep)
+#'
+#' # The typed flatten functions remove one level and coerce to an atomic
+#' # vector at the same time:
+#' flatten_dbl(list(1, list(2)))
+#'
+#' # Only bare lists are flattened, but you can splice S3 lists
+#' # explicitly:
+#' foo <- set_attrs(list("bar"), class = "foo")
+#' str(flatten(list(1, foo, list(100))))
+#' str(flatten(list(1, splice(foo), list(100))))
+#'
+#' # Instead of splicing manually, flatten_if() and squash_if() let
+#' # you specify a predicate function:
+#' is_foo <- function(x) inherits(x, "foo") || is_bare_list(x)
+#' str(flatten_if(list(1, foo, list(100)), is_foo))
+#'
+#' # squash_if() does the same with deep lists:
+#' deep_foo <- list(1, list(foo, list(foo, 100)))
+#' str(deep_foo)
+#'
+#' str(squash(deep_foo))
+#' str(squash_if(deep_foo, is_foo))
+flatten <- function(x) {
+  deprecate_soft(c(
+    "`flatten()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "list", is_spliced_bare, 1L)
+}
+# rlang 1.1.0: Soft deprecation.
+
+#' @rdname flatten
+#' @export
+flatten_lgl <- function(x) {
+  deprecate_soft(c(
+    "`flatten_lgl()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` and/or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "logical", is_spliced_bare, 1L)
+}
+#' @rdname flatten
+#' @export
+flatten_int <- function(x) {
+  deprecate_soft(c(
+    "`flatten_int()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` and/or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "integer", is_spliced_bare, 1L)
+}
+#' @rdname flatten
+#' @export
+flatten_dbl <- function(x) {
+  deprecate_soft(c(
+    "`flatten_dbl()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` and/or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "double", is_spliced_bare, 1L)
+}
+#' @rdname flatten
+#' @export
+flatten_cpl <- function(x) {
+  deprecate_soft(c(
+    "`flatten_cpl()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` and/or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "complex", is_spliced_bare, 1L)
+}
+#' @rdname flatten
+#' @export
+flatten_chr <- function(x) {
+  deprecate_soft(c(
+    "`flatten_chr()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` and/or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "character", is_spliced_bare, 1L)
+}
+#' @rdname flatten
+#' @export
+flatten_raw <- function(x) {
+  deprecate_soft(c(
+    "`flatten_raw()` is deprecated as of rlang 1.1.0.",
+    "i" = "Please use `purrr::list_flatten()` and/or `purrr::list_c()`."
+  ))
+  .Call(ffi_squash, x, "raw", is_spliced_bare, 1L)
+}
+
+#' @rdname flatten
+#' @export
+squash <- function(x) {
+  deprecate_soft("`squash()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "list", is_spliced_bare, -1L)
+}
+#' @rdname flatten
+#' @export
+squash_lgl <- function(x) {
+  deprecate_soft("`squash_lgl()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "logical", is_spliced_bare, -1L)
+}
+#' @rdname flatten
+#' @export
+squash_int <- function(x) {
+  deprecate_soft("`squash_int()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "integer", is_spliced_bare, -1L)
+}
+#' @rdname flatten
+#' @export
+squash_dbl <- function(x) {
+  deprecate_soft("`squash_dbl()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "double", is_spliced_bare, -1L)
+}
+#' @rdname flatten
+#' @export
+squash_cpl <- function(x) {
+  deprecate_soft("`squash_cpl()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "complex", is_spliced_bare, -1L)
+}
+#' @rdname flatten
+#' @export
+squash_chr <- function(x) {
+  deprecate_soft("`squash_chr()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "character", is_spliced_bare, -1L)
+}
+#' @rdname flatten
+#' @export
+squash_raw <- function(x) {
+  deprecate_soft("`squash_raw()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "raw", is_spliced_bare, -1L)
+}
+
+#' @rdname flatten
+#' @param predicate A function of one argument returning whether it
+#'   should be spliced.
+#' @export
+flatten_if <- function(x, predicate = is_spliced) {
+  deprecate_soft("`flatten_if()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "list", predicate, 1L)
+}
+#' @rdname flatten
+#' @export
+squash_if <- function(x, predicate = is_spliced) {
+  deprecate_soft("`squash_if()` is deprecated as of rlang 1.1.0.")
+  .Call(ffi_squash, x, "list", predicate, -1L)
+}
+#' Splice lists
+#'
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' `dots_splice()` is like [dots_list()] but automatically splices
+#' list inputs.
+#'
+#' @inheritParams dots_list
+#' @keywords internal
+#' @export
+dots_splice <- function(...,
+                        .ignore_empty = c("trailing", "none", "all"),
+                        .preserve_empty = FALSE,
+                        .homonyms = c("keep", "first", "last", "error"),
+                        .check_assign = FALSE) {
+  deprecate_soft("`dots_splice()` is deprecated as of rlang 1.1.0.")
+  dots <- .Call(
+    ffi_dots_flat_list,
+    frame_env = environment(),
+    named = NULL,
+    ignore_empty = .ignore_empty,
+    preserve_empty = .preserve_empty,
+    unquote_names = TRUE,
+    homonyms = .homonyms,
+    check_assign = .check_assign
+  )
+  names(dots) <- names2(dots)
+  dots
+}
 
 #  Deprecated in rlang 1.0.0
 
@@ -119,7 +355,7 @@ locally <- function(expr) {
 #' type_of(list)
 #' type_of(`$`)
 type_of <- function(x) {
-  signal_soft_deprecated(c(
+  deprecate_warn(c(
     "`type_of()` is deprecated as of rlang 0.4.0.",
     "Please use `typeof()` or your own version instead."
   ))
@@ -199,7 +435,7 @@ type_of <- function(x) {
 #'   "default"
 #' )
 switch_type <- function(.x, ...) {
-  signal_soft_deprecated(c(
+  deprecate_warn(c(
     "`switch_type()` is soft-deprecated as of rlang 0.4.0.",
     "Please use `switch(typeof())` or `switch(my_typeof())` instead."
   ))
@@ -208,29 +444,28 @@ switch_type <- function(.x, ...) {
 #' @rdname switch_type
 #' @export
 coerce_type <- function(.x, .to, ...) {
-  signal_soft_deprecated("`coerce_type()` is soft-deprecated as of rlang 0.4.0.")
+  deprecate_warn("`coerce_type()` is soft-deprecated as of rlang 0.4.0.")
   switch(type_of_(.x), ..., abort_coercion(.x, .to))
 }
 #' @rdname switch_type
 #' @export
 switch_class <- function(.x, ...) {
-  signal_soft_deprecated("`switch_class()` is soft-deprecated as of rlang 0.4.0.")
+  deprecate_warn("`switch_class()` is soft-deprecated as of rlang 0.4.0.")
   switch(class(.x), ...)
 }
 #' @rdname switch_type
 #' @export
 coerce_class <- function(.x, .to, ...) {
-  signal_soft_deprecated("`coerce_class()` is soft-deprecated as of rlang 0.4.0.")
+  deprecate_warn("`coerce_class()` is soft-deprecated as of rlang 0.4.0.")
   switch(class(.x), ..., abort_coercion(.x, .to))
 }
-
 #' Format a type for error messages
 #'
 #' @description
 #' `r lifecycle::badge("deprecated")`
 #'
 #' `friendly_type()` is deprecated. Please use the
-#' `compat-friendly-type.R` file instead.
+#' `standalone-friendly-type.R` file instead.
 #'
 #' @param type A type as returned by [typeof()].
 #' @return A string of the prettified type, qualified with an
@@ -238,9 +473,11 @@ coerce_class <- function(.x, .to, ...) {
 #' @export
 #' @keywords internal
 friendly_type <- function(type) {
-  signal_soft_deprecated("`friendly_type()` is deprecated as of rlang 0.4.11.")
+  deprecate_warn("`friendly_type()` is deprecated as of rlang 0.4.11.")
   type
 }
+# rlang 0.4.0: Soft-deprecation
+# rlang 1.1.0: Deprecation
 
 
 ##  Eval
@@ -258,7 +495,7 @@ invoke <- function(.fn, .args = list(), ...,
                    .env = caller_env(), .bury = c(".fn", "")) {
   # rlang 0.4.0: Soft-deprecation
   # rlang 1.0.0: Deprecation
-  warn_deprecated(c(
+  deprecate_warn(c(
     "`invoke()` is deprecated as of rlang 0.4.0.",
     "Please use `exec()` or `inject()` instead."
   ))
@@ -302,7 +539,7 @@ invoke <- function(.fn, .args = list(), ...,
 #'
 #' @description
 #'
-#' `r lifecycle::badge("soft-deprecated")`
+#' `r lifecycle::badge("deprecated")`
 #'
 #' These are equivalent to the base functions (e.g. [as.logical()],
 #' [as.list()], etc), but perform coercion rather than conversion.
@@ -405,14 +642,12 @@ invoke <- function(.fn, .args = list(), ...,
 #' as_list(x)
 #' @name vector-coercion
 NULL
-
-signal_deprecated_cast <- function(fn, env = caller_env(2)) {
-  signal_soft_deprecated(env = env, c(
+signal_deprecated_cast <- function(fn, user_env = caller_env(2)) {
+  deprecate_warn(user_env = user_env, c(
     sprintf("`%s()` is deprecated as of rlang 0.4.0", fn),
     "Please use `vctrs::vec_cast()` instead."
   ))
 }
-
 #' @rdname vector-coercion
 #' @export
 as_logical <- function(x) {
@@ -458,7 +693,7 @@ env_as_list <- function(x) {
   set_names(x, .Call(ffi_unescape_character, names_x))
 }
 vec_as_list <- function(x) {
-  coerce_type_vec(x, obj_type_friendly(list(), value = FALSE),
+  coerce_type_vec(x, vec_type_friendly(list()),
     logical = ,
     integer = ,
     double = ,
@@ -471,28 +706,28 @@ vec_as_list <- function(x) {
 }
 
 legacy_as_logical <- function(x) {
-  coerce_type_vec(x, obj_type_friendly(lgl(), value = FALSE),
+  coerce_type_vec(x, vec_type_friendly(lgl()),
     logical = { attributes(x) <- NULL; x },
     integer = as_base_type(x, as.logical),
     double = as_integerish_type(x, as.logical, lgl())
   )
 }
 legacy_as_integer <- function(x) {
-  coerce_type_vec(x, obj_type_friendly(int(), value = FALSE),
+  coerce_type_vec(x, vec_type_friendly(int()),
     logical = as_base_type(x, as.integer),
     integer = { attributes(x) <- NULL; x },
     double = as_integerish_type(x, as.integer, int(), value = FALSE)
   )
 }
 legacy_as_double <- function(x) {
-  coerce_type_vec(x, obj_type_friendly(dbl(), value = FALSE),
+  coerce_type_vec(x, vec_type_friendly(dbl()),
     logical = ,
     integer = as_base_type(x, as.double),
     double = { attributes(x) <- NULL; x }
   )
 }
 legacy_as_complex <- function(x) {
-  coerce_type_vec(x, obj_type_friendly(cpl(), value = FALSE),
+  coerce_type_vec(x, vec_type_friendly(cpl()),
     logical = ,
     integer = ,
     double = as_base_type(x, as.complex),
@@ -505,7 +740,7 @@ legacy_as_character <- function(x, encoding = NULL) {
   }
   coerce_type_vec(
     x,
-    obj_type_friendly(chr(), value = FALSE),
+    vec_type_friendly(chr()),
     string = ,
     character = {
       attributes(x) <- NULL
@@ -569,6 +804,8 @@ vec_coerce <- function(x, type) {
 
 #  Stack and frames  -------------------------------------------------
 
+# 2022-01: https://github.com/tidyverse/purrr/issues/851
+
 #' Call stack information
 #'
 #' @description
@@ -582,8 +819,7 @@ NULL
 #' @rdname stack-deprecated
 #' @export
 ctxt_frame <- function(n = 1) {
-  # 2022-01: https://github.com/tidyverse/purrr/issues/851
-  warn_deprecated("`ctxt_frame()` is deprecated as of rlang 0.3.0.")
+  deprecate_warn("`ctxt_frame()` is deprecated as of rlang 0.3.0.")
   stopifnot(n > 0)
   pos <- sys.nframe() - n
 
@@ -608,7 +844,7 @@ ctxt_frame <- function(n = 1) {
 #' @rdname stack-deprecated
 #' @export
 global_frame <- function() {
-  warn_deprecated("`global_frame()` is deprecated as of rlang 0.3.0.")
+  deprecate_warn("`global_frame()` is deprecated as of rlang 0.3.0.")
   new_frame(list(
     pos = 0L,
     caller_pos = NA_integer_,
@@ -636,7 +872,7 @@ new_frame <- function(x) {
 #' @export
 quo_expr <- function(quo, warn = FALSE) {
   # 2022-01: Still used by many packages on CRAN
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "`quo_expr()` is deprecated as of rlang 0.2.0.",
     "Please use `quo_squash()` instead."
   ))
@@ -697,7 +933,7 @@ UQS <- function(x) {
 lang <- function(.fn, ..., .ns = NULL) {
   # 2022-01: Still used in attempt
   # https://github.com/ColinFay/attempt/issues/16
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "`lang()` is deprecated as of rlang 0.2.0.",
     "Please use `call2()` instead."
   ))
@@ -715,7 +951,7 @@ lang <- function(.fn, ..., .ns = NULL) {
 is_lang <- function(x, name = NULL, n = NULL, ns = NULL) {
   # 2022-01: Still used in foolbox
   # https://github.com/mailund/foolbox/issues/50
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "`is_lang()` is deprecated as of rlang 0.2.0.",
     "Please use `is_call()` instead."
   ))
@@ -746,6 +982,8 @@ is_lang <- function(x, name = NULL, n = NULL, ns = NULL) {
 #' @keywords internal
 #' @export
 call_standardise <- function(call, env = caller_env()) {
+  deprecate_soft("`call_standardise()` is deprecated as of rlang 0.4.11")
+
   expr <- get_expr(call)
   if (!is_call(expr)) {
     abort_call_input_type("call")
@@ -762,7 +1000,6 @@ call_standardise <- function(call, env = caller_env()) {
     set_expr(call, matched)
   }
 }
-
 #' Extract function from a call
 #'
 #' @description
@@ -773,6 +1010,7 @@ call_standardise <- function(call, env = caller_env()) {
 #' @keywords internal
 #' @export
 call_fn <- function(call, env = caller_env()) {
+  deprecate_soft("`call_fn()` is deprecated as of rlang 0.4.11")
   expr <- get_expr(call)
   env <- get_env(call, env)
 
@@ -788,9 +1026,13 @@ call_fn <- function(call, env = caller_env()) {
     eval_bare(node_car(expr), env)
   )
 }
+# rlang 0.4.11: silent deprecation
+# rlang 1.1.0: soft-deprecation
 
 
 #  Environments  -----------------------------------------------------
+
+# 2022-01: https://github.com/r-lib/conflicted/issues/65
 
 #' Deprecated `scoped` functions
 #'
@@ -805,8 +1047,7 @@ call_fn <- function(call, env = caller_env()) {
 #' @keywords internal
 #' @export
 scoped_env <- function(nm) {
-  # 2022-01: https://github.com/r-lib/conflicted/issues/65
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "`scoped_env()` is deprecated as of rlang 0.3.0.",
     "Please use `search_env()` instead."
   ))
@@ -820,11 +1061,13 @@ scoped_env <- function(nm) {
   }
   as.environment(nm)
 }
+
+# 2022-01: https://github.com/tidyverse/purrr/issues/851
+
 #' @rdname scoped_env
 #' @export
 is_scoped <- function(nm) {
-  # 2022-01: https://github.com/tidyverse/purrr/issues/851
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "`is_scoped()` is deprecated as of rlang 0.3.0.",
     "Please use `is_attached()` instead."
   ))
@@ -834,35 +1077,6 @@ is_scoped <- function(nm) {
     stop("`nm` must be a string", call. = FALSE)
   }
   nm %in% c(search(), "NULL")
-}
-
-
-#  Vectors  ----------------------------------------------------------
-
-#' Retired vector construction by length
-#'
-#' @description
-#'
-#' `r lifecycle::badge("deprecated")`
-#'
-#' These functions were deprecated and renamed with `new_` prefix in
-#' rlang 0.2.0. This is for consistency with other non-variadic object
-#' constructors.
-#'
-#' @param .x A vector.
-#' @name vector-old-ctors
-#' @keywords internal
-NULL
-
-#' @rdname vector-old-ctors
-#' @export
-lgl_along <- function(.x) {
-  stop_defunct("`lgl_along()` is deprecated as of rlang 0.2.0.")
-}
-#' @rdname vector-old-ctors
-#' @export
-int_along <- function(.x) {
-  stop_defunct("`int_along()` is deprecated as of rlang 0.2.0.")
 }
 
 
@@ -879,7 +1093,7 @@ set_attrs <- function(.x, ...) {
   # 2018-10: Soft-deprecated
   # 2019-06: Deprecated
   # 2022-01: Used in `survivalAnalysis`
-  warn_deprecated("`set_attrs()` is deprecated as of rlang 0.3.0")
+  deprecate_warn("`set_attrs()` is deprecated as of rlang 0.3.0")
 
   if (!is_copyable(.x)) {
     abort("`.x` is uncopyable.")
@@ -904,6 +1118,9 @@ names(set_attrs_null) <- ""
 
 #  Conditions --------------------------------------------------------
 
+# 1.0.0: Silently deprecated. Used in recipes (in a deprecated function).
+# 1.1.0: soft-deprecated
+
 #' Establish handlers on the stack
 #'
 #' @description
@@ -916,7 +1133,10 @@ names(set_attrs_null) <- ""
 #' @keywords internal
 #' @export
 with_handlers <- function(.expr, ...) {
-  # 1.0.0: Silently deprecated. Used in recipes.
+  deprecate_soft(c(
+    "`with_handlers()` is deprecated as of rlang 1.0.0.",
+    "i" = "Please use `tryCatch()`, `withCallingHandlers()`, or `try_fetch()`."
+  ))
 
   handlers <- list2(...)
 
@@ -940,14 +1160,15 @@ with_handlers <- function(.expr, ...) {
 #' @rdname with_handlers
 #' @export
 calling <- function(handler) {
+  deprecate_soft("`calling()` is deprecated as of rlang 1.0.0.")
   handler <- as_function(handler)
   new_box(handler, "rlang_box_calling_handler")
 }
 #' @rdname with_handlers
 #' @export
 exiting <- function(handler) {
-  signal_soft_deprecated(c(
-    "`exiting()` is soft-deprecated as of rlang 0.4.0.",
+  deprecate_soft(c(
+    "`exiting()` is deprecated as of rlang 0.4.0.",
     "Handlers are now treated as exiting by default."
   ))
   handler <- as_function(handler)
@@ -956,6 +1177,9 @@ exiting <- function(handler) {
 
 
 #  Scoped_
+
+# rlang 0.4.2: Silent deprecation.
+# rlang 1.0.0: Soft deprecation.
 
 #' Deprecated `scoped_` functions
 #'
@@ -972,7 +1196,7 @@ exiting <- function(handler) {
 #' @keywords internal
 #' @export
 scoped_interactive <- function(value = TRUE, frame = caller_env()) {
-  signal_soft_deprecated(c(
+  deprecate_soft(c(
     "`scoped_interactive()` is deprecated as of rlang 0.4.2.",
     "Please use `local_interactive()` instead."
   ))
@@ -981,7 +1205,7 @@ scoped_interactive <- function(value = TRUE, frame = caller_env()) {
 #' @rdname scoped_interactive
 #' @export
 scoped_options <- function(..., .frame = caller_env()) {
-  signal_soft_deprecated(c(
+  deprecate_soft(c(
     "`scoped_options()` is deprecated as of rlang 0.4.2.",
     "Please use `local_options()` instead."
   ))
@@ -990,11 +1214,9 @@ scoped_options <- function(..., .frame = caller_env()) {
 #' @rdname scoped_interactive
 #' @export
 scoped_bindings <- function(..., .env = .frame, .frame = caller_env()) {
-  signal_soft_deprecated(c(
+  deprecate_soft(c(
     "`scoped_bindings()` is deprecated as of rlang 0.4.2.",
     "Please use `local_bindings()` instead."
   ))
   local_bindings(..., .env = .env, .frame = .frame)
 }
-# rlang 0.4.2: Silent deprecation.
-# rlang 1.0.0: Soft deprecation.

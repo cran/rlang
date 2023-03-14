@@ -199,7 +199,7 @@ as_quosure <- function(x, env = NULL) {
 
   if (is_symbolic(x)) {
     if (is_null(env)) {
-      warn_deprecated(paste_line(
+      deprecate_warn(paste_line(
         "`as_quosure()` requires an explicit environment as of rlang 0.3.0.",
         "Please supply `env`."
       ))
@@ -272,7 +272,7 @@ c.quosures <- function(..., recursive = FALSE) {
   if (every(out, is_quosure)) {
     new_quosures(out)
   } else {
-    warn_deprecated(paste_line(
+    deprecate_warn(paste_line(
       "Quosure lists can't be concatenated with objects other than quosures as of rlang 0.3.0.",
       "Please call `as.list()` on the quosure list first."
     ))
@@ -309,7 +309,7 @@ as.list.quosures <- function(x, ...) {
   x
 }
 signal_quosure_assign <- function(x) {
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "Assigning non-quosure objects to quosure lists is deprecated as of rlang 0.3.0.",
     "Please coerce to a bare list beforehand with `as.list()`"
   ))
@@ -377,8 +377,7 @@ quo_squash <- function(quo, warn = FALSE) {
 #'
 #' @keywords internal
 #' @description
-#'
-#' `r lifecycle::badge("questioning")`
+#' `r lifecycle::badge("superseded")`
 #'
 #' **Note:** You should now use [as_label()] or [as_name()] instead
 #' of `quo_name()`. See life cycle section below.
@@ -405,7 +404,7 @@ quo_squash <- function(quo, warn = FALSE) {
 #'
 #' @section Life cycle:
 #'
-#' These functions are in the questioning life cycle stage.
+#' These functions are superseded.
 #'
 #' * [as_label()] and [as_name()] should be used instead of
 #'   `quo_name()`. `as_label()` transforms any R object to a string
@@ -453,37 +452,43 @@ quo_name <- function(quo) {
 }
 
 quo_squash_impl <- function(x, parent = NULL, warn = FALSE) {
+  quo_squash_do <- function(x) {
+    if (!is_false(warn)) {
+      if (is_string(warn)) {
+        msg <- warn
+      } else {
+        msg <- "Collapsing inner quosure"
+      }
+      warn(msg)
+      warn <- FALSE
+    }
+
+    while (is_quosure(maybe_missing(x))) {
+      x <- quo_get_expr(x)
+    }
+    if (!is_null(parent)) {
+      node_poke_car(parent, maybe_missing(x))
+    }
+    quo_squash_impl(x, parent, warn = warn)
+  }
+
+  node_squash <- function(x) {
+    while (!is_null(x)) {
+      quo_squash_impl(node_car(x), parent = x, warn = warn)
+      x <- node_cdr(x)
+    }
+  }
+
   switch_expr(
     x,
     language = {
       if (is_quosure(x)) {
-        if (!is_false(warn)) {
-          if (is_string(warn)) {
-            msg <- warn
-          } else {
-            msg <- "Collapsing inner quosure"
-          }
-          warn(msg)
-          warn <- FALSE
-        }
-
-        while (is_quosure(maybe_missing(x))) {
-          x <- quo_get_expr(x)
-        }
-        if (!is_null(parent)) {
-          node_poke_car(parent, maybe_missing(x))
-        }
-        quo_squash_impl(x, parent, warn = warn)
+        x <- quo_squash_do(x)
       } else {
-        quo_squash_impl(node_cdr(x), warn = warn)
+        node_squash(x)
       }
     },
-    pairlist = {
-      while (!is_null(x)) {
-        quo_squash_impl(node_car(x), x, warn = warn)
-        x <- node_cdr(x)
-      }
-    }
+    pairlist = node_squash(x)
   )
 
   maybe_missing(x)
@@ -513,7 +518,7 @@ str.quosure <- function(object, ...) {
 
 #' @export
 as.character.quosure <- function(x, ...) {
-  warn_deprecated(paste_line(
+  deprecate_warn(paste_line(
     "Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.",
     "Please use `as_label()` or `as_name()` instead."
   ))
@@ -522,7 +527,7 @@ as.character.quosure <- function(x, ...) {
 
 #' @export
 `[.quosure` <- function(x, i, ...) {
-  signal_soft_deprecated(c(
+  deprecate_soft(c(
     "Subsetting quosures with `[` is deprecated as of rlang 0.4.0",
     "Please use `quo_get_expr()` instead."
   ))
@@ -530,7 +535,7 @@ as.character.quosure <- function(x, ...) {
 }
 #' @export
 `[[.quosure` <- function(x, i, ...) {
-  signal_soft_deprecated(c(
+  deprecate_soft(c(
     "Subsetting quosures with `[[` is deprecated as of rlang 0.4.0",
     "Please use `quo_get_expr()` instead."
   ))
@@ -732,3 +737,19 @@ median.quosure <- function(x, na.rm = TRUE, ...) {
 quantile.quosure <- function(x, na.rm = TRUE, ...) {
   abort_quosure_op("Summary", "quantile")
 }
+
+#' @export
+c.quosure <- function(..., recursive = FALSE) {
+  inputs <- list(...)
+  if (some(inputs, function(x) !is_quosure(x) && !is.list(x))) {
+    abort("Can't concatenate quosures with incompatible objects.")
+  }
+
+  out <- NextMethod()
+  if (!every(out, is_quosure)) {
+    abort("Can't concatenate quosures with incompatible objects.")
+  }
+
+  new_quosures(out)
+}
+

@@ -73,15 +73,19 @@ detect_installed <- function(info) {
     return(all(hook(info$pkg, info$ver, info$cmp)))
   }
 
-  flatten_lgl(pmap(info, function(pkg, cmp, ver) {
+  out <- list_c(pmap(info, function(pkg, cmp, ver) {
     if (is_string(pkg, "base")) {
       # Special-case the base package because it is not locked on
       # older R versions
       is_fully_loaded <- TRUE
     } else {
+      # Check that package is on disk in case it's been removed (#1561)
+      is_fully_loaded <- is_on_disk(pkg)
+
       # Check for sealed namespaces to protect against `is_installed()`
       # being called from user hooks of `pkg` (#1378)
       is_fully_loaded <-
+        is_fully_loaded &&
         requireNamespace(pkg, quietly = TRUE) &&
         env_is_locked(ns_env(pkg))
     }
@@ -92,6 +96,15 @@ detect_installed <- function(info) {
       FALSE
     }
   }))
+
+  out %||% TRUE
+}
+
+is_on_disk <- function(pkg) {
+  # A warning is emitted if the package was removed from disk
+  suppressWarnings(
+    nzchar(system.file(package = pkg))
+  )
 }
 
 pkg_version_info <- function(pkg,
@@ -165,7 +178,7 @@ as_version_info <- function(pkg, call = caller_env()) {
   }
 
   info <- set_names(transpose(ver), c("cmp", "ver"))
-  info <- map(info, flatten_chr)
+  info <- map(info, list_c)
 
   pkg <- sub(version_regex, "\\1", pkg)
   info <- c(list(pkg = pkg), info)
@@ -306,7 +319,7 @@ check_pkg_version <- function(pkg,
 check_action <- function(action, call = caller_env()) {
   # Take `pkg`, `version`, and `compare`?
   if (!is_null(action)) {
-    check_closure(action, what = "`NULL` or a function", call = call)
+    check_closure(action, call = call, allow_null = TRUE)
 
     if (!"..." %in% names(formals(action))) {
       msg <- sprintf(
@@ -343,10 +356,11 @@ cnd_header.rlib_error_package_not_found <- function(cnd, ...) {
   reason <- cnd$reason
   n <- length(pkg)
 
-  pkg_enum <- chr_quoted(cnd$pkg)
+  # Quote with `"` to make it easier to copy/paste (#1447)
+  pkg_enum <- chr_quoted(cnd$pkg, type = "\"")
 
   if (!is_null(version)) {
-    pkg_enum <- flatten_chr(pmap(list(pkg_enum, compare, version), function(p, o, v) {
+    pkg_enum <- list_c(pmap(list(pkg_enum, compare, version), function(p, o, v) {
       if (is_na(v)) {
         p
       } else {
@@ -355,7 +369,7 @@ cnd_header.rlib_error_package_not_found <- function(cnd, ...) {
     }))
   }
 
-  pkg_enum <- chr_enumerate(pkg_enum, final = "and")
+  pkg_enum <- oxford_comma(pkg_enum, final = "and")
 
   info <- pluralise(
     n,

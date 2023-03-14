@@ -15,7 +15,7 @@
     Output
       Error in `h()`:
       ! Error message
-      Run `rlang::last_error()` to see where the error occurred.
+      Run `rlang::last_trace()` to see where the error occurred.
       Execution halted
     Code
       cat_line(default_non_interactive)
@@ -53,9 +53,8 @@
       Error in `h()`:
       ! Error message
       Warning message:
-      `"collapse"` is deprecated as of rlang 1.1.0.
-      Please use `"none"` instead.
-      This warning is displayed once per session. 
+      `"collapse"` is deprecated as of rlang 1.1.0. Please use `"none"` instead.
+      This warning is displayed once every 8 hours. 
       Execution halted
     Code
       cat_line(full)
@@ -76,7 +75,7 @@
     Output
       Error in `h()`:
       ! Error message
-      Run `rlang::last_error()` to see where the error occurred.
+      Run `rlang::last_trace()` to see where the error occurred.
       Execution halted
     Code
       cat_line(rethrown_non_interactive)
@@ -144,7 +143,7 @@
       ! bar
       Caused by error in `h()`:
       ! foo
-      Run `rlang::last_error()` to see where the error occurred.
+      Run `rlang::last_trace()` to see where the error occurred.
       Execution halted
     Code
       cat_line(non_interactive)
@@ -179,10 +178,18 @@
       ! foo
       ---
       Backtrace:
-        1. rlang:::catch_error(f())
-        9. rlang (local) f()
-       10. rlang (local) g()
-       11. rlang (local) h()
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) h()
     Code
       # From `last_error()`
       print(last_error())
@@ -192,11 +199,19 @@
       ! foo
       ---
       Backtrace:
-        1. rlang:::catch_error(f())
-        9. rlang (local) f()
-       10. rlang (local) g()
-       11. rlang (local) h()
-      Run `rlang::last_trace()` to see the full context.
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) h()
+      Run rlang::last_trace(drop = FALSE) to see 1 hidden frame.
     Code
       # Saved from `last_error()`
       {
@@ -209,11 +224,19 @@
       ! foo
       ---
       Backtrace:
-        1. rlang:::catch_error(f())
-        9. rlang (local) f()
-       10. rlang (local) g()
-       11. rlang (local) h()
-      Run `rlang::last_trace()` to see the full context.
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) h()
+      Run rlang::last_trace(drop = FALSE) to see 1 hidden frame.
     Code
       # Saved from `last_error()`, but no longer last
       {
@@ -226,11 +249,19 @@
       ! foo
       ---
       Backtrace:
-        1. rlang:::catch_error(f())
-        9. rlang (local) f()
-       10. rlang (local) g()
-       11. rlang (local) h()
-      Run `rlang::last_trace()` to see the full context.
+           x
+        1. +-rlang:::catch_error(f())
+        2. | \-rlang::catch_cnd(expr, "error")
+        3. |   +-rlang::eval_bare(...)
+        4. |   +-base::tryCatch(...)
+        5. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        6. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        7. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        8. |   \-base::force(expr)
+        9. \-rlang (local) f()
+       10.   \-rlang (local) g()
+       11.     \-rlang (local) h()
+      Run rlang::last_trace(drop = FALSE) to see 1 hidden frame.
 
 # Backtrace on rethrow: stop() - tryCatch()
 
@@ -244,10 +275,19 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -258,10 +298,19 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -272,10 +321,19 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -286,10 +344,19 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
 
 # Backtrace on rethrow: stop() - withCallingHandlers()
 
@@ -303,14 +370,24 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::stop("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -321,14 +398,24 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -339,14 +426,24 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -357,14 +454,24 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::stop("low-level")
 
 # Backtrace on rethrow: stop() - try_fetch()
 
@@ -378,14 +485,29 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::stop("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -396,14 +518,29 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -414,14 +551,29 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::stop("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -432,14 +584,29 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::stop("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::stop("low-level")
 
 # Backtrace on rethrow: abort() - tryCatch()
 
@@ -453,13 +620,26 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       17. rlang (local) low1()
-       18. rlang (local) low2()
-       19. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::tryCatch(...)
+       14.       | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       15.       |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       16.       |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       17.       \-rlang (local) low1()
+       18.         \-rlang (local) low2()
+       19.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -470,13 +650,26 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       17. rlang (local) low1()
-       18. rlang (local) low2()
-       19. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::tryCatch(...)
+       14.       | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       15.       |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       16.       |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       17.       \-rlang (local) low1()
+       18.         \-rlang (local) low2()
+       19.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -487,13 +680,26 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       17. rlang (local) low1()
-       18. rlang (local) low2()
-       19. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::tryCatch(...)
+       14.       | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       15.       |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       16.       |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       17.       \-rlang (local) low1()
+       18.         \-rlang (local) low2()
+       19.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -504,13 +710,26 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       17. rlang (local) low1()
-       18. rlang (local) low2()
-       19. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::tryCatch(...)
+       14.       | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       15.       |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       16.       |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       17.       \-rlang (local) low1()
+       18.         \-rlang (local) low2()
+       19.           \-rlang (local) low3()
 
 # Backtrace on rethrow: abort() - withCallingHandlers()
 
@@ -524,13 +743,23 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -541,13 +770,23 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -558,13 +797,23 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -575,13 +824,23 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
 
 # Backtrace on rethrow: abort() - try_fetch()
 
@@ -595,13 +854,28 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -612,13 +886,28 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -629,13 +918,28 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -646,13 +950,28 @@
       ! low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
 
 # Backtrace on rethrow: warn = 2 - tryCatch()
 
@@ -666,10 +985,19 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -680,10 +1008,19 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -694,10 +1031,19 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -708,10 +1054,19 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
 
 # Backtrace on rethrow: warn = 2 - withCallingHandlers()
 
@@ -725,14 +1080,24 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::warning("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -743,14 +1108,24 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -761,14 +1136,24 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -779,14 +1164,24 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       14. rlang (local) low1()
-       15. rlang (local) low2()
-       16. rlang (local) low3()
-       17. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-base::withCallingHandlers(...)
+       14.       \-rlang (local) low1()
+       15.         \-rlang (local) low2()
+       16.           \-rlang (local) low3()
+       17.             \-base::warning("low-level")
 
 # Backtrace on rethrow: warn = 2 - try_fetch()
 
@@ -800,14 +1195,29 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::warning("low-level")
     Code
       print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
     Output
@@ -818,14 +1228,29 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = TRUE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = TRUE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = TRUE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = TRUE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
     Output
@@ -836,14 +1261,29 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = TRUE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = TRUE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = TRUE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = TRUE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::warning("low-level")
     Code
       print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
     Output
@@ -854,14 +1294,29 @@
       ! (converted from warning) low-level
       ---
       Backtrace:
-        1. base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
-       10. rlang (local) high1(chain = FALSE, stop_helper = FALSE)
-       11. rlang (local) high2(...)
-       12. rlang (local) high3(...)
-       19. rlang (local) low1()
-       20. rlang (local) low2()
-       21. rlang (local) low3()
-       22. base::warning("low-level")
+           x
+        1. +-base::print(catch_error(high1(chain = FALSE, stop_helper = FALSE)))
+        2. +-rlang:::catch_error(high1(chain = FALSE, stop_helper = FALSE))
+        3. | \-rlang::catch_cnd(expr, "error")
+        4. |   +-rlang::eval_bare(...)
+        5. |   +-base::tryCatch(...)
+        6. |   | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+        7. |   |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+        8. |   |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+        9. |   \-base::force(expr)
+       10. \-rlang (local) high1(chain = FALSE, stop_helper = FALSE)
+       11.   \-rlang (local) high2(...)
+       12.     \-rlang (local) high3(...)
+       13.       +-rlang::try_fetch(...)
+       14.       | +-base::tryCatch(...)
+       15.       | | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       16.       | |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       17.       | |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       18.       | \-base::withCallingHandlers(...)
+       19.       \-rlang (local) low1()
+       20.         \-rlang (local) low2()
+       21.           \-rlang (local) low3()
+       22.             \-base::warning("low-level")
 
 # abort() displays call in error prefix
 
@@ -1131,7 +1586,7 @@
       ! foo
       x bar
       i This is an internal error that was detected in the rlang package.
-        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://https://tidyverse.org/help/>) and the full backtrace.
+        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://tidyverse.org/help/>) and the full backtrace.
     Code
       err(abort("foo", body = c(x = "bar"), .internal = TRUE))
     Output
@@ -1140,7 +1595,7 @@
       ! foo
       x bar
       i This is an internal error that was detected in the rlang package.
-        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://https://tidyverse.org/help/>) and the full backtrace.
+        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://tidyverse.org/help/>) and the full backtrace.
 
 # setting `.internal` adds footer bullet (fallback)
 
@@ -1152,7 +1607,7 @@
       ! foo
       x bar
       i This is an internal error that was detected in the rlang package.
-        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://https://tidyverse.org/help/>) and the full backtrace.
+        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://tidyverse.org/help/>) and the full backtrace.
     Code
       err(abort("foo", body = c(x = "bar"), .internal = TRUE))
     Output
@@ -1161,7 +1616,7 @@
       ! foo
       x bar
       i This is an internal error that was detected in the rlang package.
-        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://https://tidyverse.org/help/>) and the full backtrace.
+        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://tidyverse.org/help/>) and the full backtrace.
 
 # must pass character `body` when `message` is > 1
 
@@ -1248,7 +1703,7 @@
       Error in `f()`:
       ! foo
       i This is an internal error that was detected in the rlang package.
-        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://https://tidyverse.org/help/>) and the full backtrace.
+        Please report it at <https://github.com/r-lib/rlang/issues> with a reprex (<https://tidyverse.org/help/>) and the full backtrace.
     Code
       err(abort("foo", footer = "bar", .internal = TRUE, call = quote(f())))
     Output
@@ -1273,10 +1728,18 @@
       ! Low-level
       ---
       Backtrace:
-        1. base::print(err(foo()))
-        9. rlang (local) foo()
-       10. rlang (local) bar()
-       11. rlang (local) baz()
+           x
+        1. +-base::print(err(foo()))
+        2. +-rlang:::err(foo())
+        3. | \-testthat::expect_error(...)
+        4. |   \-testthat:::expect_condition_matching(...)
+        5. |     \-testthat:::quasi_capture(...)
+        6. |       +-testthat (local) .capture(...)
+        7. |       | \-base::withCallingHandlers(...)
+        8. |       \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+        9. \-rlang (local) foo()
+       10.   \-rlang (local) bar()
+       11.     \-rlang (local) baz()
 
 # if `call` is older than handler caller, use that as bottom
 
@@ -1293,8 +1756,15 @@
       ! Tilt.
       ---
       Backtrace:
-       1. base::print(expect_error(f()))
-       8. rlang (local) f()
+          x
+       1. +-base::print(expect_error(f()))
+       2. +-testthat::expect_error(f())
+       3. | \-testthat:::expect_condition_matching(...)
+       4. |   \-testthat:::quasi_capture(...)
+       5. |     +-testthat (local) .capture(...)
+       6. |     | \-base::withCallingHandlers(...)
+       7. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+       8. \-rlang (local) f()
     Code
       low_level <- (function(call) {
         abort("Tilt.", call = list(NULL, frame = call))
@@ -1308,8 +1778,15 @@
       ! Tilt.
       ---
       Backtrace:
-       1. base::print(expect_error(f()))
-       8. rlang (local) f()
+          x
+       1. +-base::print(expect_error(f()))
+       2. +-testthat::expect_error(f())
+       3. | \-testthat:::expect_condition_matching(...)
+       4. |   \-testthat:::quasi_capture(...)
+       5. |     +-testthat (local) .capture(...)
+       6. |     | \-base::withCallingHandlers(...)
+       7. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+       8. \-rlang (local) f()
 
 # base causal errors include full user backtrace
 
@@ -1323,8 +1800,23 @@
       ! non-numeric argument to binary operator
       ---
       Backtrace:
-        1. base::print(expect_error(my_verb(add(1, ""))))
-       16. rlang (local) add(1, "")
+           x
+        1. +-base::print(expect_error(my_verb(add(1, ""))))
+        2. +-testthat::expect_error(my_verb(add(1, "")))
+        3. | \-testthat:::expect_condition_matching(...)
+        4. |   \-testthat:::quasi_capture(...)
+        5. |     +-testthat (local) .capture(...)
+        6. |     | \-base::withCallingHandlers(...)
+        7. |     \-rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+        8. +-rlang (local) my_verb(add(1, ""))
+        9. | \-rlang (local) with_chained_errors(expr)
+       10. |   \-rlang::try_fetch(...)
+       11. |     +-base::tryCatch(...)
+       12. |     | \-base (local) tryCatchList(expr, classes, parentenv, handlers)
+       13. |     |   \-base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+       14. |     |     \-base (local) doTryCatch(return(expr), name, parentenv, handler)
+       15. |     \-base::withCallingHandlers(...)
+       16. \-rlang (local) add(1, "")
 
 # can supply header method via `message`
 
@@ -1336,4 +1828,16 @@
       abort(function(cnd, ...) "foo")
     Error <rlang_error>
       foo
+
+# newlines are preserved by cli (#1535)
+
+    Code
+      abort("foo\nbar", use_cli_format = TRUE)
+    Error <rlang_error>
+      foo bar
+    Code
+      abort("foo\fbar", use_cli_format = TRUE)
+    Error <rlang_error>
+      foo
+      bar
 

@@ -9,8 +9,9 @@ test_that("matches arg", {
 })
 
 test_that("gives an error with more than one arg", {
-  expect_snapshot_error(
-    arg_match0_wrapper(c("bar", "fun"), c("bar", "baz"))
+  # Interpolates `values` in the error message (#1545)
+  expect_snapshot(
+    (expect_error(arg_match0_wrapper(c("bar", "fun"), c("bar", "baz"))))
   )
 })
 
@@ -319,5 +320,15 @@ test_that("arg_match() backtrace highlights call and arg", {
 
   expect_snapshot({
     print_highlighted_trace(err)
+  })
+})
+
+test_that("arg_match() supports `NA` (#1519)", {
+  f <- function(x = c("a", "b")) arg_match(x)
+
+  expect_snapshot({
+    (expect_error(f(NA)))
+    (expect_error(f(na_chr)))
+    (expect_error(f(chr())))
   })
 })

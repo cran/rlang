@@ -38,19 +38,12 @@ last_trace <- function(drop = NULL) {
 
   # Drop by default with new tree display, don't drop with legacy
   # behaviour
-  drop <- drop %||% use_tree_display()
+  drop <- drop %||% TRUE
 
   err$rlang$internal$trace_simplify <- "none"
   err$rlang$internal$trace_drop <- drop
 
   err
-}
-
-use_tree_display <- function() {
-  if (is_true(peek_option("rlang:::trace_display_tree_override"))) {
-    return(TRUE)
-  }
-  is_true(peek_option("rlang:::trace_display_tree")) && !is_testing()
 }
 
 peek_last_error <- function(cnd) {
@@ -63,7 +56,7 @@ on_load(
   the$last_error <- NULL
 )
 
-#' Display last warnings
+#' Display last messages and warnings
 #'
 #' @description
 #'
@@ -111,33 +104,6 @@ on_load(
 #' last_warnings()
 #' #> [[1]]
 #' #> <warning/rlang_warning>
-#' #> Warning in `f()`: foo
-#' #> Backtrace:
-#' #>  1. global f()
-#' #>
-#' #> [[2]]
-#' #> <warning/rlang_warning>
-#' #> Warning in `g()`: bar
-#' #> Backtrace:
-#' #>  1. global f()
-#' #>  2. global g()
-#' #>
-#' #> [[3]]
-#' #> <warning/rlang_warning>
-#' #> Warning in `h()`: baz
-#' #> Backtrace:
-#' #>  1. global f()
-#' #>  2. global g()
-#' #>  3. global h()
-#' ```
-#'
-#' To get a full backtrace, use [summary()]. In this case the full
-#' backtraces do not include more information:
-#'
-#' ```r
-#' summary(last_warnings())
-#' #> [[1]]
-#' #> <warning/rlang_warning>
 #' #> Warning in `f()`:
 #' #> foo
 #' #> Backtrace:
@@ -164,6 +130,50 @@ on_load(
 #' #>  3.     \-global h()
 #' ```
 #'
+#' This works similarly with messages:
+#'
+#' ```r
+#' f <- function() { inform("Hey!"); g() }
+#' g <- function() { inform("Hi!"); h() }
+#' h <- function() inform("Hello!")
+#'
+#' f()
+#' #> Hey!
+#' #> Hi!
+#' #> Hello!
+#'
+#' rlang::last_messages()
+#' #> [[1]]
+#' #> <message/rlang_message>
+#' #> Message:
+#' #> Hey!
+#' #> ---
+#' #> Backtrace:
+#' #>     x
+#' #>  1. \-global f()
+#' #>
+#' #> [[2]]
+#' #> <message/rlang_message>
+#' #> Message:
+#' #> Hi!
+#' #> ---
+#' #> Backtrace:
+#' #>     x
+#' #>  1. \-global f()
+#' #>  2.   \-global g()
+#' #>
+#' #> [[3]]
+#' #> <message/rlang_message>
+#' #> Message:
+#' #> Hello!
+#' #> ---
+#' #> Backtrace:
+#' #>     x
+#' #>  1. \-global f()
+#' #>  2.   \-global g()
+#' #>  3.     \-global h()
+#' ```
+#'
 #' @export
 last_warnings <- function(n = NULL) {
   out <- new_list_of_conditions(the$last_warnings)
@@ -177,6 +187,7 @@ last_messages <- function(n = NULL) {
 }
 
 on_load({
+  the$n_conditions <- 0L
   the$last_top_frame <- NULL
   the$last_warnings <- list()
   the$last_messages <- list()
@@ -191,24 +202,48 @@ on_load({
 # on the stack, then we'll wrongly keep collecting warnings instead of
 # starting anew.
 push_warning <- function(cnd) {
-  top <- obj_address(sys.frame(1))
-
-  if (identical(the$last_top_frame, top)) {
-    the$last_warnings <- c(the$last_warnings, list(cnd))
-  } else {
-    the$last_top_frame <- top
-    the$last_warnings <- list(cnd)
-  }
+  push_condition(cnd, "last_warnings")
 }
 push_message <- function(cnd) {
-  top <- obj_address(sys.frame(1))
+  push_condition(cnd, "last_messages")
+}
 
-  if (identical(the$last_top_frame, top)) {
-    the$last_messages <- c(the$last_messages, list(cnd))
-  } else {
+push_condition <- function(cnd, last) {
+  top <- obj_address(cmd_frame())
+
+  if (has_new_cmd_frame(top)) {
     the$last_top_frame <- top
-    the$last_messages <- list(cnd)
+    the[[last]] <- list(cnd)
+    the$n_conditions <- 1L
+  } else {
+    the[[last]] <- c(the[[last]], list(cnd))
+
+    # Count the number of pushed conditions to avoid entracing too many
+    # times (#1473)
+    the$n_conditions <- the$n_conditions + 1L
   }
+}
+
+cmd_frame <- function() {
+  if (knitr_in_progress()) {
+    ns <- detect(sys.frames(), function(f) env_top_name(f) == "knitr")
+    ns %||% sys.frame(1)
+  } else {
+    getOption("rlang:::cnd_frame", sys.frame(1))
+  }
+}
+
+env_top_name <- function(x) {
+  x <- topenv(x)
+  if (is_namespace(x)) {
+    ns_env_name(x)
+  } else {
+    ""
+  }
+}
+
+has_new_cmd_frame <- function(top = obj_address(cmd_frame())) {
+  !identical(the$last_top_frame, top)
 }
 
 # Transform foreign warnings to rlang warnings or messages. Preserve

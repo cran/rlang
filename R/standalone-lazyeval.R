@@ -1,8 +1,14 @@
-# nocov start - compat-lazyeval (last updated: rlang 0.3.0)
-
+# ---
+# repo: r-lib/rlang
+# file: standalone-lazyeval.R
+# last-updated: 2018-09-18
+# license: https://unlicense.org
+# imports: rlang
+# ---
+#
 # This file serves as a reference for compatibility functions for lazyeval.
-# Please find the most recent version in rlang's repository.
-
+#
+# nocov start
 
 warn_underscored <- function() {
   return(NULL)

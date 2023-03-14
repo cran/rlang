@@ -315,9 +315,9 @@ test_that("collapsing of eval() frames detects when error occurs within eval()",
     eval()
   }
 
-  catch_cnd(with_handlers(
+  catch_cnd(withCallingHandlers(
     fn(),
-    error = calling(function(err) trace <<- trace_back(e))
+    error = function(err) trace <<- trace_back(e)
   ))
 
   expect_snapshot_trace(trace)
@@ -463,7 +463,7 @@ test_that("caught error does not display backtrace in knitted files", {
   lines <- render_md("test-trace.Rmd")
   error_line <- lines[[length(lines)]]
   expect_match(error_line, "foo$")
-  
+
   expect_snapshot({
     cat_line(render_md("test-trace-full.Rmd"))
   })

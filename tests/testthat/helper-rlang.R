@@ -121,11 +121,28 @@ err <- function(...) {
   (expect_error(...))
 }
 
-checker <- function(foo, check) {
-  check(foo)
+checker <- function(foo, check, ...) {
+  check(foo, ...)
 }
 
 import_or_skip <- function(ns, names, env = caller_env()) {
   skip_if_not_installed(ns)
   ns_import_from(ns, names, env = env)
+}
+
+friendly_types <- function(x, vector = TRUE) {
+  out <- c(
+    object = obj_type_friendly(x),
+    object_no_value = obj_type_friendly(x, value = FALSE)
+  )
+
+  if (vector) {
+    out <- c(
+      out,
+      vector = vec_type_friendly(x),
+      vector_length = vec_type_friendly(x, length = TRUE)
+    )
+  }
+
+  out
 }

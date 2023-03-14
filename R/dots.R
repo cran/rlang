@@ -81,6 +81,11 @@ NULL
 #'   [dynamic][dyn-dots].
 #' @return A list containing the `...` inputs.
 #'
+#' @details
+#' For historical reasons, `dots_list()` creates a named list by
+#' default. By comparison `list2()` implements the preferred behaviour
+#' of only creating a names vector when a name is supplied.
+#'
 #' @export
 list2 <- function(...) {
   .Call(
@@ -171,19 +176,22 @@ list3 <- function(...) {
 #' fn("wrong!", dat = letters)   # partial matching of `data`
 #' fn(some_data, !!!list(data = letters))  # no matching
 #'
+#' # Empty trailing arguments are allowed:
+#' list2(1, )
 #'
-#' # Empty arguments trigger an error by default:
-#' try(fn(, ))
+#' # But non-trailing empty arguments cause an error:
+#' try(list2(1, , ))
 #'
-#' # You can choose to preserve empty arguments instead:
+#' # Use the more configurable `dots_list()` function to preserve all
+#' # empty arguments:
 #' list3 <- function(...) dots_list(..., .preserve_empty = TRUE)
 #'
 #' # Note how the last empty argument is still ignored because
 #' # `.ignore_empty` defaults to "trailing":
-#' list3(, )
+#' list3(1, , )
 #'
 #' # The list with preserved empty arguments is equivalent to:
-#' list(missing_arg())
+#' list(1, missing_arg())
 #'
 #'
 #' # Arguments with duplicated names are kept by default:
@@ -255,7 +263,7 @@ dots_split <- function(...,
   }
 
   if (!is_null(.n_unnamed) && all(n != .n_unnamed)) {
-    ns <- chr_enumerate(.n_unnamed)
+    ns <- oxford_comma(.n_unnamed)
     abort(sprintf("Expected %s unnamed arguments in `...`", ns))
   }
 
@@ -268,77 +276,45 @@ dots_split <- function(...,
   list(named = named, unnamed = unnamed)
 }
 
-#' Splice lists
+#' Splice values at dots collection time
 #'
 #' @description
+#' The splicing operator `!!!` operates both in values contexts like
+#' [list2()] and [dots_list()], and in metaprogramming contexts like
+#' [expr()], [enquos()], or [inject()]. While the end result looks the
+#' same, the implementation is different and much more efficient in
+#' the value cases. This difference in implementation may cause
+#' performance issues for instance when going from:
 #'
-#' `r lifecycle::badge("questioning")`
-#'
-#' - `splice` marks an object to be spliced. It is equivalent to using
-#'   `!!!` in a function taking [dynamic dots][dyn-dots].
-#'
-#' - `dots_splice()` is like [dots_list()] but automatically splices
-#'   list inputs.
-#'
-#'
-#' @section Standard splicing versus quoting splicing:
-#'
-#' The `!!!` operator works differently in _standard_ functions taking
-#' dots with `dots_list()` than in _quoting_ functions taking dots
-#' with [enexprs()] or [enquos()].
-#'
-#' * In quoting functions `!!!` disaggregates its argument (let's call
-#'   it `x`) into as many objects as there are elements in
-#'   `x`. E.g. `quo(foo(!!! c(1, 2)))` is completely equivalent to
-#'   `quo(foo(1, 2))`. The creation of those separate objects has an
-#'   overhead but is typically not important when manipulating calls
-#'   because function calls typically take a small number of
-#'   arguments.
-#'
-#' * In standard functions, disaggregating the spliced collection
-#'   would have a negative performance impact in cases where
-#'   `dots_list()` is used to build up data structures from user
-#'   inputs. To avoid this spliced inputs are marked with [splice()]
-#'   and the final list is built with (the equivalent of)
-#'   `flatten_if(dots, is_spliced)`.
-#'
-#' Most of the time you should not care about the difference. However
-#' if you use a standard function taking tidy dots within a quoting
-#' function, the `!!!` operator will disaggregate its argument because
-#' the behaviour of the quasiquoting function has priority. You might
-#' then observe some performance cost in edge cases. Here is one
-#' example where this would happen:
-#'
-#' ```
-#' purrr::rerun(10, dplyr::bind_rows(!!! x))
+#' ```r
+#' xs <- list(2, 3)
+#' list2(1, !!!xs, 4)
 #' ```
 #'
-#' `purrr::rerun()` is a quoting function and `dplyr::bind_rows()` is
-#' a standard function. Because `bind_rows()` is called _inside_
-#' `rerun()`, the list `x` will be disaggregated into a pairlist of
-#' arguments. To avoid this you can use `splice()` instead:
+#' to:
 #'
-#' ```
-#' purrr::rerun(10, dplyr::bind_rows(splice(x)))
+#' ```r
+#' inject(list2(1, !!!xs, 4))
 #' ```
 #'
+#' In the former case, the performant value-splicing is used. In the
+#' latter case, the slow metaprogramming splicing is used.
 #'
-#' @section Life cycle:
+#' A common practical case where this may occur is when code is
+#' wrapped inside a tidyeval context like `dplyr::mutate()`. In this
+#' case, the metaprogramming operator `!!!` will take over the
+#' value-splicing operator, causing an unexpected slowdown.
 #'
-#' * `dots_splice()` is in the questioning stage. It is part of our
-#'   experiments with dots semantics. Compared to `dots_list()`,
-#'   `dots_splice()` automatically splices lists. We now lean towards
-#'   adopting a single type of dots semantics (those of `dots_list()`)
-#'   where splicing is explicit.
+#' To avoid this in performance-critical code, use `splice()` instead
+#' of `!!!`:
 #'
-#' * `splice()` is in the questioning stage. It is not clear whether it is
-#'   really needed as there are other ways to avoid the performance
-#'   issue discussed above.
+#' ```r
+#' # These both use the fast splicing:
+#' list2(1, splice(xs), 4)
+#' inject(list2(1, splice(xs), 4))
+#' ```
 #'
-#'
-#' @param x A list to splice.
-#'
-#' @keywords internal
+#' @param x A list or vector to splice non-eagerly.
 #' @export
 splice <- function(x) {
   .Call(ffi_new_splice_box, x)
@@ -358,29 +334,6 @@ print.rlang_box_splice <- function(x, ...) {
   cat_line("<spliced>")
   print(unbox(x))
 }
-
-#' @rdname splice
-#' @inheritParams dots_list
-#' @export
-dots_splice <- function(...,
-                        .ignore_empty = c("trailing", "none", "all"),
-                        .preserve_empty = FALSE,
-                        .homonyms = c("keep", "first", "last", "error"),
-                        .check_assign = FALSE) {
-  dots <- .Call(
-    ffi_dots_flat_list,
-    frame_env = environment(),
-    named = NULL,
-    ignore_empty = .ignore_empty,
-    preserve_empty = .preserve_empty,
-    unquote_names = TRUE,
-    homonyms = .homonyms,
-    check_assign = .check_assign
-  )
-  names(dots) <- names2(dots)
-  dots
-}
-
 
 #' Evaluate dots with preliminary splicing
 #'
@@ -470,7 +423,7 @@ abort_dots_homonyms <- function(dots, dups) {
 
 homonym_enum <- function(nm, dups, nms) {
   dups[nms != nm] <- FALSE
-  chr_enumerate(as.character(which(dups)), final = "and")
+  oxford_comma(as.character(which(dups)), final = "and")
 }
 
 

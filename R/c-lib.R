@@ -21,9 +21,9 @@ use_rlang_c_library <- function() {
 
   check_rlang(rlang_path)
   rlang_lib_path <- fs::path(rlang_path, "src", "rlang")
-  rlang_lib_include_path <- fs::path(rlang_path, "src", c("rlang.c", "rlang-rcc.cpp"))
+  rlang_lib_include_path <- fs::path(rlang_path, "src", "rlang.c")
 
-  proj_path <- usethis::proj_path()
+  proj_path <- usethis::proj_get()
   if (is_rlang_dir(proj_path)) {
     abort(c(
       "Can't update rlang from itself.",
@@ -33,7 +33,7 @@ use_rlang_c_library <- function() {
 
   src_path <- fs::path(proj_path, "src")
   lib_path <- fs::path(src_path, "rlang")
-  lib_include_path <- fs::path(src_path, c("rlang.c", "rlang-rcc.cpp"))
+  lib_include_path <- fs::path(src_path, "rlang.c")
 
   has_library <- any(fs::file_exists(c(lib_path, lib_include_path)))
 
@@ -66,10 +66,6 @@ use_rlang_c_library <- function() {
   if (!has_include_directive(src_path)) {
     usethis::ui_todo("Add to `src/Makevars`:")
     usethis::ui_code_block("PKG_CPPFLAGS = -I./rlang")
-  }
-  if (!has_cpp11_sysreq(proj_path)) {
-    usethis::ui_todo("Add to `DESCRIPTION`:")
-    usethis::ui_code_block("SystemRequirements: C++11")
   }
   if (!detect_rlang_lib_usage(src_path)) {
     usethis::ui_todo("Include the library with `#include <rlang.h>`.")
@@ -122,11 +118,6 @@ has_include_directive <- function(src_path) {
 
   makevars_lines <- readLines(makevars_path)
   any(grepl("PKG_CPPFLAGS.*-I.*rlang", makevars_lines))
-}
-
-has_cpp11_sysreq <- function(proj_path) {
-  desc_lines <- readLines(fs::path(proj_path, "DESCRIPTION"))
-  any(grepl("C++11", desc_lines, fixed = TRUE))
 }
 
 detect_rlang_lib_usage <- function(src_path) {
@@ -294,6 +285,11 @@ dyn_chr_poke <- function(x, i, value) {
 }
 dyn_list_poke <- function(x, i, value) {
   invisible(.Call(ffi_dyn_list_poke, x, i, value))
+}
+
+# https://github.com/r-lib/rlang/issues/1556
+has_size_one_bool <- function() {
+  .Call(ffi_has_size_one_bool)
 }
 
 #' @export

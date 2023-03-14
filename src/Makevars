@@ -65,6 +65,7 @@ internal-files = \
         internal/quo.c \
         internal/replace-na.c \
         internal/squash.c \
+        internal/standalone-types-check.c \
         internal/sym-unescape.c \
         internal/tests.c \
         internal/utils.c \
@@ -79,8 +80,6 @@ $(SHLIB): rlang.o internal.o
 
 rlang.c: $(lib-files)
 	touch rlang.c
-rlang-rcc.cpp: $(lib-cpp-files)
-	touch rlang-rcc.cpp
 internal.c: $(internal-files)
 	touch internal.c
 export.c: $(export-files)

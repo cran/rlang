@@ -13,17 +13,23 @@ test_that("exprs() captures empty arguments", {
 
 test_that("dots are always named", {
   expect_named(dots_list("foo"), "")
-  expect_named(dots_splice("foo", list("bar")), c("", ""))
   expect_named(exprs(foo, bar), c("", ""))
+
+  local_lifecycle_silence()
+  expect_named(dots_splice("foo", list("bar")), c("", ""))
 })
 
 test_that("dots can be spliced", {
-  spliced_dots <- dots_values(!!! list(letters))
+  local_lifecycle_silence()
+
+  spliced_dots <- dots_values(!!!list(letters))
   expect_identical(spliced_dots, list(splice(list(letters))))
-  expect_identical(flatten(dots_values(!!! list(letters))), list(letters))
-  expect_identical(list2(!!! list(letters)), list(letters))
+  expect_identical(list2(!!!list(letters)), list(letters))
   wrapper <- function(...) list2(...)
-  expect_identical(wrapper(!!! list(letters)), list(letters))
+  expect_identical(wrapper(!!!list(letters)), list(letters))
+
+  local_lifecycle_silence()
+  expect_identical(flatten(dots_values(!!! list(letters))), list(letters))
 })
 
 test_that("interpolation by value does not guard formulas", {
@@ -60,8 +66,10 @@ test_that("dots_values() handles forced dots", {
 })
 
 test_that("empty arguments trigger meaningful error", {
-  expect_error(list2(1, , 3), "Argument 2 is empty")
-  expect_error(dots_list(1, , 3), "Argument 2 is empty")
+  expect_snapshot({
+    (expect_error(list2(1, , 3), "empty"))
+    (expect_error(dots_list(1, , 3), "empty"))
+  })
 })
 
 test_that("cleans empty arguments", {
@@ -72,7 +80,7 @@ test_that("cleans empty arguments", {
 })
 
 test_that("doesn't clean named empty argument arguments", {
-  expect_error(dots_list(1, a = ), "Argument 2 is empty")
+  expect_error(dots_list(1, a = ), "empty")
   expect_identical(exprs(1, a = ), alist(1, a = ))
   expect_identical(exprs(1, a = , b = , , .ignore_empty = "all"), alist(1, a = , b = ))
 })
@@ -92,12 +100,14 @@ test_that("can splice NULL value", {
 })
 
 test_that("dots_splice() flattens lists", {
+  local_lifecycle_silence()
   expect_identical(dots_splice(list("a", list("b"), "c"), "d", list("e")), named_list("a", list("b"), "c", "d", "e"))
   expect_identical(dots_splice(list("a"), !!! list("b"), list("c"), "d"), named_list("a", "b", "c", "d"))
   expect_identical(dots_splice(list("a"), splice(list("b")), list("c"), "d"), named_list("a", "b", "c", "d"))
 })
 
 test_that("dots_splice() doesn't squash S3 objects", {
+  local_lifecycle_silence()
   s <- structure(list(v1 = 1, v2 = 2), class = "foo")
   expect_identical(dots_splice(s, s), named_list(s, s))
 })
@@ -255,10 +265,13 @@ test_that("can mix `!!!` and splice boxes", {
 
 test_that("list2() and dots_values() support splice boxes", {
   expect_identical(list2(1, splice(c("foo", "bar")), 3), list(1, "foo", "bar", 3))
+
+  local_lifecycle_silence()
   expect_identical(dots_values(1, splice(c("foo", "bar")), 3), list(1, splice(list("foo", "bar")), 3))
 })
 
 test_that("dots_values() doesn't splice", {
+  local_lifecycle_silence()
   expect_identical_(dots_values(!!!c(1:3)), list(splice(as.list(1:3))))
   expect_identical_(dots_values(!!!list("foo", "bar")), list(splice(list("foo", "bar"))))
 })
@@ -347,6 +360,19 @@ test_that("`list2(!!!x)` returns `x` without duplication", {
     x <- 1:100 + 0L
     with_memory_prof(out <- list2(!!!x))
     expect_equal(out, as.list(x))
+  })
+})
+
+test_that("list2(...) doesn't copy forced promises (#1491)", {
+  fn <- function(...) {
+    list(...)
+    with_memory_prof(list2(...))
+  }
+
+  x <- seq_len(1e4) + 0
+
+  expect_snapshot({
+    fn(x, x, x, x, x, x)
   })
 })
 

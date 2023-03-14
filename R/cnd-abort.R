@@ -88,6 +88,11 @@
 #'   individual and unformatted lines. Any newline character `"\\n"`
 #'   already present in `message` is reformatted by cli's paragraph
 #'   formatter. See `r link("topic_condition_formatting")`.
+#' @param .inherit Whether the condition inherits from `parent`
+#'   according to [cnd_inherits()] and [try_fetch()]. By default,
+#'   parent conditions of higher severity are not inherited. For
+#'   instance an error chained to a warning is not inherited to avoid
+#'   unexpectedly catching an error downgraded to a warning.
 #' @param .internal If `TRUE`, a footer bullet is added to `message`
 #'   to let the user know that the error is internal and that they
 #'   should report it to the package authors. This argument is
@@ -252,6 +257,7 @@ abort <- function(message = NULL,
                   trace = NULL,
                   parent = NULL,
                   use_cli_format = NULL,
+                  .inherit = TRUE,
                   .internal = FALSE,
                   .file = NULL,
                   .frame = caller_env(),
@@ -321,6 +327,11 @@ abort <- function(message = NULL,
   message <- message_info$message
   extra_fields <- message_info$extra_fields
   use_cli_format <- message_info$use_cli_format
+
+  extra_fields$rlang <- c(
+    extra_fields$rlang,
+    list(inherit = .inherit)
+  )
 
   parent_trace <- if (rethrowing) parent[["trace"]]
 
@@ -679,7 +690,7 @@ footer_internal <- function(env) {
       url_line <- sprintf(
         "Please report it at %s with a %s and the full backtrace.",
         format_url(url),
-        format_href("reprex", "https://https://tidyverse.org/help/")
+        format_href("reprex", "https://tidyverse.org/help/")
       )
     }
   } else {
@@ -1322,7 +1333,7 @@ call_restore <- function(x, to) {
 #' * It prints the backtrace for the current error according to the
 #'   `rlang_backtrace_on_error` option.
 #'
-#' @section Errors in RMarkdown:
+#' @section Warnings and errors in RMarkdown:
 #'
 #' The display of errors depends on whether they're expected (i.e.
 #' chunk option `error = TRUE`) or unexpected:
@@ -1350,8 +1361,29 @@ call_restore <- function(x, to) {
 #' backtraces. If needed, you can override this by setting the
 #' `rlang_trace_top_env` global option.
 #'
+#' Similarly to `rlang_backtrace_on_error_report`, you can set
+#' `rlang_backtrace_on_warning_report` inside RMarkdown documents to
+#' tweak the display of warnings. This is useful in conjunction with
+#' [global_entrace()]. Because of technical limitations, there is
+#' currently no corresponding `rlang_backtrace_on_warning` option for
+#' normal R sessions.
+#'
+#' To get full entracing in an Rmd document, include this in a setup
+#' chunk before the first error or warning is signalled.
+#'
+#' ````
+#' ```{r setup}
+#' rlang::global_entrace()
+#' options(rlang_backtrace_on_warning_report = "full")
+#' options(rlang_backtrace_on_error_report = "full")
+#' ```
+#' ````
+#'
+#'
 #' @name rlang_backtrace_on_error
-#' @aliases add_backtrace
+#' @seealso rlang_backtrace_on_warning
+#' @aliases add_backtrace rlang_backtrace_on_error_report
+#'   rlang_backtrace_on_warning_report
 #'
 #' @examples
 #' # Display a simplified backtrace on error for both base and rlang
@@ -1395,11 +1427,7 @@ format_onerror_backtrace <- function(cnd, opt = peek_backtrace_on_error()) {
   # reminder when there is no trace to display
   if (opt == "reminder") {
     if (is_interactive()) {
-      if (use_tree_display()) {
-        last_error <- style_rlang_run("last_trace()")
-      } else {
-        last_error <- style_rlang_run("last_error()")
-      }
+      last_error <- style_rlang_run("last_trace()")
       reminder <- col_silver(paste0("Run `", last_error, "` to see where the error occurred."))
     } else {
       reminder <- NULL
@@ -1445,6 +1473,22 @@ peek_backtrace_on_error <- function() {
 # by knitr
 peek_backtrace_on_error_report <- function() {
   peek_backtrace_on_error_opt("rlang_backtrace_on_error_report") %||% "none"
+}
+
+peek_backtrace_on_warning_report <- function() {
+  opt <- peek_backtrace_on_error_opt("rlang_backtrace_on_warning_report") %||% "none"
+
+  if (is_string(opt, "reminder")) {
+    options(rlang_backtrace_on_warning_report = "none")
+    warn(c(
+      "`rlang_backtrace_on_warning_report` must be one of `c(\"none\", \"branch\", \"full\")`.",
+      i = "The option was reset to \"none\"."
+    ))
+
+    opt <- "none"
+  }
+
+  opt
 }
 
 peek_backtrace_on_error_opt <- function(name) {

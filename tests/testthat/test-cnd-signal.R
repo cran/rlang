@@ -19,10 +19,10 @@ test_that("cnd_signal() and signal() returns NULL invisibly", {
 })
 
 test_that("signal() accepts character vectors of classes (#195)", {
-  expect <- calling(function(cnd) {
+  expect <- function(cnd) {
     expect_identical(class(cnd), c("foo", "bar", "condition"))
-  })
-  with_handlers(signal("", c("foo", "bar")), foo = expect)
+  }
+  withCallingHandlers(signal("", c("foo", "bar")), foo = expect)
 })
 
 test_that("can pass condition metadata", {
@@ -42,7 +42,7 @@ test_that("can signal and catch interrupts", {
 
 test_that("can signal interrupts with cnd_signal()", {
   intr <- catch_cnd(interrupt())
-  with_handlers(cnd_signal(intr),
+  tryCatch(cnd_signal(intr),
     condition = function(cnd) expect_s3_class(cnd, "interrupt")
   )
 })
@@ -314,6 +314,26 @@ test_that("can reset verbosity", {
   expect_warning(
     warn("foo", .frequency = "once", .frequency_id = "test_reset_verbosity")
   )
+})
+
+test_that("downgraded conditions are not inherited (#1573)", {
+  cnd <- catch_cnd(warn("", parent = error_cnd()))
+  expect_false(cnd$rlang$inherit)
+
+  cnd <- catch_cnd(inform("", parent = error_cnd()))
+  expect_false(cnd$rlang$inherit)
+
+  cnd <- catch_cnd(inform("", parent = warning_cnd()))
+  expect_false(cnd$rlang$inherit)
+
+  cnd <- catch_cnd(warn("", parent = error_cnd(), .inherit = TRUE))
+  expect_true(cnd$rlang$inherit)
+
+  cnd <- catch_cnd(inform("", parent = error_cnd(), .inherit = TRUE))
+  expect_true(cnd$rlang$inherit)
+
+  cnd <- catch_cnd(inform("", parent = warning_cnd(), .inherit = TRUE))
+  expect_true(cnd$rlang$inherit)
 })
 
 

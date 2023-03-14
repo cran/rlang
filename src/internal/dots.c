@@ -27,13 +27,26 @@ enum dots_ignore_empty {
   DOTS_IGNORE_EMPTY_SIZE,
 };
 
+struct dots_capture_info {
+  enum dots_collect type;
+  r_ssize count;
+  enum arg_named named;
+  bool needs_expansion;
+  enum dots_ignore_empty ignore_empty;
+  bool preserve_empty;
+  bool unquote_names;
+  enum dots_homonyms homonyms;
+  bool check_assign;
+  r_obj* (*big_bang_coerce)(r_obj*);
+  bool splice;
+};
+
 static
 const char* dots_ignore_empty_c_values[DOTS_IGNORE_EMPTY_SIZE] = {
   [DOTS_IGNORE_EMPTY_trailing] = "trailing",
   [DOTS_IGNORE_EMPTY_none] = "none",
   [DOTS_IGNORE_EMPTY_all] = "all"
 };
-
 
 #include "decl/dots-decl.h"
 
@@ -58,20 +71,6 @@ r_obj* rlang_unbox(r_obj* x) {
   }
   return r_list_get(x, 0);
 }
-
-struct dots_capture_info {
-  enum dots_collect type;
-  r_ssize count;
-  enum arg_named named;
-  bool needs_expansion;
-  enum dots_ignore_empty ignore_empty;
-  bool preserve_empty;
-  bool unquote_names;
-  enum dots_homonyms homonyms;
-  bool check_assign;
-  r_obj* (*big_bang_coerce)(r_obj*);
-  bool splice;
-};
 
 struct dots_capture_info init_capture_info(enum dots_collect type,
                                            r_obj* named,
@@ -102,7 +101,7 @@ struct dots_capture_info init_capture_info(enum dots_collect type,
 
 static
 bool has_glue = false;
-r_obj* ffi_glue_is_here() {
+r_obj* ffi_glue_is_here(void) {
   has_glue = true;
   return r_null;
 }
@@ -135,7 +134,7 @@ r_obj* ffi_chr_has_curly(r_obj* x) {
 }
 
 static
-void require_glue() {
+void require_glue(void) {
   r_obj* call = KEEP(r_parse("is_installed('glue')"));
   r_obj* out = KEEP(r_eval(call, rlang_ns_env));
 
@@ -150,10 +149,8 @@ void require_glue() {
 }
 
 static
-r_obj* glue_unquote(r_obj* lhs, r_obj* env) {
-  if (r_typeof(lhs) != R_TYPE_character ||
-      r_length(lhs) != 1 ||
-      !has_curly(r_chr_get_c_string(lhs, 0))) {
+r_obj* glue_embrace(r_obj* lhs, r_obj* env) {
+  if (!r_is_string(lhs) || !has_curly(r_chr_get_c_string(lhs, 0))) {
     return lhs;
   }
 
@@ -161,8 +158,8 @@ r_obj* glue_unquote(r_obj* lhs, r_obj* env) {
     require_glue();
   }
 
-  r_obj* glue_unquote_call = KEEP(r_call2(glue_unquote_fn, lhs));
-  lhs = r_eval(glue_unquote_call, env);
+  r_obj* glue_embrace_call = KEEP(r_call2(glue_embrace_fn, lhs));
+  lhs = r_eval(glue_embrace_call, env);
   FREE(1);
   return lhs;
 }
@@ -176,7 +173,7 @@ r_obj* def_unquote_name(r_obj* expr, r_obj* env) {
 
   switch (info.op) {
   case INJECTION_OP_none:
-    lhs = KEEP_N(glue_unquote(lhs, env), &n_kept);
+    lhs = KEEP_N(glue_embrace(lhs, env), &n_kept);
     break;
   case INJECTION_OP_uq:
     lhs = KEEP_N(r_eval(info.operand, env), &n_kept);
@@ -200,16 +197,17 @@ r_obj* def_unquote_name(r_obj* expr, r_obj* env) {
   }
 
   int err = 0;
-  lhs = r_new_symbol(lhs, &err);
+  r_obj* out = r_new_symbol(lhs, &err);
   if (err) {
-    r_abort("The LHS of `:=` must be a string or a symbol");
+    r_abort("The LHS of `:=` must be a string, not %s.",
+            r_obj_type_friendly(lhs));
   }
 
   FREE(n_kept);
-  return lhs;
+  return out;
 }
 
-void signal_retired_splice() {
+void signal_retired_splice(void) {
   const char* msg =
     "Unquoting language objects with `!!!` is deprecated as of rlang 0.4.0.\n"
     "Please use `!!` instead.\n"
@@ -220,7 +218,7 @@ void signal_retired_splice() {
     "  # Good:\n"
     "  dplyr::select(data, !!enquo(x))    # Unquote single quosure\n"
     "  dplyr::select(data, !!!enquos(x))  # Splice list of quosures\n";
-  warn_deprecated(msg, msg);
+  deprecate_warn(msg, msg);
 }
 
 static
@@ -363,16 +361,6 @@ r_obj* dots_big_bang(struct dots_capture_info* capture_info,
 }
 
 static inline
-bool should_ignore(enum dots_ignore_empty ignore_empty,
-                   r_ssize i,
-                   r_ssize n) {
-  switch (ignore_empty) {
-  case DOTS_IGNORE_EMPTY_all: return true;
-  case DOTS_IGNORE_EMPTY_trailing: return i == n - 1;
-  default: return false;
-  }
-}
-static inline
 r_obj* dot_get_expr(r_obj* dot) {
   return r_list_get(dot, 0);
 }
@@ -396,12 +384,13 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
   r_obj* node = dots;
   for (r_ssize i = 0; node != r_null; ++i, node = r_node_cdr(node)) {
     r_obj* elt = r_node_car(node);
+    r_obj* name = r_node_tag(node);
+
     r_obj* expr = dot_get_expr(elt);
     r_obj* env = dot_get_env(elt);
 
     // Unquoting rearranges expressions
-    // FIXME: Only duplicate the call tree, not the leaves
-    expr = KEEP(r_copy(expr));
+    expr = KEEP(r_node_tree_clone(expr));
 
     if (unquote_names && r_is_call(expr, ":=")) {
       if (r_node_tag(node) != r_null) {
@@ -434,16 +423,13 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
     struct injection_info info = which_expansion_op(expr, unquote_names);
     enum dots_op dots_op = info.op + (INJECTION_OP_MAX * capture_info->type);
 
-    r_obj* name = r_node_tag(node);
+    bool last = i == n - 1;
 
-    // Ignore empty arguments
-    if (expr == r_syms.missing
-        && (name == r_null || name == r_strs.empty)
-        && should_ignore(capture_info->ignore_empty, i, n)) {
-      capture_info->needs_expansion = true;
-      r_node_poke_car(node, empty_spliced_arg);
-      FREE(1);
-      continue;
+#define SKIP_MISSING(EXPR, NPROT)                               \
+    if (should_ignore(capture_info, EXPR, name, last)) {        \
+      ignore(capture_info, node);                               \
+      FREE(NPROT);                                              \
+      continue;                                                 \
     }
 
     switch (dots_op) {
@@ -453,34 +439,33 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
     case DOTS_OP_expr_dot_data:
     case DOTS_OP_expr_curly:
       expr = call_interp_impl(expr, env, info);
+      SKIP_MISSING(expr, 1)
       capture_info->count += 1;
       break;
-    case DOTS_OP_expr_uqs:
-      expr = dots_big_bang(capture_info, info.operand, env, false);
-      break;
+
     case DOTS_OP_quo_none:
     case DOTS_OP_quo_uq:
     case DOTS_OP_quo_fixup:
     case DOTS_OP_quo_dot_data:
-    case DOTS_OP_quo_curly: {
+    case DOTS_OP_quo_curly:
       expr = KEEP(call_interp_impl(expr, env, info));
       expr = forward_quosure(expr, env);
+      SKIP_MISSING(quo_get_expr(expr), 2)
+
       FREE(1);
       capture_info->count += 1;
       break;
-    }
-    case DOTS_OP_quo_uqs: {
-      expr = dots_big_bang(capture_info, info.operand, env, true);
-      break;
-    }
+
     case DOTS_OP_value_none:
     case DOTS_OP_value_fixup:
     case DOTS_OP_value_dot_data: {
+      SKIP_MISSING(expr, 1)
+
       r_obj* orig = expr;
 
       if (expr == r_syms.missing) {
         if (!capture_info->preserve_empty) {
-          r_abort("Argument %d is empty", i + 1);
+          r_abort("Argument %d can't be empty.", i + 1);
         }
       } else if (env != r_envs.empty) {
         // Don't evaluate when `env` is the empty environment. This
@@ -510,19 +495,26 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
       break;
     }
     case DOTS_OP_value_uq:
-      r_abort("Can't use `!!` in a non-quoting function");
-    case DOTS_OP_value_uqs: {
-      expr = dots_big_bang(capture_info, info.operand, env, false);
-      break;
-    }
+      r_abort("Can't use `!!` in a non-quoting function.");
     case DOTS_OP_value_curly:
-      r_abort("Can't use `{{` in a non-quoting function");
+      r_abort("Can't use `{{` in a non-quoting function.");
     case DOTS_OP_expr_uqn:
     case DOTS_OP_quo_uqn:
     case DOTS_OP_value_uqn:
-      r_abort("`:=` can't be chained");
+      r_abort("`:=` can't be chained.");
+
+    case DOTS_OP_expr_uqs:
+      expr = dots_big_bang(capture_info, info.operand, env, false);
+      break;
+    case DOTS_OP_quo_uqs:
+      expr = dots_big_bang(capture_info, info.operand, env, true);
+      break;
+    case DOTS_OP_value_uqs:
+      expr = dots_big_bang(capture_info, info.operand, env, false);
+      break;
+
     case DOTS_OP_MAX:
-      r_abort("Internal error: `DOTS_OP_MAX`");
+      r_stop_unreachable();
     }
 
     r_node_poke_car(node, expr);
@@ -531,6 +523,30 @@ r_obj* dots_unquote(r_obj* dots, struct dots_capture_info* capture_info) {
 
   return dots;
 }
+
+static inline
+bool should_ignore(struct dots_capture_info* p_capture_info,
+                   r_obj* expr,
+                   r_obj* name,
+                   bool last) {
+  if (expr != r_syms.missing ||
+      (name != r_null && name != r_strs.empty)) {
+    return false;
+  }
+
+  switch (p_capture_info->ignore_empty) {
+  case DOTS_IGNORE_EMPTY_all: return true;
+  case DOTS_IGNORE_EMPTY_trailing: return last;
+  default: return false;
+  }
+}
+static inline
+void ignore(struct dots_capture_info* p_capture_info,
+            r_obj* node) {
+  p_capture_info->needs_expansion = true;
+  r_node_poke_car(node, empty_spliced_arg);
+}
+
 
 static
 enum dots_ignore_empty arg_match_ignore_empty(r_obj* ignore_empty) {
@@ -603,7 +619,7 @@ static
 void check_named_splice(r_obj* node) {
   if (r_node_tag(node) != r_null) {
     const char* msg = "`!!!` can't be supplied with a name. Only the operand's names are retained.";
-    stop_defunct(msg);
+    deprecate_stop(msg);
   }
 }
 
@@ -1063,7 +1079,7 @@ r_obj* ffi_dots_pairlist(r_obj* frame_env,
 }
 
 void rlang_init_dots(r_obj* ns) {
-  glue_unquote_fn = r_eval(r_sym("glue_unquote"), ns);
+  glue_embrace_fn = r_eval(r_sym("glue_embrace"), ns);
 
   auto_name_call = r_parse("rlang:::quos_auto_name(x)");
   r_preserve(auto_name_call);
@@ -1117,7 +1133,7 @@ void rlang_init_dots(r_obj* ns) {
 
 static r_obj* auto_name_call = NULL;
 static r_obj* empty_spliced_arg = NULL;
-static r_obj* glue_unquote_fn = NULL;
+static r_obj* glue_embrace_fn = NULL;
 static r_obj* dots_homonyms_values = NULL;
 static r_obj* dots_ignore_empty_values = NULL;
 static r_obj* quosures_attrib = NULL;

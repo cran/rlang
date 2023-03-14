@@ -92,7 +92,10 @@ test_that("corner cases are handled when interpolating dot names", {
     expect_identical(names(quos(!!var := NULL)), "NA")
 
     var <- NULL
-    expect_error(quos(!!var := NULL), "must be a string or a symbol")
+    expect_snapshot({
+      (expect_error(quos(!!var := NULL)))
+      (expect_error(list2(!!c("a", "b") := NULL)))
+    })
 })
 
 test_that("dots are forwarded to named arguments", {
@@ -385,6 +388,27 @@ test_that("endots() supports `.ignore_empty`", {
   expect_identical(fn(foo, ), exprs(foo))
 })
 
+test_that("endots() supports `.ignore_null` (#1450)", {
+  # enquos()
+  fn <- function(...) enquos(..., .ignore_null = "all")
+  expect_identical(fn(NULL, NULL), quos())
+  expect_identical(fn(foo = NULL, NULL), quos(foo = NULL))
+  expect_identical(fn(!!!list(foo = NULL), NULL), quos(foo = NULL))
+
+  fn <- function(foo, ...) enquos(foo, ..., .ignore_null = "all")
+  expect_identical(fn(NULL, NULL), quos())
+
+  fn <- function(...) enquos(...)
+  expect_identical(fn(NULL, NULL), quos(NULL, NULL))
+
+  # enexprs()
+  fn <- function(...) enexprs(..., .ignore_null = "all")
+  expect_identical(fn(NULL, NULL), exprs())
+
+  fn <- function(...) enexprs(...)
+  expect_identical(fn(NULL, NULL), exprs(NULL, NULL))
+})
+
 test_that("ensyms() captures multiple symbols", {
   fn <- function(arg, ...) ensyms(arg, ...)
   expect_identical(fn(foo, bar, baz), exprs(foo, bar, baz))
@@ -411,7 +435,7 @@ test_that("closures are captured with their calling environment", {
 
 test_that("the missing argument is captured", {
   expect_equal_(
-    quos(!!missing_arg()),
+    quos(!!missing_arg(), .ignore_empty = "none"),
     quos(, ),
     ignore_formula_env = TRUE
   )
@@ -483,7 +507,7 @@ test_that("enexprs() and enquos() support empty dots", {
 })
 
 test_that("supplying `!!!` with a name warns", {
-  local_options(lifecycle_verbose_soft_deprecation = TRUE)
+  local_options(lifecycle_verbosity = "warning")
   expect_no_warning_(quos(!!!1, 2, !!!NULL))
   expect_defunct(quos(foo = !!!1, 2, bar = !!!NULL), "Only the operand's names are retained")
 })
@@ -621,4 +645,38 @@ test_that("`enexprs()` and variants support `.named = NULL` (#1223)", {
   expect_equal(fn(), unname(quos()))
   expect_equal(fn(1), unname(quos(1)))
   expect_equal(fn(x = 1), quos(x = 1))
+})
+
+test_that("`.named = NULL` yields `NULL` names (#1505)", {
+  fn <- function() enquos(.named = NULL)
+  expect_null(names(fn()))
+
+  fn <- function(...) enquos(..., .named = NULL)
+  expect_null(names(fn()))
+  expect_null(names(fn(foo)))
+
+  expect_null(names(quos(.named = NULL)))
+  expect_null(names(quos(foo, .named = NULL)))
+})
+
+test_that("embraced empty arg are detected consistently (#1421)", {
+  fn_quos <- function(cond, ...) {
+    quos_it({{cond}}, ...)
+  }
+  fn_enquos <- function(cond, ...) {
+    enquos_it({{cond}}, ...)
+  }
+
+  quos_it <- function(..., .ignore_empty = "all") {
+    quos(..., .ignore_empty = .ignore_empty)
+  }
+  enquos_it <- function(..., .ignore_empty = "all") {
+    enquos(..., .ignore_empty = .ignore_empty)
+  }
+
+  expect_equal(fn_quos(), quos())
+  expect_equal(fn_enquos(), quos())
+
+  expect_equal(fn_quos(.ignore_empty = "trailing"), quos())
+  expect_equal(fn_enquos(.ignore_empty = "trailing"), quos())
 })

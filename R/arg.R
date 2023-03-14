@@ -52,6 +52,13 @@ arg_match <- function(arg,
     return(arg_match_multi(arg, values, error_arg, error_call))
   }
 
+  if (!length(arg)) {
+    msg <- sprintf(
+      "%s must be length 1, not length 0",
+      format_arg(error_arg)
+    )
+    abort(msg, call = error_call, arg = error_arg)
+  }
   if (length(arg) > 1 && !setequal(arg, values)) {
     msg <- arg_match_invalid_msg(arg, values, error_arg)
     abort(msg, call = error_call, arg = error_arg)
@@ -99,6 +106,10 @@ arg_match0 <- function(arg,
   .External(ffi_arg_match0, arg, values, environment())
 }
 
+chr_interpolate <- function(x) {
+  paste0(deparse(x), collapse = "")
+}
+
 stop_arg_match <- function(arg, values, error_arg, error_call) {
   if (length(arg) > 1) {
     sorted_arg <- sort(unique(arg))
@@ -107,10 +118,14 @@ stop_arg_match <- function(arg, values, error_arg, error_call) {
       msg <- sprintf(
         "%s must be length 1 or a permutation of %s.",
         format_arg("arg"),
-        format_arg("values")
+        format_code(chr_interpolate(values))
       )
-      abort(msg, call = quote(arg_match()), arg = "arg")
+      abort(msg, call = error_call, arg = "arg")
     }
+  }
+
+  if (is_na(arg)) {
+    check_string(arg, arg = error_arg, call = error_call)
   }
 
   msg <- arg_match_invalid_msg(arg, values, error_arg)
@@ -147,7 +162,7 @@ stop_arg_match <- function(arg, values, error_arg, error_call) {
 
 arg_match_invalid_msg <- function(val, values, error_arg) {
   msg <- paste0(format_arg(error_arg), " must be one of ")
-  msg <- paste0(msg, chr_enumerate(chr_quoted(values, "\"")))
+  msg <- paste0(msg, oxford_comma(chr_quoted(values, "\"")))
 
   if (is_null(val)) {
     msg <- paste0(msg, ".")
@@ -195,26 +210,6 @@ check_required <- function(x,
 
 chr_quoted <- function(chr, type = "`") {
   paste0(type, chr, type)
-}
-chr_enumerate <- function(chr, sep = ", ", final = "or") {
-  n <- length(chr)
-
-  if (n < 2) {
-    return(chr)
-  }
-
-  n <- length(chr)
-  head <- chr[seq_len(n - 1)]
-  last <- chr[length(chr)]
-
-  head <- paste(head, collapse = sep)
-
-  # Write a or b. But a, b, or c.
-  if (n > 2) {
-    paste0(head, sep, final, " ", last)
-  } else {
-    paste0(head, " ", final, " ", last)
-  }
 }
 
 #' Check that arguments are mutually exclusive
@@ -278,7 +273,7 @@ check_exclusive <- function(...,
   if (n_present == 0) {
     if (.require) {
       args <- map(names(args), format_arg)
-      enum <- chr_enumerate(args)
+      enum <- oxford_comma(args)
       msg <- sprintf("One of %s must be supplied.", enum)
       abort(msg, call = .call)
     } else {
@@ -291,11 +286,11 @@ check_exclusive <- function(...,
   }
 
   args <- map_chr(names(args), format_arg)
-  enum <- chr_enumerate(args)
+  enum <- oxford_comma(args)
   msg <- sprintf("Exactly one of %s must be supplied.", enum)
 
   if (n_present != length(args)) {
-    enum <- chr_enumerate(args[present], final = "and")
+    enum <- oxford_comma(args[present], final = "and")
     msg <- c(msg, x = sprintf("%s were supplied together.", enum))
   }
 

@@ -287,6 +287,9 @@ cnd_type <- function(cnd) {
 #' object is a particular kind of error or has been caused by such an
 #' error.
 #'
+#' Some chained conditions carry parents that are not inherited. See
+#' the `.inherit` argument of [abort()], [warn()], and [inform()].
+#'
 #'
 #' # Capture an error with `cnd_inherits()`
 #'
@@ -345,6 +348,19 @@ cnd_type <- function(cnd) {
 #' class(cnd$parent)
 #' ```
 #'
+#' Note that `try_fetch()` uses `cnd_inherits()` internally. This
+#' makes it very easy to match a parent condition:
+#'
+#' ```{r, comment = "#>", collapse = TRUE}
+#' cnd <- try_fetch(
+#'   f(),
+#'   bar = function(x) x
+#' )
+#'
+#' # This is the parent
+#' class(cnd)
+#' ```
+#'
 #' @param cnd A condition to test.
 #' @param class A class passed to [inherits()].
 #'
@@ -357,6 +373,11 @@ cnd_some <- function(cnd, fn, ...) {
   while (is_condition(cnd)) {
     if (fn(cnd, ...)) {
       return(TRUE)
+    }
+
+    inherit <- .subset2(.subset2(cnd, "rlang"), "inherit")
+    if (is_false(inherit)) {
+      return(FALSE)
     }
 
     cnd <- cnd[["parent"]]
@@ -406,7 +427,7 @@ format.rlang_error <- function(x,
   # Recommend printing the full backtrace if called from `last_error()`
   from_last_error <- is_true(x$rlang$internal$from_last_error)
   if (from_last_error && !is_null(x$trace)) {
-    if (use_tree_display() && drop && !all(x$trace$visible)) {
+    if (drop && !all(x$trace$visible)) {
       n_hidden <- sum(!x$trace$visible)
       hidden <- ngettext(
         n_hidden,
@@ -448,7 +469,7 @@ summary.rlang_warning <- function(object, ...) {
 format.rlang_warning <- function(x,
                                  ...,
                                  backtrace = TRUE,
-                                 simplify = c("branch", "none")) {
+                                 simplify = "none") {
   cnd_format(x, ..., backtrace = backtrace, simplify = simplify)
 }
 

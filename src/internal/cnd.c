@@ -141,7 +141,7 @@ void without_winch(void* payload) {
   r_poke_option("rlang_trace_use_winch", data->old_use_winch);
 }
 
-r_obj* ffi_test_stop_internal() {
+r_obj* ffi_test_stop_internal(void) {
   r_stop_internal("foo");
   return r_null;
 }
@@ -150,8 +150,7 @@ r_obj* ffi_test_stop_internal() {
 // Probably should be implemented at R level
 r_obj* ffi_new_condition(r_obj* class,
                          r_obj* msg,
-                         r_obj* data,
-                         r_obj* error_call) {
+                         r_obj* data) {
   if (msg == r_null) {
     msg = r_chrs.empty_string;
   } else if (r_typeof(msg) != R_TYPE_character) {
@@ -202,12 +201,12 @@ r_obj* new_condition_names(r_obj* data) {
   return nms;
 }
 
-const char* rlang_obj_type_friendly_full(r_obj* x, bool value, bool length) {
-  r_obj* out_obj = KEEP(r_eval_with_xyz(obj_type_friendly_call,
-                                        x,
-                                        r_lgl(value),
-                                        r_lgl(length),
-                                        rlang_ns_env));
+// `length` is no longer a valid argument
+const char* rlang_obj_type_friendly_full(r_obj* x, bool value, bool _length) {
+  r_obj* out_obj = KEEP(r_eval_with_xy(obj_type_friendly_call,
+                                       x,
+                                       r_lgl(value),
+                                       rlang_ns_env));
 
   if (!r_is_string(out_obj)) {
     r_stop_unexpected_type(r_typeof(out_obj));
@@ -227,7 +226,7 @@ void rlang_init_cnd(r_obj* ns) {
   format_arg_call = r_parse("format_arg(x)");
   r_preserve(format_arg_call);
 
-  obj_type_friendly_call = r_parse("obj_type_friendly(x, y, z)");
+  obj_type_friendly_call = r_parse("obj_type_friendly(x, y)");
   r_preserve(obj_type_friendly_call);
 }
 

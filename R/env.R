@@ -58,66 +58,22 @@
 #' as argument to a function), modifying the bindings of one of those
 #' references changes all other references as well.
 #'
-#'
-#' @section Life cycle:
-#'
-#' - `child_env()` is in the questioning stage. It is redundant now
-#'   that `env()` accepts parent environments.
-#'
 #' @param ...,data <[dynamic][dyn-dots]> Named values. You can
 #'   supply one unnamed to specify a custom parent, otherwise it
 #'   defaults to the current environment.
-#' @param .parent,parent A parent environment.
+#' @param parent A parent environment.
 #' @seealso [env_has()], [env_bind()].
 #' @export
 #' @examples
-#' # env() creates a new environment which has the current environment
-#' # as parent
+#' # env() creates a new environment that inherits from the current
+#' # environment by default
 #' env <- env(a = 1, b = "foo")
 #' env$b
 #' identical(env_parent(env), current_env())
 #'
-#' # Supply one unnamed argument to override the default:
+#' # Supply one unnamed argument to inherit from another environment:
 #' env <- env(base_env(), a = 1, b = "foo")
 #' identical(env_parent(env), base_env())
-#'
-#'
-#' # child_env() lets you specify a parent:
-#' child <- child_env(env, c = "bar")
-#' identical(env_parent(child), env)
-#'
-#' # This child environment owns `c` but inherits `a` and `b` from `env`:
-#' env_has(child, c("a", "b", "c", "d"))
-#' env_has(child, c("a", "b", "c", "d"), inherit = TRUE)
-#'
-#' # `parent` is passed to as_environment() to provide handy
-#' # shortcuts. Pass a string to create a child of a package
-#' # environment:
-#' child_env("rlang")
-#' env_parent(child_env("rlang"))
-#'
-#' # Or `NULL` to create a child of the empty environment:
-#' child_env(NULL)
-#' env_parent(child_env(NULL))
-#'
-#' # The base package environment is often a good default choice for a
-#' # parent environment because it contains all standard base
-#' # functions. Also note that it will never inherit from other loaded
-#' # package environments since R keeps the base package at the tail
-#' # of the search path:
-#' base_child <- child_env("base")
-#' env_has(base_child, c("lapply", "("), inherit = TRUE)
-#'
-#' # On the other hand, a child of the empty environment doesn't even
-#' # see a definition for `(`
-#' empty_child <- child_env(NULL)
-#' env_has(empty_child, c("lapply", "("), inherit = TRUE)
-#'
-#' # Note that all other package environments inherit from base_env()
-#' # as well:
-#' rlang_child <- child_env("rlang")
-#' env_has(rlang_child, "env", inherit = TRUE)     # rlang function
-#' env_has(rlang_child, "lapply", inherit = TRUE)  # base function
 #'
 #'
 #' # Both env() and child_env() support tidy dots features:
@@ -151,13 +107,7 @@ env <- function(...) {
   env_bind0(env, dots$named)
   env
 }
-#' @rdname env
-#' @export
-child_env <- function(.parent, ...) {
-  env <- new.env(parent = as_environment(.parent))
-  env_bind0(env, list2(...))
-  env
-}
+
 #' @rdname env
 #' @export
 new_environment <- function(data = list(), parent = empty_env()) {
@@ -804,4 +754,116 @@ env_browse <- function(env, value = TRUE) {
 #' @export
 env_is_browsed <- function(env) {
   .Call(ffi_env_is_browsed, env)
+}
+
+#' Is frame environment user facing?
+#'
+#' @description
+#' Detects if `env` is user-facing, that is, whether it's an environment
+#' that inherits from:
+#'
+#' - The global environment, as would happen when called interactively
+#' - A package that is currently being tested
+#'
+#' If either is true, we consider `env` to belong to an evaluation
+#' frame that was called _directly_ by the end user. This is by
+#' contrast to _indirect_ calls by third party functions which are not
+#' user facing.
+#'
+#' For instance the [lifecycle](https://lifecycle.r-lib.org/) package
+#' uses `env_is_user_facing()` to figure out whether a deprecated function
+#' was called directly or indirectly, and select an appropriate
+#' verbosity level as a function of that.
+#'
+#' @param env An environment.
+#'
+#' @section Escape hatch:
+#'
+#' You can override the return value of `env_is_user_facing()` by
+#' setting the global option `"rlang_user_facing"` to:
+#'
+#' - `TRUE` or `FALSE`.
+#' - A package name as a string. Then `env_is_user_facing(x)` returns
+#'   `TRUE` if `x` inherits from the namespace corresponding to that
+#'   package name.
+#'
+#' @examples
+#' fn <- function() {
+#'   env_is_user_facing(caller_env())
+#' }
+#'
+#' # Direct call of `fn()` from the global env
+#' with(global_env(), fn())
+#'
+#' # Indirect call of `fn()` from a package
+#' with(ns_env("utils"), fn())
+#' @export
+env_is_user_facing <- function(env) {
+  check_environment(env)
+
+  if (env_inherits_global(env)) {
+    return(TRUE)
+  }
+
+  opt <- peek_option("rlang_user_facing")
+  if (!is_null(opt)) {
+    if (is_bool(opt)) {
+      return(opt)
+    }
+
+    if (is_string(opt)) {
+      top <- topenv(env)
+      if (!is_namespace(top)) {
+        return(FALSE)
+      }
+
+      return(identical(ns_env_name(top), opt))
+    }
+
+    options(rlang_user_facing = NULL)
+    msg <- c(
+      sprintf(
+        "`options(rlang_user_facing = )` must be `TRUE`, `FALSE`, or a package name, not %s.",
+        obj_type_friendly(opt)
+      ),
+      "i" = "The option was reset to `NULL`."
+    )
+    abort(msg)
+  }
+
+  if (from_testthat(env)) {
+    return(TRUE)
+  }
+
+  FALSE
+}
+
+env_inherits_global <- function(env) {
+  # `topenv(emptyenv())` returns the global env. Return `FALSE` in
+  # that case to allow passing the empty env when the
+  # soft-deprecation should not be promoted to deprecation based on
+  # the caller environment.
+  if (is_reference(env, empty_env())) {
+    return(FALSE)
+  }
+
+  is_reference(topenv(env), global_env())
+}
+
+# TRUE if we are in unit tests and the package being tested is the
+# same as the package that called
+from_testthat <- function(env) {
+  tested_package <- Sys.getenv("TESTTHAT_PKG")
+  if (!nzchar(tested_package)) {
+    return(FALSE)
+  }
+
+  top <- topenv(env)
+  if (!is_namespace(top)) {
+    return(FALSE)
+  }
+
+  # Test for environment names rather than reference/contents because
+  # testthat clones the namespace
+  identical(ns_env_name(top), tested_package)
 }
