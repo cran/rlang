@@ -1,3 +1,18 @@
+# rlang 1.1.1
+
+* `englue()` now allows omitting `{{`. This is to make it easier to
+  embed in external functions that need to support either `{` and `{{`
+  (#1601).
+
+* Fix for CRAN checks.
+
+* `stop_input_type()` now handles `I()` input literally in `arg`
+  (#1607, @simonpcouch).
+
+* `parse_expr()` and `parse_exprs()` are now faster when
+  `getOption("keep.source")` is `TRUE` (#1603).
+
+
 # rlang 1.1.0
 
 ## Life cycle changes

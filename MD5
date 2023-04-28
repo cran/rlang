@@ -1,8 +1,8 @@
-83831f9ec371b91c7137d9caeceaea67 *DESCRIPTION
+4358a251a007591fd309d1359d5dcb29 *DESCRIPTION
 e6f43178fbfc71c5d0c6586954b66df1 *LICENSE
 571f9fded5d43695ad11e04790c0af64 *LICENSE.note
 8074975cae52b5fac2c1dca49d125429 *NAMESPACE
-b2665e4630c5c60154043630f29c08b0 *NEWS.md
+29f47f1e3ac1fe22a58a5393e2da01e9 *NEWS.md
 735441b7f469df891cd9debe004dd218 *R/aaa-topics.R
 af48e2aea4069022642137731a197575 *R/aaa.R
 0384758d34ddd8cd5cd163da3000138a *R/arg.R
@@ -37,10 +37,10 @@ e5da8077a918b141472dc0258b744a47 *R/lifecycle-deprecated.R
 343dd3cfad5c3587a57cd8e73005d49b *R/names.R
 8b5fab9d099b28b18415e2fc85ff2ebb *R/node.R
 e8e834d8ba802b18ddd2d237279cac4a *R/nse-defuse.R
-d17098e21b551662e65e7f29517538d0 *R/nse-inject.R
+c0a6ce233b9f7d827b5a896baa94ea79 *R/nse-inject.R
 9038dd465c374a761c9e89f0af28733e *R/obj.R
 0bddb5ba1717c123255df58a6a26d8d0 *R/operators.R
-efdd4cdb46c87375f428d42ae1e98035 *R/parse.R
+fecaff6975a3389233125ea5322c47a7 *R/parse.R
 27ba0cec8276fba36575dc63157f055b *R/quo.R
 8a5fc056502149af6e6d3a2fdc36080d *R/raw.R
 e1b34265467d74d53757e60dc4e009f5 *R/rlang-package.R
@@ -52,7 +52,7 @@ b354b8900c157fdab28f60dfcb6fccdd *R/standalone-cli.R
 2cd11253698248cd89fc9d6616de3d6d *R/standalone-lazyeval.R
 140e25cf99883626a76840c948f55c3c *R/standalone-lifecycle.R
 95db0fd247b0ac2f1dc0b9cbf0f70f61 *R/standalone-linked-version.R
-8d67fd19332cecb36d35eef2cf0ea342 *R/standalone-obj-type.R
+c1f434dcfc6ce6191e755a17643e2161 *R/standalone-obj-type.R
 98d4ba5a3b47cee97c92cc434da15f32 *R/standalone-purrr.R
 6d2c89ebecb4fa2f677dbf1e13b93830 *R/standalone-rlang.R
 3467e8cc25c0a2c3c58b6b721ad419da *R/standalone-s3-register.R
@@ -248,7 +248,7 @@ e07f4164899d7a4df71231469f28ef00 *man/ns_env.Rd
 f7db9c3f41a662777dc9ae8ecaa4045b *man/op-na-default.Rd
 104a6a1976e8c95b00c7f5f3457ba6d7 *man/op-null-default.Rd
 ed4dcc3823679adb0b250a2594ae3c6f *man/pairlist2.Rd
-0472287b8a7847a6805f062d0c014868 *man/parse_expr.Rd
+6a42fefcb01e3f37f10d6a5811d28a06 *man/parse_expr.Rd
 afc9cc159795e4415c38a5987075910d *man/prim_name.Rd
 546ba404ed245116362209f93d99c1f9 *man/qq_show.Rd
 b71040a0147644f62a7e97580659c9fa *man/quo_expr.Rd
@@ -263,7 +263,7 @@ f679bebf0d611e153fab4d49a3b47a07 *man/rlang_backtrace_on_error.Rd
 5e2bee79f2da314eac8c4811f4dfc10d *man/rlang_error.Rd
 62022180afd07b3a46263c817e4e6eb5 *man/rlib_trace_spec.Rd
 47fcca843474e62ad16ccd3703a44a93 *man/rmd/glue-operators.Rmd
-df97ae596fa99284c7c626e46c51e753 *man/rmd/setup.Rmd
+e6005d32672c76030e9bfff7d40e5dbd *man/rmd/setup.Rmd
 f9cbbb7a16efcd6c18d1cf4740675ee1 *man/rmd/topic-condition-customisation.Rmd
 e0c1308495d1ba4a93b19703a78ce02c *man/rmd/topic-condition-formatting.Rmd
 19b81a6a3700cd90481e72251e04f51b *man/rmd/topic-data-mask-ambiguity.Rmd
@@ -296,19 +296,19 @@ ef1436704e9225e5ef75178c17845c57 *man/stack.Rd
 d3dc0a4f4528b9baf031d16defc56f39 *man/switch_type.Rd
 2e0a61c6e54f14f8e5aac8bcdd7c5122 *man/sym.Rd
 654ea7e43f626acbb7c7886a549c51c7 *man/topic-condition-customisation.Rd
-a599df35ff0f8f60eedb4205141547eb *man/topic-condition-formatting.Rd
+ccee651d9da8ad9b6e28d1a292977fb2 *man/topic-condition-formatting.Rd
 e845825b2ab842ee73bdbe9a69348758 *man/topic-data-mask-ambiguity.Rd
-6cfcc448a980c5c60bab0a31dfeda5ed *man/topic-data-mask-programming.Rd
-b1416eeb5e4b40f0abaeb887eacbb56f *man/topic-data-mask.Rd
+2d1c728d2547b440652f412f0b482d52 *man/topic-data-mask-programming.Rd
+be4afc9cc71d10c85499e7bc061f1a65 *man/topic-data-mask.Rd
 b5a8ebaa33d76b5d2d75f3d7a0499bcd *man/topic-defuse.Rd
 bbc05f783495fbf54fd5edef9243b028 *man/topic-double-evaluation.Rd
 2fa83201ff93feb7d16a9ac4ed802c67 *man/topic-embrace-constants.Rd
 6269df0bd2139689e46fd960881ce5ae *man/topic-embrace-non-args.Rd
 c477dc0b9501f5a1eb706bfcc666b39e *man/topic-error-call.Rd
-11543749014553c33e17fedb6148035d *man/topic-error-chaining.Rd
-a5929e1dc9ee4cfd9c0d577bfcb3fdee *man/topic-inject-out-of-context.Rd
+1b847a41bea28bb6074c9ea4ab0a895f *man/topic-error-chaining.Rd
+9aabb764812da07fc21e8475ef13f77d *man/topic-inject-out-of-context.Rd
 4e3c562b10960d05ac0e23625f130253 *man/topic-inject.Rd
-a5b74549e98b428b147c2635bf9d91de *man/topic-metaprogramming.Rd
+2bea08336b82cdf7abb022dde9bce1f5 *man/topic-metaprogramming.Rd
 8ac68805eaf5086a2bd7ff4d7e8a5fcd *man/topic-multiple-columns.Rd
 c254b3ad2117423c0456035fde13fd4e *man/topic-quosure.Rd
 e5ce6b3f74e050b8a1336ea241a8a09b *man/trace_back.Rd
@@ -351,7 +351,7 @@ ab8ba9d44711965151ee298799eb93c4 *src/internal/decl/env-decl.h
 69d4333c022312deed09703c28e257ee *src/internal/decl/tests-decl.h
 d8f62d08155e52256bfa294f1d79b484 *src/internal/decl/vec-decl.h
 0b24ac9853cd6b1b492ec52f93f72404 *src/internal/dots-ellipsis.c
-a95af2ba2e5644732bb617a9edb9b84b *src/internal/dots.c
+7171dfbcd875a5615972bb4cb29be754 *src/internal/dots.c
 d643f0fdfb78450ba3590fb78cbe0efe *src/internal/dots.h
 8be427875b2af1b35509050ae46be105 *src/internal/encoding.c
 599ee0872d65b1c2a12c4a2bdc2fcb09 *src/internal/env-binding.c
@@ -434,7 +434,7 @@ ec36cc014954270b6b827f3844f5cf1b *src/rlang/fn.c
 1eae432b32bb6ac5533515d570ee50fe *src/rlang/fn.h
 676b90d434ca8455b5306a86a73ec080 *src/rlang/formula.c
 db5097eb19dae675d9523431fe7a7b85 *src/rlang/formula.h
-c4db4e4a9cf1ae40f5d913db04659b0b *src/rlang/globals.c
+97d8e16a62839f989c53127d4339efb6 *src/rlang/globals.c
 ba2c20c5c3596a89f9c9b40c8eb242d7 *src/rlang/globals.h
 240370964fa57c63867b60d3a66bb0ad *src/rlang/node.c
 04013de2090e7a49f594111532d8dbe8 *src/rlang/node.h
@@ -465,7 +465,7 @@ aad9cb50156b9ab0f02ea91fb31db1b7 *src/rlang/vendor.c
 139544f5576475c395dc8601655c7948 *src/rlang/vendor.h
 4b8fd26a08a137a90c8d1323faa286ec *src/rlang/walk.c
 05a1bc12017a29dd10726ce3a2320dcb *src/rlang/walk.h
-df9f9c3b58ffe9f90c82f3da36aeda35 *src/version.c
+d4b0d78580b0415cf22e5bae1f46dd64 *src/version.c
 b535466226f2ed8212a97ea8790639c4 *tests/sink.R
 689f0fa1b25df0719206586844edb2d0 *tests/testthat.R
 551d389cbed2dcebdb066ff491b0f2ce *tests/testthat/_snaps/arg.md
@@ -489,7 +489,7 @@ ee7c3ae60a3c22d0030176c52f40863a *tests/testthat/_snaps/fn.md
 c314b68ccbad562aaa1d13e02e2e46eb *tests/testthat/_snaps/friendly-type.md
 bd5eeee7ec11d1ef892cf26bf3dcee01 *tests/testthat/_snaps/lifecycle.md
 638a4a11bb7b08ee82bbf5c29ffbd0cf *tests/testthat/_snaps/nse-defuse.md
-2549b4e6e666114d43d7a0ec16752036 *tests/testthat/_snaps/nse-inject.md
+ad54bc1d35a53acc94658bfa38163280 *tests/testthat/_snaps/nse-inject.md
 30e39e163d67da011eab19ae8e8a62e6 *tests/testthat/_snaps/operators.md
 d9977898c017591a75b1e000134935fd *tests/testthat/_snaps/parse.md
 11a021d7f695acb39f3bdd47a32ed331 *tests/testthat/_snaps/pre-3.6.0/cnd-abort.md
@@ -497,6 +497,7 @@ d9977898c017591a75b1e000134935fd *tests/testthat/_snaps/parse.md
 2e542a6e49bca2ba6e29e8e3f82f046f *tests/testthat/_snaps/session.md
 27181555eae14983a14582ceb3ca58ae *tests/testthat/_snaps/standalone-cli.md
 91ed2571b4fed85009551cf4c891a169 *tests/testthat/_snaps/standalone-downstream-deps.md
+0bfc8bf78945a3c1f92fd9cedf54a118 *tests/testthat/_snaps/standalone-obj-type.md
 03dc0e3b135a47f2162a713e003cee33 *tests/testthat/_snaps/standalone-rlang.md
 bf2192fe3fe5338469b7d880b687846f *tests/testthat/_snaps/standalone-s3-register.md
 849dd09395c83c5a12bc34bac3f21810 *tests/testthat/_snaps/standalone-types-check.md
@@ -547,7 +548,7 @@ c6a8f89c1b26d5b57dfa9c1bb14547c5 *tests/testthat/test-call.R
 790abbfa0ddd511287fa3fca981b28ce *tests/testthat/test-deparse.R
 4a05bbf91de69ec12d52ed09c0038dbf *tests/testthat/test-deprecated-vec-squash.R
 5b3e156dbbb32a4061e5a6574f6472c3 *tests/testthat/test-deprecated.R
-1e6fd0482ad330070fc25a367a54eebc *tests/testthat/test-dots-ellipsis.R
+dc1e9e1e02bd49ef2a02fccc2f10964d *tests/testthat/test-dots-ellipsis.R
 2e89ef91d86022e87d91fa389ef487cf *tests/testthat/test-dots.R
 ffe3d9956d8d976c7f28947c71c46227 *tests/testthat/test-encoding.R
 50267dfc30521c19a40807a9584f494b *tests/testthat/test-entrace.Rmd
@@ -565,7 +566,7 @@ ace5a10bc42c509b44c2227ac2dc4b04 *tests/testthat/test-formula.R
 18fc02939481b71f2585729de604d3a7 *tests/testthat/test-names.R
 3e8b4e677880f90dc1df3aa739f10947 *tests/testthat/test-node.R
 358b8bb63eb7b4664a1160cb8342b125 *tests/testthat/test-nse-defuse.R
-2d402ae00eb3784d3a41f21d38cb703d *tests/testthat/test-nse-inject.R
+394073bb1656b7fb3a86f48fcc26a779 *tests/testthat/test-nse-inject.R
 18cceb00e279a71a3b6658c7be5b433e *tests/testthat/test-obj.R
 6e8559b1ff84952b4611d235f5f19a37 *tests/testthat/test-operators.R
 763c3b3df1681bddd39fe347a3dca8b9 *tests/testthat/test-parent-errors.Rmd
@@ -577,7 +578,7 @@ a0907b64d582856e08b2683e4120fd67 *tests/testthat/test-quo.R
 507cdddc0c4b741a528c2b5930971ca2 *tests/testthat/test-stack.R
 a3863a6a1f98b35d1b9bf06a26a4ae7b *tests/testthat/test-standalone-cli.R
 f1b3b8e1ba47b794f0e4157d979ac825 *tests/testthat/test-standalone-downstream-deps.R
-e7c14c9b1325296e88a89f214ee4843f *tests/testthat/test-standalone-obj-type.R
+cb407c903b426e5b6e53fbc934822f9a *tests/testthat/test-standalone-obj-type.R
 088a84317df507d0867e7a1f13009c4b *tests/testthat/test-standalone-purrr.R
 e7dcfa9e8275abaee417a1937d768917 *tests/testthat/test-standalone-rlang.R
 b3cd0d7565345fff425d5d7c35c0ce30 *tests/testthat/test-standalone-s3-register.R
