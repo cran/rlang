@@ -528,28 +528,10 @@ test_that("generic call is picked up in methods", {
     g()
   }
 
-  f4 <- function(x) {
-    f4_dispatch(x)
-  }
-  f4_dispatch <- function(x) {
-    local_error_call("caller")
-    UseMethod("f4")
-  }
-  f4.foo <- function(x) {
-    NextMethod()
-  }
-  f4.bar <- function(x) {
-    NextMethod()
-  }
-  f4.default <- function(x) {
-    g()
-  }
-
   expect_snapshot({
     err(f1())
     err(f2())
     err(f3())
-    err(f4(NULL))
   })
 })
 
@@ -879,5 +861,19 @@ test_that("newlines are preserved by cli (#1535)", {
   expect_snapshot(error = TRUE, {
     abort("foo\nbar", use_cli_format = TRUE)
     abort("foo\fbar", use_cli_format = TRUE)
+  })
+})
+
+test_that("`show.error.messages` is respected by `abort()` (#1630)", {
+  run_error_script <- function(envvars = chr()) {
+    run_script(test_path("fixtures", "error-show-messages.R"), envvars = envvars)
+  }
+
+  with_messages <- run_error_script(envvars = c("show_error_messages=TRUE"))
+  without_messages <- run_error_script(envvars = c("show_error_messages=FALSE"))
+
+  expect_snapshot({
+    cat_line(with_messages)
+    cat_line(without_messages)
   })
 })

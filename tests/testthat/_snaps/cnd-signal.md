@@ -22,22 +22,24 @@
 
     Code
       inform("foo", .frequency = "regularly", .frequency_id = as.character(runif(1)))
-    Message <rlang_message>
+    Message
       foo
       This message is displayed once every 8 hours.
     Code
       inform("bar", .frequency = "regularly", .frequency_id = as.character(runif(1)))
-    Message <rlang_message>
+    Message
       bar
       This message is displayed once every 8 hours.
     Code
       warn("foo", .frequency = "regularly", .frequency_id = as.character(runif(1)))
-    Warning <rlang_warning>
+    Condition
+      Warning:
       foo
       This warning is displayed once every 8 hours.
     Code
       warn("bar", .frequency = "regularly", .frequency_id = as.character(runif(1)))
-    Warning <rlang_warning>
+    Condition
+      Warning:
       bar
       This warning is displayed once every 8 hours.
 
@@ -63,19 +65,19 @@
     Output
       <error/rlang_error>
       Error in `abort()`:
-      ! `message` must be a character vector, not a <foo/rlang_error/error/condition> object.
+      ! `message` must be a character vector, not a <foo> object.
     Code
       (expect_error(inform(error_cnd("foo"))))
     Output
       <error/rlang_error>
       Error in `inform()`:
-      ! `message` must be a character vector, not a <foo/rlang_error/error/condition> object.
+      ! `message` must be a character vector, not a <foo> object.
     Code
       (expect_error(warn(class = error_cnd("foo"))))
     Output
       <error/rlang_error>
       Error in `warn()`:
-      ! `class` must be a character vector, not a <foo/rlang_error/error/condition> object.
+      ! `class` must be a character vector, not a <foo> object.
     Code
       (expect_error(abort("foo", call = base::call)))
     Output
@@ -87,10 +89,12 @@
 
     Code
       expect_equal(error_cnd(.subclass = "foo"), error_cnd("foo"))
-    Warning <lifecycle_warning_deprecated>
+    Condition
+      Warning:
       The `.subclass` argument of `error_cnd()` has been renamed to `class`.
     Code
       expect_error(abort("foo", .subclass = "bar"), class = "bar")
-    Warning <lifecycle_warning_deprecated>
+    Condition
+      Warning:
       The `.subclass` argument of `abort()` has been renamed to `class`.
 

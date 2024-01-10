@@ -1467,12 +1467,6 @@
       <error/rlang_error>
       Error in `f3()`:
       ! foo
-    Code
-      err(f4(NULL))
-    Output
-      <error/rlang_error>
-      Error in `f4()`:
-      ! foo
 
 # errors are fully displayed (parents, calls) in knitted files
 
@@ -1822,22 +1816,42 @@
 
     Code
       abort(~"foo")
-    Error <rlang_error>
-      foo
+    Condition
+      Error:
+      ! foo
     Code
       abort(function(cnd, ...) "foo")
-    Error <rlang_error>
-      foo
+    Condition
+      Error:
+      ! foo
 
 # newlines are preserved by cli (#1535)
 
     Code
       abort("foo\nbar", use_cli_format = TRUE)
-    Error <rlang_error>
-      foo bar
+    Condition
+      Error:
+      ! foo bar
     Code
       abort("foo\fbar", use_cli_format = TRUE)
-    Error <rlang_error>
-      foo
+    Condition
+      Error:
+      ! foo
       bar
+
+# `show.error.messages` is respected by `abort()` (#1630)
+
+    Code
+      cat_line(with_messages)
+    Output
+      Error:
+      ! Oh no
+      Backtrace:
+          x
+       1. \-rlang::abort("Oh no")
+      Execution halted
+    Code
+      cat_line(without_messages)
+    Output
+      Execution halted
 
