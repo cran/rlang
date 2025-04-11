@@ -1,6 +1,7 @@
 #include <rlang.h>
-#include "../internal/utils.h"
-#include "../internal/vec.h"
+#include "internal.h"
+#include "utils.h"
+#include "vec.h"
 
 // From rlang/vec.c
 void r_vec_poke_n(r_obj* x, r_ssize offset,
@@ -475,13 +476,6 @@ r_obj* ffi_env_poke_parent(r_obj* env, r_obj* new_parent) {
   return env;
 }
 
-r_obj* ffi_env_frame(r_obj* env) {
-  return FRAME(env);
-}
-r_obj* ffi_env_hash_table(r_obj* env) {
-  return HASHTAB(env);
-}
-
 r_obj* ffi_env_inherits(r_obj* env, r_obj* ancestor) {
   return r_lgl(r_env_inherits(env, ancestor, r_envs.empty));
 }
@@ -509,26 +503,6 @@ r_obj* ffi_env_bind_list(r_obj* env, r_obj* names, r_obj* data) {
   }
 
   return r_null;
-}
-
-r_obj* ffi_env_browse(r_obj* env, r_obj* value) {
-  if (r_typeof(env) != R_TYPE_environment) {
-    r_abort("`env` must be an environment.");
-  }
-  if (!r_is_bool(value)) {
-    r_abort("`value` must be a single logical value.");
-  }
-
-  r_obj* old = r_lgl(RDEBUG(env));
-  SET_RDEBUG(env, r_lgl_get(value, 0));
-  return old;
-}
-
-r_obj* ffi_env_is_browsed(r_obj* env) {
-  if (r_typeof(env) != R_TYPE_environment) {
-    r_abort("`env` must be an environment.");
-  }
-  return r_lgl(RDEBUG(env));
 }
 
 r_obj* ffi_ns_registry_env(void) {
@@ -806,23 +780,6 @@ r_obj* ffi_promise_value(r_obj* x, r_obj* env) {
   }
 }
 
-// Picks up symbols from parent environment to avoid bumping namedness
-// during promise resolution
-r_obj* ffi_named(r_obj* x, r_obj* env) {
-  int n_kept = 0;
-
-  x = PROTECT(Rf_findVarInFrame3(env, x, FALSE));
-  ++n_kept;
-
-  if (TYPEOF(x) == PROMSXP) {
-    x = PROTECT(Rf_eval(x, env));
-    ++n_kept;
-  }
-
-  UNPROTECT(n_kept);
-  return Rf_ScalarInteger(NAMED(x));
-}
-
 r_obj* ffi_find_var(r_obj* env, r_obj* sym) {
   return Rf_findVar(sym, env);
 }
@@ -1067,6 +1024,16 @@ r_obj* protect_missing(r_obj* x) {
   }
 }
 
+r_obj* ffi_has_private_accessors(void) {
+#ifdef RLANG_USE_PRIVATE_ACCESSORS
+  return r_true;
+#else
+  return r_false;
+#endif
+}
+
+#ifdef RLANG_USE_PRIVATE_ACCESSORS
+
 // [[ register() ]]
 r_obj* ffi_sexp_iterate(r_obj* x, r_obj* fn) {
   struct r_dyn_array* p_out = r_new_dyn_vector(R_TYPE_list, 256);
@@ -1125,3 +1092,5 @@ r_obj* ffi_sexp_iterate(r_obj* x, r_obj* fn) {
   FREE(3);
   return r_dyn_unwrap(p_out);
 }
+
+#endif

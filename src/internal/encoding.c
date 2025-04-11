@@ -32,7 +32,6 @@ r_obj* obj_encode_utf8(r_obj* x) {
   default: break;
   }
 
-  // For performance, avoid `KEEP()` / `FREE()` when not needed
   r_obj* attrib = r_attrib(x);
   if (attrib != r_null) {
     KEEP(x);
@@ -190,9 +189,10 @@ bool str_needs_encoding(r_obj* x) {
   return (!str_is_ascii_or_utf8(x)) && (x != NA_STRING);
 }
 
+#if (R_VERSION < R_Version(4, 5, 0))
+
 #define MASK_ASCII 8
 #define MASK_UTF8 64
-
 // The first 128 values are ASCII, and are the same regardless of the encoding.
 // Otherwise we enforce UTF-8.
 static inline
@@ -201,5 +201,11 @@ bool str_is_ascii_or_utf8(r_obj* x) {
   return (levels & MASK_ASCII) || (levels & MASK_UTF8);
 }
 
-#undef MASK_ASCII
-#undef MASK_UTF8
+#else
+
+static inline
+bool str_is_ascii_or_utf8(r_obj* x) {
+  return Rf_charIsUTF8(x);
+}
+
+#endif
