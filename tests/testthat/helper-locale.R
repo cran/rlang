@@ -18,15 +18,17 @@ get_lang_strings <- function() {
 
 get_native_lang_string <- function() {
   lang_strings <- get_lang_strings()
-  if (length(lang_strings$same) == 0)
+  if (length(lang_strings$same) == 0) {
     testthat::skip("No native language string available")
+  }
   lang_strings$same[[1L]]
 }
 
 get_alien_lang_string <- function() {
   lang_strings <- get_lang_strings()
-  if (length(lang_strings$different) == 0)
+  if (length(lang_strings$different) == 0) {
     testthat::skip("No alien language string available")
+  }
   lang_strings$different[[1L]]
 }
 
@@ -49,12 +51,7 @@ poke_locale_non_utf8 <- function() {
     return(NULL)
   }
 
-  tryCatch(
-    poke_ctype_locale("en_US.ISO8859-1"),
-    warning = function(...) {
-      testthat::skip("Cannot set latin-1 locale")
-    }
-  )
+  poke_ctype_locale("en_US.ISO8859-1")
 }
 
 with_latin1_locale <- function(expr) {
@@ -97,7 +94,10 @@ poke_ctype_locale <- function(x) {
   }
   # Workaround bug in Sys.setlocale()
   old <- Sys.getlocale("LC_CTYPE")
-  Sys.setlocale("LC_CTYPE", locale = x)
+  tryCatch(
+    Sys.setlocale("LC_CTYPE", locale = x),
+    warning = function(cnd) testthat::skip(sprintf("Can't set locale '%s'", x))
+  )
   invisible(old)
 }
 

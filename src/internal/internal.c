@@ -56,6 +56,7 @@ void rlang_init_internal(r_obj* ns) {
   rlang_init_cnd(ns);
   rlang_init_cnd_handlers(ns);
   rlang_init_dots(ns);
+  rlang_init_env();
   rlang_init_expr_interp();
   rlang_init_eval_tidy();
   rlang_init_fn();
@@ -228,7 +229,6 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_lof_info",                     (DL_FUNC) &ffi_lof_info, 1},
   {"ffi_lof_push_back",                (DL_FUNC) &ffi_lof_push_back, 1},
   {"ffi_lof_unwrap",                   (DL_FUNC) &ffi_lof_unwrap, 1},
-  {"ffi_mark_object",                  (DL_FUNC) &ffi_mark_object, 1},
   {"ffi_missing_arg",                  (DL_FUNC) &ffi_missing_arg, 0},
   {"ffi_names2",                       (DL_FUNC) &ffi_names2, 2},
   {"ffi_names_as_unique",              (DL_FUNC) &ffi_names_as_unique, 2},
@@ -267,7 +267,6 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_pairlist_rev",                 (DL_FUNC) &r_pairlist_rev, 1},
   {"ffi_peek_srcref",                  (DL_FUNC) &ffi_peek_srcref, 0},
   {"ffi_poke_attrib",                  (DL_FUNC) &r_poke_attrib, 2},
-  {"ffi_poke_type",                    (DL_FUNC) &ffi_poke_type, 2},
   {"ffi_precious_dict",                (DL_FUNC) &ffi_precious_dict, 0},
   {"ffi_preserve",                     (DL_FUNC) &ffi_preserve, 1},
   {"ffi_promise_env",                  (DL_FUNC) &ffi_promise_env, 2},
@@ -316,9 +315,7 @@ static const R_CallMethodDef r_callables[] = {
   {"ffi_test_stop_internal",           (DL_FUNC) &ffi_test_stop_internal, 1},
   {"ffi_test_sys_call",                (DL_FUNC) &ffi_test_sys_call, 1},
   {"ffi_test_sys_frame",               (DL_FUNC) &ffi_test_sys_frame, 1},
-  {"ffi_true_length",                  (DL_FUNC) &ffi_true_length, 1},
   {"ffi_unescape_character",           (DL_FUNC) &ffi_unescape_character, 1},
-  {"ffi_unmark_object",                (DL_FUNC) &ffi_unmark_object, 1},
   {"ffi_unpreserve",                   (DL_FUNC) &ffi_unpreserve, 1},
   {"ffi_use_local_precious_list",      (DL_FUNC) &ffi_use_local_precious_list, 1},
   {"ffi_vec_alloc",                    (DL_FUNC) &ffi_vec_alloc, 2},
@@ -346,6 +343,7 @@ static const R_ExternalMethodDef externals[] = {
   {"ffi_exec",                          (DL_FUNC) &ffi_exec, 2},
   {"ffi_tilde_eval",                    (DL_FUNC) &ffi_tilde_eval, 3},
   {"ffi_try_fetch",                     (DL_FUNC) &ffi_try_fetch, 1},
+  {"ffi_list2",                         (DL_FUNC) &ffi_list2, 0},
   {NULL, NULL, 0}
 };
 
@@ -387,8 +385,6 @@ void R_init_rlang(DllInfo* dll) {
   R_RegisterCCallable("rlang", "rlang_xxh3_64bits",            (DL_FUNC) &XXH3_64bits);
 
   // Maturing
-  R_RegisterCCallable("rlang", "rlang_env_dots_list",          (DL_FUNC) &rlang_env_dots_list);
-  R_RegisterCCallable("rlang", "rlang_env_dots_values",        (DL_FUNC) &rlang_env_dots_values);
   R_RegisterCCallable("rlang", "rlang_is_splice_box",          (DL_FUNC) &is_splice_box);
   R_RegisterCCallable("rlang", "rlang_obj_encode_utf8",        (DL_FUNC) &obj_encode_utf8);
   R_RegisterCCallable("rlang", "rlang_str_as_symbol",          (DL_FUNC) &r_str_as_symbol);
@@ -398,6 +394,10 @@ void R_init_rlang(DllInfo* dll) {
 
   // Experimental
   R_RegisterCCallable("rlang", "rlang_squash_if",              (DL_FUNC) &r_squash_if);
+
+  // Deprecated
+  R_RegisterCCallable("rlang", "rlang_env_dots_list",          (DL_FUNC) &rlang_env_dots_list);
+  R_RegisterCCallable("rlang", "rlang_env_dots_values",        (DL_FUNC) &rlang_env_dots_values);
 
   // Compatibility
   R_RegisterCCallable("rlang", "rlang_as_data_mask",           (DL_FUNC) &ffi_as_data_mask_compat);

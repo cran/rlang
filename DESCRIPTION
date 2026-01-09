@@ -1,5 +1,5 @@
 Package: rlang
-Version: 1.1.6
+Version: 1.1.7
 Title: Functions for Base Types and Core R and 'Tidyverse' Features
 Description: A toolbox for working with base types, core R features
   like the condition system, and core 'Tidyverse' features like tidy
@@ -20,21 +20,21 @@ Authors@R: c(
 License: MIT + file LICENSE
 ByteCompile: true
 Biarch: true
-Depends: R (>= 3.5.0)
+Depends: R (>= 4.0.0)
 Imports: utils
 Suggests: cli (>= 3.1.0), covr, crayon, desc, fs, glue, knitr,
         magrittr, methods, pillar, pkgload, rmarkdown, stats, testthat
         (>= 3.2.0), tibble, usethis, vctrs (>= 0.2.3), withr
 Enhances: winch
 Encoding: UTF-8
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 URL: https://rlang.r-lib.org, https://github.com/r-lib/rlang
 BugReports: https://github.com/r-lib/rlang/issues
 Config/build/compilation-database: true
 Config/testthat/edition: 3
 Config/Needs/website: dplyr, tidyverse/tidytemplate
 NeedsCompilation: yes
-Packaged: 2025-04-10 09:25:27 UTC; lionel
+Packaged: 2026-01-08 10:35:58 UTC; lionel
 Author: Lionel Henry [aut, cre],
   Hadley Wickham [aut],
   mikefc [cph] (Hash implementation based on Mike's xxhashlite),
@@ -42,4 +42,4 @@ Author: Lionel Henry [aut, cre],
   Posit, PBC [cph, fnd]
 Maintainer: Lionel Henry <lionel@posit.co>
 Repository: CRAN
-Date/Publication: 2025-04-11 08:40:10 UTC
+Date/Publication: 2026-01-09 12:10:02 UTC

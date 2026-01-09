@@ -87,9 +87,13 @@ test_that("control flow is deparsed", {
     })),
     c("function(a = 1, b = 2) {", "  3", "  4", "  5", "}")
   )
+  # fmt: skip
   expect_identical(while_deparse(quote(while (1) 2)), "while (1) 2")
+  # fmt: skip
   expect_identical(for_deparse(quote(for (a in 2) 3)), "for (a in 2) 3")
+  # fmt: skip
   expect_identical(repeat_deparse(quote(repeat 1)), "repeat 1")
+  # fmt: skip
   expect_identical(
     if_deparse(quote(
       if (1) 2 else {
@@ -267,7 +271,6 @@ test_that("operands are wrapped in parentheses to ensure correct predecence", {
   expect_identical_(sexp_deparse(expr((!!quote(1^2))^3)), "(1^2)^3")
 
   skip_on_cran()
-  skip_if(getRversion() < "4.0.0")
   expect_identical_(sexp_deparse(quote(function() 1?2)), "(function() 1) ? 2")
   expect_identical_(
     sexp_deparse(expr(!!quote(function() 1)?2)),
@@ -364,6 +367,7 @@ test_that("call_deparse() delimits CAR when needed", {
   expect_identical(call_deparse(call), "`+`(f)(x)")
   expect_identical(parse_expr(expr_deparse(call)), call)
 
+  # fmt: skip
   call <- expr((!!quote(while (TRUE) NULL))(x))
   expect_identical(call_deparse(call), "`while`(TRUE, NULL)(x)")
   expect_identical(parse_expr(expr_deparse(call)), call)
@@ -684,16 +688,14 @@ test_that("symbols with unicode are deparsed consistently (#691)", {
 
 test_that("formal parameters are backticked if needed", {
   expect_identical(
-    expr_deparse(function(`^`) {
-    }),
+    expr_deparse(function(`^`) {}),
     c("<function(`^`) { }>")
   )
 })
 
 test_that("empty blocks are deparsed on the same line", {
   expect_identical(
-    expr_deparse(quote({
-    })),
+    expr_deparse(quote({})),
     "{ }"
   )
 })
@@ -701,8 +703,7 @@ test_that("empty blocks are deparsed on the same line", {
 test_that("top-level S3 objects are deparsed", {
   skip_on_cran()
   f <- structure(
-    function() {
-    },
+    function() {},
     class = "lambda"
   )
   expect_identical(expr_deparse(f), "<lambda>")
@@ -739,6 +740,7 @@ test_that("as_label() supports special objects", {
   expect_identical(as_label(quo(foo)), "foo")
   expect_identical(as_label(quo(foo(!!quo(bar)))), "foo(bar)")
   expect_identical(as_label(~foo), "~foo")
+  expect_identical(as_label(call("{", quote({x}))), "{ ... }")
   expect_identical(as_label(NULL), "NULL")
 })
 
@@ -844,6 +846,8 @@ test_that("backslashes in strings are properly escaped (#1160)", {
 })
 
 test_that("formulas are deparsed (#1169)", {
+  skip_if_not_installed("pillar")
+
   # Evaluated formulas are treated as objects
   expect_equal(
     expr_deparse(~foo),
@@ -868,6 +872,8 @@ test_that("formulas are deparsed (#1169)", {
 })
 
 test_that("matrices and arrays are formatted (#383)", {
+  skip_if_not_installed("pillar")
+
   mat <- matrix(1:3)
   expect_equal(as_label(mat), "<int[,1]>")
   expect_equal(expr_deparse(mat), "<int[,1]: 1L, 2L, 3L>")

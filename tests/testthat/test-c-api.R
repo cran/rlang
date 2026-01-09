@@ -83,9 +83,30 @@ test_that("r_which_operator() returns correct tokens", {
   expect_identical(call_parse_type(quote(?a)), "?unary")
   expect_identical(call_parse_type(quote(a?b)), "?")
 
-  expect_identical(call_parse_type(quote(while (a) b)), "while")
-  expect_identical(call_parse_type(quote(for (a in b) b)), "for")
-  expect_identical(call_parse_type(quote(repeat a)), "repeat")
+  expect_identical(
+    call_parse_type(quote(
+      while (a) {
+        b
+      }
+    )),
+    "while"
+  )
+  expect_identical(
+    call_parse_type(quote(
+      for (a in b) {
+        b
+      }
+    )),
+    "for"
+  )
+  expect_identical(
+    call_parse_type(quote(
+      repeat {
+        a
+      }
+    )),
+    "repeat"
+  )
   expect_identical(call_parse_type(quote(if (a) b)), "if")
   expect_identical(call_parse_type(quote(break)), "break")
   expect_identical(call_parse_type(quote(next)), "next")
@@ -839,10 +860,42 @@ test_that("can shrink vectors", {
   expect_equal(out, as.list(1:2))
 
   # Uses truelength to modify in place on recent R
-  if (getRversion() >= "3.4.0") {
+  if (getRversion() >= "3.4.0" && getRversion() < "4.6.0") {
     expect_equal(x_atomic, 1:2)
     expect_equal(x_list, as.list(1:2))
   }
+})
+
+test_that("can grow vectors allocated with vec_alloc()", {
+  x <- vec_alloc("integer", 3L)
+  x[1:3] <- 1:3
+  out <- vec_resize(x, 5)
+  expect_length(out, 5)
+  expect_equal(x, 1:3)
+  expect_equal(out[1:3], x)
+
+  x <- vec_alloc("list", 3L)
+  x[[1]] <- 1
+  x[[2]] <- 2
+  x[[3]] <- 3
+  out <- vec_resize(x, 5)
+  expect_length(out, 5)
+  expect_equal(x[[1]], 1)
+  expect_equal(out[1:3], x[1:3])
+})
+
+test_that("can shrink vectors allocated with vec_alloc()", {
+  x_atomic <- vec_alloc("integer", 3L)
+  x_atomic[1:3] <- 1:3
+  out <- vec_resize(x_atomic, 2)
+  expect_equal(out, 1:2)
+
+  x_list <- vec_alloc("list", 3L)
+  x_list[[1]] <- 1
+  x_list[[2]] <- 2
+  x_list[[3]] <- 3
+  out <- vec_resize(x_list, 2)
+  expect_equal(out, list(1, 2))
 })
 
 test_that("can grow and shrink dynamic arrays", {
