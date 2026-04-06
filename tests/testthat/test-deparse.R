@@ -385,11 +385,6 @@ test_that("literal functions are deparsed", {
   )
 })
 
-test_that("literal dots are deparsed", {
-  dots <- (function(...) env_get(, "..."))(NULL)
-  expect_identical_(sexp_deparse(expr(foo(!!dots))), "foo(<...>)")
-})
-
 test_that("environments are deparsed", {
   expect_identical(sexp_deparse(expr(foo(!!env()))), "foo(<environment>)")
 })

@@ -85,7 +85,7 @@ search_envs <- function() {
 #' @rdname search_envs
 #' @export
 search_env <- function(name) {
-  check_name(name)
+  check_string(name, allow_empty = FALSE)
 
   if (!is_attached(name)) {
     abort(paste_line(
@@ -343,15 +343,14 @@ env_label <- function(env) {
 }
 
 #' Return the namespace registry env
-#'
-#' Note that the namespace registry does not behave like a normal
-#' environment because the parent is `NULL` instead of the empty
-#' environment. This is exported for expert usage in development tools
-#' only.
-#'
+#' @description
+#' `r lifecycle::badge("defunct")`
 #' @keywords internal
 #' @export
 ns_registry_env <- function() {
+  if (getRversion() >= "4.6") {
+    deprecate_stop("`ns_registry_env()` is defunct.")
+  }
   .Call(ffi_ns_registry_env)
 }
 

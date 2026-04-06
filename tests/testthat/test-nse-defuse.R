@@ -492,6 +492,27 @@ test_that("enquo() works with lexically scoped arguments", {
   expect_identical(capture(foo), quo(foo))
 })
 
+test_that("enquo(..N) works with lexically scoped dots", {
+  capture <- function(...) {
+    eval_bare(quote(enquo(..1)), child_env(env()))
+  }
+  caller_env <- current_env()
+  result <- capture(foo)
+  expect_equal(quo_get_expr(result), quote(foo))
+  expect_identical(quo_get_env(result), caller_env)
+})
+
+test_that("enquo() follows ..N through lexically scoped env", {
+  capture <- function(x) enquo0(x)
+  fn <- function(...) {
+    eval_bare(quote(capture(..1)), child_env(env()))
+  }
+  caller_env <- current_env()
+  result <- fn(x + y)
+  expect_equal(quo_get_expr(result), quote(x + y))
+  expect_identical(quo_get_env(result), caller_env)
+})
+
 test_that("closures are captured with their calling environment", {
   expect_reference(quo_get_env(quo(!!function() NULL)), environment())
 })
@@ -701,6 +722,45 @@ test_that("can capture forced numbered dot", {
   expect_equal(fn(1 + 1), quo(2))
 })
 
+test_that("enquo() returns literal when ..N chain hits forced promise", {
+  inner <- function(...) enquo(..1)
+  outer <- function(...) {
+    force(..1)
+    inner(..1)
+  }
+  expect_equal(outer(1 + 1), quo(2))
+
+  inner <- function(...) enquos(...)
+  outer <- function(...) {
+    force(..1)
+    inner(..1)
+  }
+  expect_equal(outer(1 + 1), quos(2))
+})
+
+test_that("enquo() returns literal when ..N chain hits value dot", {
+  # The compiler unwraps literals from promises, creating DOT_TYPE_value dots
+  inner <- function(...) enquo(..1)
+  outer <- function(...) inner(..1)
+  wrapper <- compiler::cmpfun(function() outer("hello"))
+  expect_equal(wrapper(), quo("hello"))
+
+  inner <- function(...) enquos(...)
+  outer <- function(...) inner(..1)
+  wrapper <- compiler::cmpfun(function() outer("hello"))
+  expect_equal(wrapper(), quos("hello"))
+})
+
+test_that("enquo() returns missing arg when ..N chain hits missing arg", {
+  inner <- function(...) enquo(..1)
+  outer <- function(...) inner(..1)
+  expect_equal(outer(, 1), quo())
+
+  inner <- function(...) enquos(...)
+  outer <- function(...) inner(..1)
+  expect_equal(outer(, 1), quos())
+})
+
 test_that("`enexprs()` and variants support `.named = NULL` (#1223)", {
   fn <- function(...) enexprs(..., .named = NULL)
   expect_equal(fn(), list())
@@ -745,4 +805,29 @@ test_that("embraced empty arg are detected consistently (#1421)", {
 
   expect_equal(fn_quos(.ignore_empty = "trailing"), quos())
   expect_equal(fn_enquos(.ignore_empty = "trailing"), quos())
+})
+
+test_that("enquos() returns literal values for forced bindings from S3 dispatch (#1886)", {
+  `+.myclass` <- function(lhs, rhs) {
+    qs <- enquos(lhs, rhs)
+    list(
+      lhs_expr = quo_get_expr(qs[[1]]),
+      rhs_expr = quo_get_expr(qs[[2]]),
+      lhs_env = quo_get_env(qs[[1]]),
+      rhs_env = quo_get_env(qs[[2]])
+    )
+  }
+
+  a <- structure(1, class = "myclass")
+  b <- structure(2, class = "myclass")
+
+  out <- a + b
+
+  # Primitive S3 dispatch pre-evaluates arguments via SET_PRVALUE(),
+  # making the bindings forced. Forced bindings have no environment,
+  # so enquos() returns the literal values in empty-env quosures.
+  expect_identical(out$lhs_expr, a)
+  expect_identical(out$rhs_expr, b)
+  expect_identical(out$lhs_env, empty_env())
+  expect_identical(out$rhs_env, empty_env())
 })

@@ -1,3 +1,19 @@
+# rlang 1.2.0
+
+* rlang and tidyeval are now fully backed by official C APIs of R!
+  Thanks to the R core team for collaborating with us on this.
+
+* `ns_registry_env()` is defunct in R >= 4.6.0 for compliance with the C API of R.
+
+* New type-checking functions exported from rlang: `check_bool()`,
+  `check_string()`, `check_name()`, `check_number_decimal()`,
+  `check_number_whole()`, and `check_data_frame()`. These were
+  previously only available via the `standalone-types-check.R`
+  standalone file. `stop_input_type()` is also now exported.
+
+* Fixed a protection issue discovered by rchk (#1865).
+
+
 # rlang 1.1.7
 
 * Progress towards making rlang conformant with the public C API of R.

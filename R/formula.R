@@ -137,7 +137,7 @@ f_rhs <- function(f) {
     signal_formula_access()
     return(quo_set_expr(x, value))
   }
-  check_formula(x, arg = "LHS")
+  check_formula(x, allow_unevaluated = TRUE, arg = "LHS")
   x[[length(x)]] <- value
   x
 }
@@ -159,7 +159,7 @@ f_lhs <- function(f) {
     signal_formula_access()
     abort("Can't set the LHS of a quosure.")
   }
-  check_formula(x, arg = "LHS")
+  check_formula(x, allow_unevaluated = TRUE, arg = "LHS")
 
   if (length(x) < 3) {
     x <- duplicate(x)
@@ -178,7 +178,9 @@ f_env <- function(f) {
     signal_formula_access()
     return(quo_get_env(f))
   }
-  check_formula(f)
+  if (!is_formula(f)) {
+    check_formula(f)
+  }
   attr(f, ".Environment")
 }
 
