@@ -5,11 +5,9 @@
 
 static int dotDotVal(r_obj* sym);
 
-
 // Capture implementation ---
 
-static
-r_obj* new_captured_arg(r_obj* x, r_obj* env) {
+static r_obj* new_captured_arg(r_obj* x, r_obj* env) {
     static r_obj* nms = NULL;
     if (!nms) {
         nms = r_alloc_character(2);
@@ -28,13 +26,11 @@ r_obj* new_captured_arg(r_obj* x, r_obj* env) {
     return info;
 }
 
-static
-r_obj* new_captured_literal(r_obj* x) {
+static r_obj* new_captured_literal(r_obj* x) {
     return new_captured_arg(x, r_envs.empty);
 }
 
-static
-r_obj* capture_delayed(r_obj* expr, r_obj* expr_env) {
+static r_obj* capture_delayed(r_obj* expr, r_obj* expr_env) {
     // Follow ..N references. This is the main difference with the accessors
     // from the R API which do follow promises but not individual `..N`
     // references.
@@ -78,24 +74,21 @@ r_obj* capture_delayed(r_obj* expr, r_obj* expr_env) {
     return new_captured_arg(expr, expr_env);
 }
 
-static
-r_obj* env_dot_delayed_capture(r_obj* env, r_ssize i) {
+static r_obj* env_dot_delayed_capture(r_obj* env, r_ssize i) {
     return capture_delayed(
         r_env_dot_delayed_expr(env, i),
         r_env_dot_delayed_env(env, i)
     );
 }
 
-static
-r_obj* env_binding_delayed_capture(r_obj* env, r_obj* sym) {
+static r_obj* env_binding_delayed_capture(r_obj* env, r_obj* sym) {
     return capture_delayed(
         r_env_binding_delayed_expr(env, sym),
         r_env_binding_delayed_env(env, sym)
     );
 }
 
-r_obj* rlang_capturearginfo(r_obj* call, r_obj* op, r_obj* args, r_obj* rho)
-{
+r_obj* rlang_capturearginfo(r_obj* call, r_obj* op, r_obj* args, r_obj* rho) {
     enum r_env_binding_type arg_type = r_env_binding_type(rho, r_sym("arg"));
 
     // May be a literal if compiler did not wrap in a promise
@@ -241,16 +234,12 @@ r_obj* capturedots(r_obj* frame) {
     return r_node_cdr(out);
 }
 
-r_obj* rlang_capturedots(r_obj* call, r_obj* op, r_obj* args, r_obj* rho)
-{
+r_obj* rlang_capturedots(r_obj* call, r_obj* op, r_obj* args, r_obj* rho) {
     r_obj* caller_env = r_node_car(args);
     return capturedots(caller_env);
 }
 
-
-static
-int dotDotVal(r_obj* sym)
-{
+static int dotDotVal(r_obj* sym) {
     if (r_typeof(sym) != R_TYPE_symbol) {
         return 0;
     }

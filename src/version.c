@@ -1,7 +1,7 @@
 #define R_NO_REMAP
 #include <Rinternals.h>
 
-const char* rlang_version = "1.2.0";
+const char* rlang_version = "1.3.0";
 
 /**
  * This file records the expected package version in the shared
@@ -23,5 +23,5 @@ const char* rlang_version = "1.2.0";
 
 // [[ register() ]]
 SEXP rlang_linked_version(void) {
-  return Rf_mkString(rlang_version);
+    return Rf_mkString(rlang_version);
 }
